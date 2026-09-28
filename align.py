@@ -7,8 +7,9 @@ Steps:
   2. bowtie2         : align unpaired reads to the index
   3. samtools sort   : sort the alignments into a BAM file
   4. samtools index  : index the sorted BAM
-  5. samtools depth  : per-position depth
-  6. matplotlib      : depth plot (PNG)
+  5. samtools fastq  : FASTQ of the aligned reads (<reads-prefix>_aligned.fastq)
+  6. samtools depth  : per-position depth
+  7. matplotlib      : depth plot (PNG)
 
 Usage:
   python align.py -U reads.fastq -V virus.fasta [-o outprefix] [-t threads]
@@ -34,6 +35,18 @@ def check_tools(tools):
     missing = [t for t in tools if shutil.which(t) is None]
     if missing:
         sys.exit("ERROR: required tool(s) not found on PATH: " + ", ".join(missing))
+
+
+def reads_prefix(fastq_path):
+    """Strip .gz and .fastq/.fq from a reads file path, keeping its directory."""
+    prefix = fastq_path
+    if prefix.endswith(".gz"):
+        prefix = prefix[:-3]
+    for ext in (".fastq", ".fq"):
+        if prefix.endswith(ext):
+            prefix = prefix[: -len(ext)]
+            break
+    return prefix
 
 
 def main():
@@ -62,6 +75,7 @@ def main():
     bam = prefix + ".sorted.bam"
     depth_txt = prefix + ".depth.txt"
     plot_png = prefix + ".depth.png"
+    aligned_fastq = reads_prefix(args.unpaired) + "_aligned.fastq"
     threads = str(args.threads)
 
     # 1. Build the bowtie2 index
@@ -77,13 +91,18 @@ def main():
     # 4. Index the BAM
     run(["samtools", "index", bam])
 
-    # 5. Compute per-position depth (-a reports positions with zero depth too)
+    # 5. Write a FASTQ of the reads that aligned (-F 4 excludes unmapped reads)
+    run(["samtools", "fastq", "-@", threads, "-F", "4", "-0", aligned_fastq, bam],
+        stdout=subprocess.DEVNULL)
+
+    # 6. Compute per-position depth (-a reports positions with zero depth too)
     with open(depth_txt, "w") as fh:
         run(["samtools", "depth", "-a", bam], stdout=fh)
 
-    # 6. Plot
+    # 7. Plot
     plot_depth(depth_txt, plot_png, title=os.path.basename(args.virus))
-    print(f"Done. Sorted BAM: {bam}\nDepth table: {depth_txt}\nDepth plot: {plot_png}")
+    print(f"Done. Sorted BAM: {bam}\nAligned reads: {aligned_fastq}\n"
+          f"Depth table: {depth_txt}\nDepth plot: {plot_png}")
 
 
 def plot_depth(depth_txt, plot_png, title=""):
