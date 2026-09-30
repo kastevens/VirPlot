@@ -28,6 +28,10 @@ Both plots are **aligned on a shared x-axis** and exported as vector-format grap
 
 ---
 
+Annotation-track drawing conventions follow the ICTV 9th Report family figures; see [`docs/ictv_drawing_conventions.md`](docs/ictv_drawing_conventions.md) for the spec and the staged implementation plan.
+
+---
+
 ## Installation
 
 Requires Python 3.9+.
