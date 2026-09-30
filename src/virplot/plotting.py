@@ -309,6 +309,11 @@ class LinearPlotter(Plotter):
         / ``−1 FS`` at the junction, outside the box on its far side.
         Readthrough: the extension sits on its partner's side; draw a thin bar
         at the read-through stop and write ``RT`` beside it.
+
+        LIMIT: these marks exist in the linear layout only. ``CircularPlotter``
+        places frameshift and readthrough ORFs correctly (the nesting rule does
+        not care how an ORF is reached) but draws no ``FS``/``RT`` text; see
+        the note in its ``_draw_annotations``.
         """
         if feat.mechanism not in ("frameshift", "readthrough"):
             return
@@ -479,6 +484,13 @@ class CircularPlotter(Plotter):
         the circle, run clockwise for virion-sense ORFs and anticlockwise for
         complementary-sense ones (so each half of a geminivirus circle carries
         one strand), and an arc overlapping one already placed nests inward.
+
+        LIMIT: ``Feature.mechanism`` is not drawn here. A frameshift or
+        readthrough ORF is nested like any other arc, but the ``+1 FS`` /
+        ``RT`` marks that ``LinearPlotter._draw_mechanism`` writes have no
+        circular counterpart yet — the junction would need a radial tick and a
+        label placed clear of the arc labels. Rare on circular genomes (the
+        ICTV circular figures show none), so deferred.
         """
         args = self.args
         extra: list = []

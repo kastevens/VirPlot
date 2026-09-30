@@ -166,13 +166,26 @@ def _strip_attrs(f: Feature) -> Feature:
 
 
 def _shift_between(prev: Feature, start: int, end: int, forward: bool) -> int:
-    """Frameshift sign from the join geometry: skipping 1 nt is +1, re-reading 1 nt is -1."""
+    """Frameshift sign from the join geometry: skipping 1 nt is +1, re-reading 1 nt is -1.
+
+    LIMIT: this is inference, not annotation. It is exactly right for a RefSeq
+    join, whose segment boundaries are the slippage site, but a hand-written
+    pair whose coordinates do not reflect the slip (say, ORF1b written from
+    its first full codon) will get a wrong or zero sign. A ``Note=`` with an
+    explicit ``+1``/``-1`` overrides this (see ``_features_from_rows``);
+    docs/GFF_GUIDE.md section 8 tells authors to write one in that case.
+    """
     gap = (start - prev.end - 1) if forward else (prev.start - end - 1)
     return {1: 1, 2: -1}.get(gap % 3, 0)
 
 
 def _shift_from_neighbour(f: Feature, feats: list[Feature]) -> int | None:
-    """For a Note=frameshift row with no sign given: infer it from the nearest upstream ORF."""
+    """For a Note=frameshift row with no sign given: infer it from the nearest upstream ORF.
+
+    Same LIMIT as ``_shift_between``: correct only when the two ORFs' coordinates
+    meet at the slippage site. Returns None (drawn as a bare ``FS``) when no
+    upstream ORF is found or the gap is a multiple of three.
+    """
     same = [g for g in feats if g is not f and g.strand == f.strand]
     if f.forward:
         ups = [g for g in same if g.end <= f.start + 2]
