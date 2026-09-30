@@ -1146,7 +1146,7 @@ z
    </g>
    <g id="FillBetweenPolyCollection_1">
     <defs>
-     <path id="madb01447de" d="M 48.07596 -33.95625 
+     <path id="m080a18a12f" d="M 48.07596 -33.95625 
 L 48.07596 -33.95625 
 L 48.119219 -33.95625 
 L 48.162477 -33.95625 
@@ -32112,7 +32112,7 @@ z
 "/>
     </defs>
     <g clip-path="url(#p595c7da65e)">
-     <use xlink:href="#madb01447de" x="0" y="293.135" style="fill: #0077cc; fill-opacity: 0.55"/>
+     <use xlink:href="#m080a18a12f" x="0" y="293.135" style="fill: #0077cc; fill-opacity: 0.9"/>
     </g>
    </g>
    <g id="matplotlib.axis_1">
@@ -36156,7 +36156,7 @@ L 715.729323 251.635893
 L 715.902357 259.17875 
 L 717.67596 259.17875 
 L 717.67596 259.17875 
-" clip-path="url(#p595c7da65e)" style="fill: none; stroke: #000000; stroke-opacity: 0.85; stroke-width: 0.35; stroke-linecap: square"/>
+" clip-path="url(#p595c7da65e)" style="fill: none; stroke: #000000; stroke-opacity: 0.8; stroke-width: 0.3; stroke-linecap: square"/>
    </g>
    <g id="patch_12">
     <path d="M 48.07596 259.17875 

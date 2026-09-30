@@ -35,8 +35,11 @@ ORF_LABEL_FONTSIZE = 7          # ORF name written outside the glyph
 LABEL_PAD_FRACTION = 0.02
 SMALL_FEATURE_THRESHOLD = 500  # bp; features shorter than this get external labels
 SMOOTH_WINDOW = 15
-DEPTH_OUTLINE = dict(color="black", linewidth=0.35, alpha=0.85)  # thin black trace, as the original figure
-DEPTH_FILL_ALPHA = 0.55
+# Depth trace, measured from the original README figure: a ~0.3 pt black line
+# at alpha ~0.8 over fills at alpha 0.9 (the stacked layers have always used 0.9;
+# a single sample now matches one layer instead of a paler wash).
+DEPTH_OUTLINE = dict(color="black", linewidth=0.3, alpha=0.8)
+DEPTH_FILL_ALPHA = 0.9
 Y_HEADROOM = 1.05
 PNG_DPI = 400
 FIGURE_WIDTH = 12

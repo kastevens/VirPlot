@@ -3,6 +3,7 @@
 # Run from the repository root:  sh docs/make_figures.sh
 set -e
 out=docs/figures
+rm -f "$out"/*.svg          # virplot never overwrites, so clear the old set first
 virplot -g examples/byv.gff3  -d examples/byv.sam  -y examples/byv.yml  -f svg --title -o "$out" --name byv_linear
 virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml -f svg --title --legend -o "$out" --name grbv_linear
 virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml -f svg --title --legend --layout circular -o "$out" --name grbv_circular

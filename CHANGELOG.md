@@ -82,10 +82,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   figure's palette) BYV now matches Closteroviridae Fig 2 on every ORF.
 - Circular arcs and their arrowheads are one path each, removing the
   hairline seam between body and head.
-- Depth trace restyled to match the original figure: a thin black outline
-  (0.35 pt) over a solid fill in `depth_line_color`, in both layouts, instead
-  of a heavier coloured line over a pale fill; the legend swatch now shows
-  the fill colour.
+- Depth trace restyled to match the original figure, whose values were
+  measured from its pixels: a 0.3 pt black outline at alpha 0.8 over a fill
+  at alpha 0.9 in `depth_line_color`, in both layouts, instead of a heavier
+  coloured line over a pale fill; the legend swatch now shows the fill colour.
+  `examples/spec.yml` takes the original figure's depth palette, recovered
+  from the same measurement (`#567eb0`, `#55b9d9`, `#85dbec`).
 - SVG and PDF output is reproducible: no embedded timestamp, and element
   ids are hashed from the output name, so regenerating an unchanged figure
   gives a byte-identical file. `docs/make_figures.sh` regenerates the
