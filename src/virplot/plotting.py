@@ -496,22 +496,31 @@ class CircularPlotter(Plotter):
         extra: list = []
         L = rna.length
 
-        # the genome circle
-        theta = np.linspace(0, 2 * np.pi, 361)
-        ax.plot(theta, np.full_like(theta, CIRC_R_BASELINE), color="black",
-                linewidth=1.0, zorder=2)
-
         placements, _ = self._placements(rna, circular=True)
         deepest = max((p.tier for p in placements), default=0)
         if deepest >= CIRC_MAX_TIERS:
             log.warning("%d nesting levels needed but only %d fit; deepest arcs are "
                         "drawn on the innermost lane", deepest + 1, CIRC_MAX_TIERS)
         deepest = min(deepest, CIRC_MAX_TIERS - 1)
-        # the innermost tier in use sits just outside the circle; tier 0 is the
-        # outermost, so "AC4 inside AC1" reads as the ICTV figures draw it
-        lane0 = CIRC_R_BASELINE + 0.02 + deepest * CIRC_LANE_STEP
+        # The innermost tier in use is anchored to the genome circle; tier 0 is
+        # the outermost, so "AC4 inside AC1" reads as the ICTV figures draw it.
+        #   outside   : arcs sit just outside the circle (default; the depth
+        #               ring occupies the inside, so nesting cannot go there)
+        #   on_circle : the innermost arcs straddle the circle line, as in the
+        #               Begomovirus / Mastrevirus figures where the arcs *are*
+        #               the genome
+        if self.settings.circular_arcs == "on_circle":
+            innermost = CIRC_R_BASELINE - CIRC_ANN_HEIGHT / 2
+        else:
+            innermost = CIRC_R_BASELINE + 0.02
+        lane0 = innermost + deepest * CIRC_LANE_STEP
         self._ring_top = lane0 + CIRC_ANN_HEIGHT
         self._outside_label_r = self._ring_top + 0.03
+
+        # the genome circle, under the arcs
+        theta = np.linspace(0, 2 * np.pi, 361)
+        ax.plot(theta, np.full_like(theta, CIRC_R_BASELINE), color="black",
+                linewidth=1.0, zorder=2)
 
         for pl in placements:
             feat = pl.feature
@@ -527,10 +536,14 @@ class CircularPlotter(Plotter):
                 ax.fill(th, r, facecolor=color, edgecolor="none", zorder=3)
 
             if not args.no_label:
-                extra.append(self._label_feature(ax, rna, feat, lane, spans))
-                if feat.gene:
-                    extra.append(self._label_outside(ax, rna, feat.gene, spans,
-                                                     fontsize=ORF_LABEL_FONTSIZE))
+                if self.settings.circular_labels == "horizontal":
+                    text = f"{feat.gene} ({feat.product})" if feat.gene else feat.product
+                    extra.append(self._label_horizontal(ax, rna, text, spans, tier))
+                else:
+                    extra.append(self._label_feature(ax, rna, feat, lane, spans))
+                    if feat.gene:
+                        extra.append(self._label_outside(ax, rna, feat.gene, spans,
+                                                         fontsize=ORF_LABEL_FONTSIZE))
 
         # origin at 12 o'clock: a dashed radius through the depth band and a
         # stem-loop icon for the intergenic region / origin of replication
@@ -569,6 +582,36 @@ class CircularPlotter(Plotter):
             th = np.concatenate([outer, inner, [b0, th0, b0]])
             r = np.concatenate([np.full(n, r_out), np.full(n, r_in), [r_lo, r_mid, r_hi]])
         return th, r
+
+    def _label_horizontal(self, ax, rna: RNA, text: str, spans, tier: int = 0):
+        """Level text just outside the ring, anchored on the side facing the arc.
+
+        The ICTV circular figures write every label horizontally, outside the
+        ring, in the form ``AV1 (CP)``; nested arcs are labelled inside the
+        circle there, which the depth ring rules out here, so all go outside.
+        A nested arc shares its mid-angle with the arc it nests in, so its
+        label is stepped one line away from the circle's equator per tier
+        (upwards in the top half, downwards in the bottom half) instead of
+        overprinting.
+        """
+        covered = sum(e - s + 1 for s, e in spans)
+        mid = ((spans[0][0] - 1 + covered / 2) % rna.length) + 1
+        theta = float(self._theta(mid, rna.length))
+        deg = np.degrees(theta) % 360                     # 0 = top, clockwise
+        if deg < 15 or deg > 345:
+            ha, va = "center", "bottom"
+        elif 165 < deg < 195:
+            ha, va = "center", "top"
+        elif deg < 180:
+            ha, va = "left", "center"
+        else:
+            ha, va = "right", "center"
+        line = self.settings.annotation_fontsize * 1.4          # points
+        dy = tier * line * (1 if deg < 90 or deg > 270 else -1)
+        return ax.annotate(text, xy=(theta, self._outside_label_r + 0.01),
+                           xytext=(0, dy), textcoords="offset points", ha=ha, va=va,
+                           fontsize=self.settings.annotation_fontsize,
+                           annotation_clip=False, zorder=5)
 
     def _label_outside(self, ax, rna: RNA, text: str, spans, fontsize: int):
         """Radial text just outside the arc ring, reading outwards."""

@@ -91,7 +91,7 @@ def test_close_repeats_first_sample_at_two_pi():
 
 def circular_rna(length=300, features=(), depth=None):
     rna = RNA(name="c", seqid="c", length=length, circular=True,
-              features=[Feature(*f) for f in features])
+              features=[Feature(*f) for f in features])   # (start, end, strand, product[, gene])
     rna.add_depth("s", np.full(length, 10) if depth is None else depth)
     return rna
 
@@ -182,3 +182,50 @@ def test_layout_auto_follows_topology(tmp_path):
 def test_layout_circular_works_on_a_linear_genome(tmp_path):
     run(tmp_path, "sample.gff3", "sample.dep", "spec.yml", "--layout", "circular")
     assert os.listdir(tmp_path) == ["out.svg"]
+
+
+# --- ICTV-style options: horizontal labels, arcs on the circle -------------
+
+def test_settings_circular_style_keys(tmp_path):
+    from virplot.settings import load_settings
+    y = tmp_path / "s.yml"
+    y.write_text("circular_labels: HORIZONTAL\ncircular_arcs: on_circle\n")
+    s = load_settings(str(y))
+    assert (s.circular_labels, s.circular_arcs) == ("horizontal", "on_circle")
+    y.write_text("circular_labels: sideways\ncircular_arcs: inside\n")
+    s = load_settings(str(y))
+    assert (s.circular_labels, s.circular_arcs) == ("tangential", "outside")   # defaults on bad values
+
+
+def test_horizontal_labels_are_level_and_name_the_orf():
+    rna = circular_rna(features=[(10, 120, "+", "CP", "V1"), (150, 250, "-", "Rep", "C1")])
+    fig = plt.figure(); ax = fig.add_subplot(projection="polar")
+    p = CircularPlotter(Settings(circular_labels="horizontal"), make_args())
+    p._draw_annotations(ax, rna)
+    labels = [t for t in ax.texts if "(" in t.get_text()]
+    assert sorted(t.get_text() for t in labels) == ["C1 (Rep)", "V1 (CP)"]
+    assert all(t.get_rotation() == 0 for t in labels)
+    plt.close(fig)
+
+
+def test_nested_arc_label_is_offset_not_overprinted():
+    # C3 nests inside C1 and shares its mid-angle
+    rna = circular_rna(features=[(2250, 3044, "-", "Rep", "C1"), (2408, 2890, "-", "REn", "C3")], length=3206)
+    fig = plt.figure(); ax = fig.add_subplot(projection="polar")
+    p = CircularPlotter(Settings(circular_labels="horizontal"), make_args())
+    p._draw_annotations(ax, rna)
+    offsets = {t.get_text(): t.xyann for t in ax.texts if "(" in t.get_text()}
+    assert offsets["C1 (Rep)"][1] == 0 and offsets["C3 (REn)"][1] != 0
+    plt.close(fig)
+
+
+def test_on_circle_puts_innermost_lane_astride_the_baseline():
+    from virplot.plotting import CIRC_R_BASELINE, CIRC_ANN_HEIGHT
+    rna = circular_rna(features=[(10, 120, "+", "CP")])
+    for mode, expect_top in (("outside", CIRC_R_BASELINE + 0.02 + CIRC_ANN_HEIGHT),
+                             ("on_circle", CIRC_R_BASELINE + CIRC_ANN_HEIGHT / 2)):
+        fig = plt.figure(); ax = fig.add_subplot(projection="polar")
+        p = CircularPlotter(Settings(circular_arcs=mode), make_args())
+        p._draw_annotations(ax, rna)
+        assert p._ring_top == pytest.approx(expect_top), mode
+        plt.close(fig)

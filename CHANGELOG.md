@@ -10,6 +10,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **ICTV-style circular options.** `circular_labels: horizontal` writes every
+  arc label level, outside the ring, as `ORF (product)`; a nested arc's label
+  steps one line away from the equator per tier so it does not overprint.
+  `circular_arcs: on_circle` sets the innermost arcs astride the genome
+  circle instead of just outside it. Both default off; `examples/grbv_ictv.yml`
+  and `docs/figures/grbv_circular_ictv.svg` show them.
 - **Frameshift and readthrough.** A RefSeq CDS split over several rows with
   `exception=ribosomal slippage` is drawn as one box per segment, each
   continuation flipped across the line and labelled `+1 FS` / `−1 FS` (sign

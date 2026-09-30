@@ -14,7 +14,11 @@ _KNOWN_KEYS = {
     "color_mapping", "default_color", "depth_line_color", "shade_color",
     "annotation_fontsize", "stacked_area_colors", "legend_location", "title",
     "overlap_mode", "end_5_label", "end_3_label", "function_palette",
+    "circular_labels", "circular_arcs",
 }
+
+CIRCULAR_LABELS = ("tangential", "horizontal")
+CIRCULAR_ARCS = ("outside", "on_circle")
 
 OVERLAP_MODES = ("auto", "flip", "tier")
 
@@ -86,6 +90,9 @@ class Settings:
     end_3_label: str = "3'"              # e.g. "3' OH", "A(n)"
     function_palette: dict[str, str] = field(
         default_factory=lambda: dict(DEFAULT_FUNCTION_PALETTE))
+    # circular layout style (ICTV figures: horizontal labels, arcs on the circle)
+    circular_labels: str = "tangential"      # tangential | horizontal
+    circular_arcs: str = "outside"           # outside | on_circle
 
     def feature_color(self, product: str) -> str:
         """Colour for a product: explicit mapping, then function class, then default.
@@ -124,6 +131,13 @@ def load_settings(yaml_path: str) -> Settings:
     palette = dict(DEFAULT_FUNCTION_PALETTE)
     palette.update(raw.get("function_palette") or {})
 
+    def choice(key: str, options: tuple, default: str) -> str:
+        value = str(raw.get(key, default)).lower()
+        if value not in options:
+            log.warning("%s %r not one of %s; using %r", key, value, "/".join(options), default)
+            return default
+        return value
+
     return Settings(
         color_mapping=raw.get("color_mapping", {}),
         default_color=raw.get("default_color", Settings.default_color),
@@ -137,4 +151,6 @@ def load_settings(yaml_path: str) -> Settings:
         end_5_label=str(raw.get("end_5_label", Settings.end_5_label)),
         end_3_label=str(raw.get("end_3_label", Settings.end_3_label)),
         function_palette=palette,
+        circular_labels=choice("circular_labels", CIRCULAR_LABELS, Settings.circular_labels),
+        circular_arcs=choice("circular_arcs", CIRCULAR_ARCS, Settings.circular_arcs),
     )

@@ -234,8 +234,8 @@ compared too, and a real fixture added.
 | Readthrough = one box + bar (§1) | — | BYDV-PAV: ORF3→ORF5 readthrough is two abutting boxes on the **same** side, no bar. And ORF5 stays above although the rule would put it below with ORF4. So **readthrough continuation does not flip, frameshift does** — opposite behaviours the coordinates alone cannot distinguish. *Implemented: a readthrough extension takes the side of the ORF it abuts and gets a thin bar + `RT`; the bar is VirPlot's addition, the figure has none.* |
 | ORF number outside, product inside (§1) | Closteroviridae: `ORF1a`/`ORF1b`/`66K 63K 100K` outside, `L-Pro Mtr Hel RdRp` inside. | **Luteoviridae: ORF numbers are inside the boxes** (`ORF1`…`ORF6`), sizes inside the product boxes beneath. Not universal. |
 | Palette (§1) | Closteroviridae only. | **Geminiviridae uses a different palette**: CP green, MP yellow, Rep teal, TrAP pink, REn blue. Luteoviridae: CP pink, MP blue, RTD green, P0 (suppressor) green. Colour is consistent *within a family figure*, not across the Report. "Small 3′ ORFs purple" is BYV p21 only; BYV p6 is grey. |
-| Circular: arcs "just outside the circle", nest inward (§3) | Mastrevirus: the arcs *are* the circle — thick coloured arcs replace the line where ORFs lie, the thin black line shows only in the LIR/SIR gaps. | Begomovirus: base arcs sit **on** the circle line; AC2/AC3/AC4 nest **inside** the circle. Nothing is drawn outside the ring except labels and the stem-loop. |
-| Circular labels | — | All labels are **horizontal**, outside the ring for base arcs (`AV1 (CP)`), inside the circle for nested ones (`AC2 (TrAP)`); format `ORF (function)`. No rotated text. Centre carries the component name (`DNA-A`) only, no length. **No position ticks or scale.** |
+| Circular: arcs "just outside the circle", nest inward (§3) | Mastrevirus: the arcs *are* the circle — thick coloured arcs replace the line where ORFs lie, the thin black line shows only in the LIR/SIR gaps. | Begomovirus: base arcs sit **on** the circle line; AC2/AC3/AC4 nest **inside** the circle. Nothing is drawn outside the ring except labels and the stem-loop. *Option: `circular_arcs: on_circle` (innermost tier astride the line; deeper nesting still steps outward).* |
+| Circular labels | — | All labels are **horizontal**, outside the ring for base arcs (`AV1 (CP)`), inside the circle for nested ones (`AC2 (TrAP)`); format `ORF (function)`. No rotated text. Centre carries the component name (`DNA-A`) only, no length. **No position ticks or scale.** *Option: `circular_labels: horizontal`.* |
 | Circular IR (§3) | Begomovirus: the common region is a thick grey arc straddling 12 o'clock with the stem-loop icon on it, labelled `CRA`/`IR`. Mastrevirus: `LIR` at top, `SIR` at bottom. | — |
 | Title `acronym (length nts)` (§1) | BYV, CTV, LIYV: `Beet yellows virus, BYV (15,468 nts)`. Luteoviridae: `Luteovirus, BYDV-PAV (5,677 nts)` (genus first). | — |
 | Segmented: stacked rows, largest first, shared scale (§1) | LIYV: `RNA-1 (8,118 nts)` over `RNA-2 (7,193 nts)`, one title, same x-scale, both left-aligned at 5′. | — |
@@ -262,13 +262,16 @@ compared too, and a real fixture added.
   should be thought of as a per-family style sheet: a Geminiviridae
   `function_palette` (CP green, MP yellow, Rep teal) is a five-line YAML,
   and the right place for it is a per-example spec, not the code default.
-* **Circular ring** — VirPlot keeps its arcs outside the genome circle and
-  nests toward it, because the inside of the circle holds the depth ring,
-  which the ICTV figures do not have. Base-tier arcs could be drawn *on* the
-  circle (Begomovirus style) at no cost; nesting inside the circle cannot
-  coexist with the depth band. Rotated arc labels and rim ticks are VirPlot
-  additions; a `--labels horizontal` option would match the figures when
-  depth is not the point.
+* **Circular ring** — by default VirPlot keeps its arcs outside the genome
+  circle and nests toward it, because the inside of the circle holds the
+  depth ring, which the ICTV figures do not have. Two spec.yml keys bring it
+  to the figures' style: `circular_arcs: on_circle` sets the innermost arcs
+  astride the circle line (Begomovirus/Mastrevirus style; outer tiers still
+  step outward, since nesting inside cannot coexist with the depth band), and
+  `circular_labels: horizontal` writes level `ORF (product)` labels outside
+  the ring. The figures label nested arcs inside the circle; VirPlot instead
+  steps a nested arc's label one line away from the equator per tier so it
+  does not overprint the arc it nests in. Rim ticks remain a VirPlot addition.
 * **IR arc and `ORF (function)` labels** — need non-CDS features
   (`misc_feature`/`regulatory` rows) and a second name per feature in the
   GFF; see §6 D–F.

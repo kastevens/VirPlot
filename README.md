@@ -126,7 +126,7 @@ virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml \
   --layout circular --legend --title
 ```
 
-`--layout auto` uses the circle for genomes the GFF marks circular and the linear tracks for the rest, which is what you want when one GFF holds both. The default stays `linear`: a circle is the honest picture of the molecule, but a linear track carries far more feature labels legibly, so it remains the better default for a densely annotated genome.
+`--layout auto` uses the circle for genomes the GFF marks circular and the linear tracks for the rest, which is what you want when one GFF holds both. Two spec.yml keys move the circle closer to the ICTV figures: `circular_labels: horizontal` writes every label level outside the ring as `ORF (product)`, and `circular_arcs: on_circle` sets the innermost arcs astride the genome circle (`examples/grbv_ictv.yml`). The default stays `linear`: a circle is the honest picture of the molecule, but a linear track carries far more feature labels legibly, so it remains the better default for a densely annotated genome.
 
 Layout and topology are independent. `--topology` decides whether depth wraps at the origin (the arithmetic); `--layout` decides how it is drawn. Drawing a circular genome with `--topology linear` renders the false origin dip as a wedge cut out of the ring at 12 o'clock — a quick way to see whether your pipeline handled the origin.
 
@@ -229,6 +229,8 @@ All visual elements are customizable via the YAML file:
 | `default_color`       | Color for unmapped products           |
 | `shade_color`         | Color for shaded gap regions          |
 | `depth_line_color`    | Fill colour of a single depth track (default `#85dbec`) |
+| `circular_labels`     | `tangential` (default, along the arc) or `horizontal` (level, outside the ring, `ORF (product)`, as in the ICTV figures) |
+| `circular_arcs`       | `outside` (default, arcs just outside the genome circle) or `on_circle` (innermost arcs astride the circle, as in the ICTV figures) |
 | `annotation_fontsize` | Font size for feature labels          |
 | `stacked_area_colors` | Color palette for stacked area chart  |
 | `legend_location`     | Legend position (e.g. `"upper left"`) |
