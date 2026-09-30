@@ -37,7 +37,8 @@ title: ""
 # --- ICTV drawing conventions (docs/ictv_drawing_conventions.md) -------------
 # Products not listed in color_mapping are coloured by function class, guessed
 # from their name (RdRp/Rep -> replicase, CP -> capsid, MP -> movement, HSP70h,
-# small p2x ORFs -> suppressor). Override a class colour here if you wish:
+# 'silencing suppressor'). A bare pNN name stays default_color: map it here.
+# Override a class colour if you wish:
 # function_palette:
 #   replicase: '#f5b041'
 #   capsid: '#e75480'

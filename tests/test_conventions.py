@@ -124,7 +124,8 @@ def test_classify_function_families():
     assert classify_function("CPm") == "capsid"
     assert classify_function("movement protein") == "movement"
     assert classify_function("HSP70h") == "hsp70"
-    assert classify_function("p22") == "suppressor"
+    assert classify_function("RNA silencing suppressor") == "suppressor"
+    assert classify_function("p22") is None            # a bare pN name carries no function
     assert classify_function("V1 protein") is None
 
 
@@ -232,3 +233,35 @@ def test_ylim_grows_with_tiers():
     fig, ax, _ = draw_linear(rna_with(F(1, 1000), F(50, 1200), F(60, 1300)))   # 3 tiers above
     assert ax.get_ylim()[1] > 2.0
     plt.close(fig)
+
+
+# --- against the ICTV figure: BYV (Closteroviridae Fig. 2) -----------------
+
+def test_byv_fixture_layout_versus_ictv_figure():
+    """Real BYV coordinates under the L1 rule, compared with the published panel.
+
+    The figure draws: ORF1a above, RdRp below, p6 below, Hsp70h above, p64
+    below, CPm above, CP below, p20 above, p21 below. The flip rule reproduces
+    every overlap-driven flip. It diverges exactly where the figure's choice is
+    not overlap-driven: RdRp (a +1 frameshift that abuts ORF1a at 7997/7999
+    without overlapping) and CP (70 nt clear of CPm, flipped for legibility).
+    Those two need expression semantics / a judgement the data does not carry.
+    """
+    ex = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples")
+    (rna,) = parse_gff_rnas(os.path.join(ex, "byv.gff3"))
+    assert not rna.two_strand
+    out = layout(rna, resolve_mode("auto", rna.two_strand))
+    side = {k: v[0] for k, v in out.items()}
+    assert all(t == 0 for _, t in out.values())          # no tiering needed
+
+    # overlap-driven flips agree with the figure (relative to each neighbour)
+    assert side["Hsp70h"] == -side["p6"]                 # 9608 shared base
+    assert side["p64"] == -side["Hsp70h"]
+    assert side["CPm"] == -side["p64"]
+    assert side["p20"] == -side["CP"]
+    assert side["p21"] == -side["p20"]
+    # non-overlap: rule keeps the side; figure agrees for RdRp/p6...
+    assert side["p6"] == side["RdRp"]
+    # ...and disagrees for the two documented cases
+    assert side["RdRp"] == side["L-Pro/Mtr/Hel"]         # figure: flipped (+1 FS)
+    assert side["CP"] == side["CPm"]                     # figure: flipped (no overlap)

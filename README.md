@@ -44,7 +44,7 @@ pip install .
 
 ## Quick Start
 
-Example data in `examples/`: a synthetic two-segment genome (`sample.gff3`, `sample_multi.gff3`, `sample.dep`, `sample.sam`, `spec.yml`) and a circular one — grapevine red blotch virus, real RefSeq NC_022002.1 annotation with simulated reads (`grbv.gff3`, `grbv.sam`, `grbv.yml`).
+Example data in `examples/`: a synthetic two-segment genome (`sample.gff3`, `sample_multi.gff3`, `sample.dep`, `sample.sam`, `spec.yml`); beet yellows virus with its real RefSeq NC_001598.1 coordinates and ICTV ORF names (`byv.gff3`, `byv.sam`); and a circular one — grapevine red blotch virus, real RefSeq NC_022002.1 annotation (`grbv.gff3`, `grbv.sam`, `grbv.yml`). Reads in the `.sam` files are simulated (`make_reads.py`, `make_grbv_sam.py`).
 
 ```bash
 # Basic plot

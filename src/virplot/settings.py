@@ -41,8 +41,9 @@ _FUNCTION_RULES: list[tuple[str, str]] = [
     (r"\b(coat|capsid|nucleocapsid|cp\b|cpm\b|cph\b|\bn protein|virion protein|"
      r"structural)", "capsid"),
     (r"\b(movement|\bmp\b|cell[- ]to[- ]cell|triple gene block|tgb\d?)", "movement"),
-    (r"\b(silencing|suppressor|\bp1[0-9]\b|\bp2[0-9]\b|\bp[3-9]\b|\bp2\d?\b|"
-     r"vsr|hc-?pro)", "suppressor"),
+    # named function only: a bare "p20"/"p6" says nothing about role (BYV p6 is
+    # a membrane protein and grey in the figure), so pN names fall to default
+    (r"\b(silencing|suppressor|vsr|hc-?pro)", "suppressor"),
     (r"\b(intergenic|\bir\b|utr|stem[- ]loop|hairpin|non-?coding)", "noncoding"),
 ]
 

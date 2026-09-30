@@ -197,3 +197,79 @@ need the depth ring made thinner or the arcs unrolled.
 now has every box above the line, since none of its ORFs overlap, and its `p7`
 takes the small-ORF purple). Per §5 that warrants a minor-version bump; not
 applied on the branch — a release decision.
+
+---
+
+## 7. Checked against the published figures
+
+The rules in §1–3 were compared with the figures themselves (viewed at
+ictv.global/report_9th on 2026-09-29): Geminiviridae Figs 2 and 5,
+Closteroviridae Figs 2, 3 and 5, Luteoviridae Fig 2. Figure images are
+Elsevier/ICTV copyright and are not in this repository. The test data was
+compared too, and a real fixture added.
+
+### 7.1 The figures are hand-drawn; the rules approximate them
+
+| Rule (§) | Holds in | Breaks in |
+|---|---|---|
+| L1 flip only on overlap (§2) | BYV: RdRp→p6 (50 nt gap) stay together below; every overlapping pair flips. CTV likewise. | BYV: CP is flipped below CPm despite a 70 nt gap (same colour, close — flipped for legibility). LIYV RNA-1: p31 is above though RdRp below and no overlap. |
+| First (5′-most) ORF above (§2) | BYV, LIYV, BYDV | **CTV: ORF1a is below, RdRp above.** Starting side is arbitrary; alternation is what matters. |
+| Frameshift = step + `+1 FS` label (§1) | CTV (label present). | BYV shows the same step with no label. The step is simply the flip; the flip happens although the two boxes abut (7997/7999) rather than overlap — so **frameshift continuation flips even without overlap**. |
+| Readthrough = one box + bar (§1) | — | BYDV-PAV: ORF3→ORF5 readthrough is two abutting boxes on the **same** side, no bar. And ORF5 stays above although the rule would put it below with ORF4. So **readthrough continuation does not flip, frameshift does** — opposite behaviours the coordinates alone cannot distinguish. |
+| ORF number outside, product inside (§1) | Closteroviridae: `ORF1a`/`ORF1b`/`66K 63K 100K` outside, `L-Pro Mtr Hel RdRp` inside. | **Luteoviridae: ORF numbers are inside the boxes** (`ORF1`…`ORF6`), sizes inside the product boxes beneath. Not universal. |
+| Palette (§1) | Closteroviridae only. | **Geminiviridae uses a different palette**: CP green, MP yellow, Rep teal, TrAP pink, REn blue. Luteoviridae: CP pink, MP blue, RTD green, P0 (suppressor) green. Colour is consistent *within a family figure*, not across the Report. "Small 3′ ORFs purple" is BYV p21 only; BYV p6 is grey. |
+| Circular: arcs "just outside the circle", nest inward (§3) | Mastrevirus: the arcs *are* the circle — thick coloured arcs replace the line where ORFs lie, the thin black line shows only in the LIR/SIR gaps. | Begomovirus: base arcs sit **on** the circle line; AC2/AC3/AC4 nest **inside** the circle. Nothing is drawn outside the ring except labels and the stem-loop. |
+| Circular labels | — | All labels are **horizontal**, outside the ring for base arcs (`AV1 (CP)`), inside the circle for nested ones (`AC2 (TrAP)`); format `ORF (function)`. No rotated text. Centre carries the component name (`DNA-A`) only, no length. **No position ticks or scale.** |
+| Circular IR (§3) | Begomovirus: the common region is a thick grey arc straddling 12 o'clock with the stem-loop icon on it, labelled `CRA`/`IR`. Mastrevirus: `LIR` at top, `SIR` at bottom. | — |
+| Title `acronym (length nts)` (§1) | BYV, CTV, LIYV: `Beet yellows virus, BYV (15,468 nts)`. Luteoviridae: `Luteovirus, BYDV-PAV (5,677 nts)` (genus first). | — |
+| Segmented: stacked rows, largest first, shared scale (§1) | LIYV: `RNA-1 (8,118 nts)` over `RNA-2 (7,193 nts)`, one title, same x-scale, both left-aligned at 5′. | — |
+| 5′/3′ ends | `5′m⁷G?` / `3′OH` (Closteroviridae); grey oval `VPg` (PLRV, PEMV); bare `5′` (BYDV). | — |
+
+### 7.2 What VirPlot does about it
+
+* **Flip rule** — kept as specified; it reproduces every overlap-driven flip
+  in BYV and CTV. The two BYV divergences are not derivable from
+  coordinates: RdRp needs frameshift semantics (stage 4), CP was a
+  legibility call. Since the figures do not agree with each other on the
+  starting side, "first ORF above" is treated as a convention of ours, not
+  theirs.
+* **Frameshift / readthrough** — must come from data. Proposed encoding for
+  stage 4: `Note=+1 frameshift` (or a `frameshift=+1` attribute) on the
+  downstream CDS ⇒ flip and label; `Note=readthrough` ⇒ stay on the same
+  side, no bar. `examples/byv.gff3` already carries `Note=+1 frameshift`
+  on ORF1b.
+* **Palette** — the keyword classifier now colours only names that state a
+  function (`RdRp`, `coat protein`, `movement`, `HSP70`, `silencing
+  suppressor`); a bare `p6`/`p20` stays `default_color` until mapped. Colour
+  should be thought of as a per-family style sheet: a Geminiviridae
+  `function_palette` (CP green, MP yellow, Rep teal) is a five-line YAML,
+  and the right place for it is a per-example spec, not the code default.
+* **Circular ring** — VirPlot keeps its arcs outside the genome circle and
+  nests toward it, because the inside of the circle holds the depth ring,
+  which the ICTV figures do not have. Base-tier arcs could be drawn *on* the
+  circle (Begomovirus style) at no cost; nesting inside the circle cannot
+  coexist with the depth band. Rotated arc labels and rim ticks are VirPlot
+  additions; a `--labels horizontal` option would match the figures when
+  depth is not the point.
+* **IR arc and `ORF (function)` labels** — need non-CDS features
+  (`misc_feature`/`regulatory` rows) and a second name per feature in the
+  GFF; see §6 D–F.
+
+### 7.3 Test data
+
+* `examples/sample.gff3` was written to *evoke* BYV but its nine ORFs are
+  spaced 100 nt apart and never overlap, in a different order from the real
+  genome, at half the length. It therefore cannot exercise the flip rule at
+  all — under the rule every box sits above the line — and it should not be
+  read as an ICTV comparison. It remains a fine depth-plotting fixture.
+* `examples/byv.gff3` (new) carries the real NC_001598.1 coordinates with
+  the ICTV ORF names and short products; `examples/byv.sam` is a flat
+  simulated read set from `examples/make_reads.py`. Against Closteroviridae
+  Fig 2 it reproduces seven of the nine placements, the two exceptions being
+  the frameshift and the legibility flip above.
+  `tests/test_conventions.py::test_byv_fixture_layout_versus_ictv_figure`
+  pins this.
+* `examples/grbv.gff3` is a Grablovirus, not in the 9th Report; its nearest
+  figure is Begomovirus DNA-A. The C2 conventions (V clockwise right, C
+  anticlockwise left, nesting) hold; RefSeq names `V1 protein` etc. carry no
+  function, which is why `grbv.yml` maps colours by hand.

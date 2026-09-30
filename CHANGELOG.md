@@ -42,6 +42,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   picks it for genomes marked circular; the default stays `linear`. A feature
   crossing the origin is drawn as the two arcs it occupies
   (`RNA.feature_spans`). `--yscale symlog` is ignored in this layout.
+- `examples/byv.gff3` / `byv.sam` — beet yellows virus with real NC_001598.1
+  CDS coordinates and ICTV ORF names, the fixture the drawing conventions
+  are checked against; `examples/make_reads.py`, a generic flat-coverage
+  read simulator. docs/ictv_drawing_conventions.md §7 records the
+  comparison with the published figures.
 - `examples/grbv.gff3`, `examples/grbv.sam`, `examples/grbv.yml` — grapevine
   red blotch virus (RefSeq NC_022002.1, 3206 nt circular): real RefSeq
   annotation with simulated, origin-spanning reads
