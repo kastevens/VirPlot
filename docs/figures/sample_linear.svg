@@ -827,7 +827,7 @@ z
    </g>
    <g id="FillBetweenPolyCollection_1">
     <defs>
-     <path id="md7a5a4a8bf" d="M 43.365625 -33.95625 
+     <path id="mdf0f0bcbfa" d="M 43.365625 -33.95625 
 L 43.365625 -42.77997 
 L 43.449335 -44.022018 
 L 43.533046 -45.264067 
@@ -16833,7 +16833,7 @@ z
 "/>
     </defs>
     <g clip-path="url(#p329993ef0d)">
-     <use xlink:href="#md7a5a4a8bf" x="0" y="293.135" style="fill: #55b9d9; fill-opacity: 0.9"/>
+     <use xlink:href="#mdf0f0bcbfa" x="0" y="293.135" style="fill: #85dbec; fill-opacity: 0.9"/>
     </g>
    </g>
    <g id="patch_12">
@@ -19997,7 +19997,7 @@ L 66.565625 161.5775
 L 66.565625 155.9775 
 L 50.565625 155.9775 
 z
-" style="fill: #55b9d9; fill-opacity: 0.9"/>
+" style="fill: #85dbec; fill-opacity: 0.9"/>
     </g>
     <g id="text_25">
      <!-- sample -->

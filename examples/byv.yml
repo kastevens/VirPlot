@@ -18,8 +18,8 @@ color_mapping:
 annotation_fontsize: 9
 default_color: '#9f9f9f'
 shade_color: '#ca4f35'
-depth_line_color: '#0077cc'
-stacked_area_colors: ['#f96666', '#82c4fa', '#f9da86']
+depth_line_color: '#85dbec'   # the original figure's top layer (sample 1)
+stacked_area_colors: ['#567eb0', '#55b9d9', '#85dbec']   # bottom layer first
 legend_location: "upper left"
 end_5_label: "5' m7G"
 end_3_label: "3' OH"

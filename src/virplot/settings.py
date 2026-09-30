@@ -74,10 +74,11 @@ def lighter(hex_color: str, amount: float = 0.35) -> str:
 class Settings:
     color_mapping: dict[str, str] = field(default_factory=dict)
     default_color: str = "#9F9F9F"
-    depth_line_color: str = "blue"
+    depth_line_color: str = "#85dbec"        # original figure's top layer
     shade_color: str = "tomato"
     annotation_fontsize: int = 8
-    stacked_area_colors: list[str] = field(default_factory=list)
+    stacked_area_colors: list[str] = field(  # original figure's layers, bottom first
+        default_factory=lambda: ["#567eb0", "#55b9d9", "#85dbec"])
     legend_location: str = "upper left"
     title: str = ""
     overlap_mode: str = "auto"           # auto | flip | tier
@@ -129,7 +130,7 @@ def load_settings(yaml_path: str) -> Settings:
         depth_line_color=raw.get("depth_line_color", Settings.depth_line_color),
         shade_color=raw.get("shade_color", Settings.shade_color),
         annotation_fontsize=raw.get("annotation_fontsize", Settings.annotation_fontsize),
-        stacked_area_colors=raw.get("stacked_area_colors", []),
+        stacked_area_colors=list(raw.get("stacked_area_colors") or Settings().stacked_area_colors),
         legend_location=raw.get("legend_location", Settings.legend_location),
         title=raw.get("title", Settings.title),
         overlap_mode=overlap_mode,

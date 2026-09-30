@@ -86,8 +86,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   measured from its pixels: a 0.3 pt black outline at alpha 0.8 over a fill
   at alpha 0.9 in `depth_line_color`, in both layouts, instead of a heavier
   coloured line over a pale fill; the legend swatch now shows the fill colour.
-  `examples/spec.yml` takes the original figure's depth palette, recovered
-  from the same measurement (`#567eb0`, `#55b9d9`, `#85dbec`).
+  The original figure's depth palette, recovered from the same measurement
+  (`#567eb0`, `#55b9d9`, `#85dbec`, bottom layer first), is now the built-in
+  default for `stacked_area_colors`, and its top layer `#85dbec` the default
+  `depth_line_color`, so a single sample looks like sample 1 of that figure.
+  The example specs use the same values.
 - SVG and PDF output is reproducible: no embedded timestamp, and element
   ids are hashed from the output name, so regenerating an unchanged figure
   gives a byte-identical file. `docs/make_figures.sh` regenerates the

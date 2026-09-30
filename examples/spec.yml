@@ -21,7 +21,7 @@ default_color: '#9f9f9f'
 
 shade_color: '#ca4f35'
 
-depth_line_color: '#55b9d9'   # the original figure's middle layer; drawn at alpha 0.9 under a thin black line
+depth_line_color: '#85dbec'   # the original figure's top layer (sample 1), alpha 0.9 under a thin black line
 
 stacked_area_colors:            # bottom layer first; these are the original README figure's colours
   - '#567eb0'

@@ -203,7 +203,7 @@ All visual elements are customizable via the YAML file:
 | `color_mapping`       | Maps product names to hex colors      |
 | `default_color`       | Color for unmapped products           |
 | `shade_color`         | Color for shaded gap regions          |
-| `depth_line_color`    | Line color for depth plot             |
+| `depth_line_color`    | Fill colour of a single depth track (default `#85dbec`) |
 | `annotation_fontsize` | Font size for feature labels          |
 | `stacked_area_colors` | Color palette for stacked area chart  |
 | `legend_location`     | Legend position (e.g. `"upper left"`) |
