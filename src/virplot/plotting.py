@@ -1,4 +1,11 @@
-"""Matplotlib plotting for genome annotations and depth."""
+"""Matplotlib plotting for genome annotations and depth.
+
+``Plotter`` holds the state every renderer needs (settings, CLI options) and
+the helpers that do not depend on figure geometry: preparing depth tracks,
+legends, saving.  ``LinearPlotter`` draws the classic two-panel figure — an
+annotation track above a depth track sharing one linear x-axis.  A circular
+renderer would subclass ``Plotter`` and override ``render`` with polar axes.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +19,7 @@ from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 
 from virplot.analysis import smooth_depth
+from virplot.models import RNA
 from virplot.settings import Settings
 
 log = logging.getLogger(__name__)
@@ -31,189 +39,197 @@ HEIGHT_RATIO_ANNOTATION = 1
 HEIGHT_RATIO_DEPTH = 1
 
 
-def plot(
-    sequence_length: int,
-    features: list[dict],
-    x_full: np.ndarray,
-    y_list: list[np.ndarray],
-    threshold_results: list[tuple],
-    settings: Settings,
-    labels: list[str],
-    args: argparse.Namespace,
-) -> None:
-    """Build the combined annotation + depth figure and save to disk."""
-    fig, (ax_ann, ax_depth) = plt.subplots(
-        2, 1,
-        figsize=(FIGURE_WIDTH, FIGURE_HEIGHT),
-        sharex=True,
-        gridspec_kw={"height_ratios": [HEIGHT_RATIO_ANNOTATION, HEIGHT_RATIO_DEPTH]},
-    )
-    fig.subplots_adjust(hspace=0)
+class Plotter:
+    """Base renderer: shared state and geometry-independent helpers."""
 
-    # --- annotation panel ---
-    prime_5, prime_3 = _draw_annotations(
-        ax_ann, features, sequence_length, settings, args,
-    )
+    def __init__(self, settings: Settings, args: argparse.Namespace):
+        self.settings = settings
+        self.args = args
 
-    # --- depth panel ---
-    layers = _draw_depth(
-        ax_depth, x_full, y_list, settings, args,
-    )
+    def render(self, rna: RNA, threshold_results: list[tuple]) -> None:
+        """Build the figure for ``rna`` and save it to disk."""
+        raise NotImplementedError
 
-    if args.legend:
-        _add_legend(ax_depth, layers, labels, settings)
+    # --- shared helpers -----------------------------------------------------
 
-    if args.shade_breaks:
-        for _, _, gaps, _ in threshold_results:
-            for g in gaps:
-                ax_depth.axvspan(g["start_bp"], g["end_bp"],
-                                 color=settings.shade_color, alpha=0.15, lw=0)
+    def _prepared_tracks(self, rna: RNA) -> tuple[list[np.ndarray], np.ndarray]:
+        """Apply --smooth / --normalize to the depth tracks.
 
-    ax_depth.set_ylabel("Read Depth", fontsize=10)
-    ax_depth.set_xlabel("Genome Position (bp)", fontsize=10)
+        Returns (per-track arrays, combined array). Smoothing is applied per
+        track; normalisation divides everything by the combined maximum so the
+        stacked total peaks at 1.
+        """
+        tracks = rna.tracks
+        if self.args.smooth:
+            tracks = [smooth_depth(y, window_size=SMOOTH_WINDOW) for y in tracks]
+        total = np.sum(tracks, axis=0) if len(tracks) > 1 else tracks[0]
+        if self.args.normalize:
+            denom = total.max() or 1.0
+            tracks = [y / denom for y in tracks]
+            total = total / denom
+        return tracks, total
 
-    if args.yscale == "symlog":
-        ax_depth.set_yscale("symlog", linthresh=args.linthresh, linscale=1)
+    def _feature_color(self, product: str) -> str:
+        return self.settings.color_mapping.get(product, self.settings.default_color)
 
-    y_plot = np.sum(y_list, axis=0) if len(y_list) > 1 else y_list[0]
-    if args.smooth:
-        y_plot = smooth_depth(y_plot, window_size=SMOOTH_WINDOW)
-    if args.normalize:
-        y_plot = y_plot / (y_plot.max() or 1.0)
-    ax_depth.set_ylim(0, y_plot.max() * Y_HEADROOM if y_plot.size else 1)
+    def _add_legend(self, ax: plt.Axes, layers: list, labels: list[str]) -> None:
+        legend = ax.legend(
+            handles=reversed(layers),
+            labels=labels,
+            loc=self.settings.legend_location,
+            fontsize=8,
+            frameon=True,
+            fancybox=False,
+            framealpha=1.0,
+            facecolor="white",
+            edgecolor="black",
+        )
+        legend.get_frame().set_linewidth(0.5)
 
-    if args.grid:
-        ax_depth.grid(True, linestyle="--", linewidth=0.3)
-
-    title_artist = None
-    if args.title:
-        title_artist = fig.text(
-            0.5, 0.95, settings.title,
+    def _add_title(self, fig: plt.Figure):
+        """Draw the YAML title if --title was given; returns the artist or None."""
+        if not self.args.title:
+            return None
+        return fig.text(
+            0.5, 0.95, self.settings.title,
             ha="center", va="bottom", fontsize=14, fontweight="bold",
         )
 
-    # --- save ---
-    _save_figure(fig, args, title_artist, prime_5, prime_3)
-    plt.close(fig)
+    def _save(self, fig: plt.Figure, extra_artists: list) -> None:
+        """Determine output path/format and save the figure."""
+        args = self.args
+        os.makedirs(args.outdir, exist_ok=True)
+
+        extra = [a for a in extra_artists if a is not None]
+        save_kwargs = dict(bbox_inches="tight", bbox_extra_artists=extra, pad_inches=0.05)
+
+        ext = args.format
+        if ext == "png":
+            save_kwargs["dpi"] = PNG_DPI
+
+        output_path = os.path.join(args.outdir, f"{args.name}.{ext}")
+
+        if os.path.exists(output_path):
+            ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            alt = f"{args.name}-{ts}.{ext}"
+            output_path = os.path.join(args.outdir, alt)
+            log.warning("File already exists. Saving to file: %s", alt)
+        else:
+            log.info("Saving to file: %s", os.path.basename(output_path))
+
+        fig.savefig(output_path, format=ext, **save_kwargs)
+        log.info("Plot saved to: %s", output_path)
 
 
-# private helpers
+class LinearPlotter(Plotter):
+    """Annotation track stacked above a depth track on a shared linear x-axis."""
 
-
-def _draw_annotations(ax: plt.Axes, features: list[dict], seq_len: int,
-                      settings: Settings, args: argparse.Namespace) -> tuple:
-    """Draw genome line and feature rectangles on the annotation axis."""
-    pad = int(seq_len * LABEL_PAD_FRACTION)
-
-    ax.plot([-pad, seq_len + pad], [ANNOTATION_Y_BASE, ANNOTATION_Y_BASE],
-            color="black", linewidth=1.2)
-    p5 = ax.text(-pad * 0.4, ANNOTATION_Y_BASE, "5'", va="center", ha="right",
-                 fontsize=10, fontweight="bold")
-    p3 = ax.text(seq_len + pad * 0.4, ANNOTATION_Y_BASE, "3'", va="center", ha="left",
-                 fontsize=10, fontweight="bold")
-
-    alternate = True
-    for feat in features:
-        start, end = feat["start"], feat["end"]
-        product = feat["product"]
-        color = settings.color_mapping.get(product, settings.default_color)
-
-        y = ANNOTATION_Y_BASE if alternate else ANNOTATION_Y_BASE - ANNOTATION_HEIGHT
-        rect = Rectangle(
-            (start, y), end - start, ANNOTATION_HEIGHT,
-            facecolor=color,
-            edgecolor="none" if args.no_border else "black",
+    def render(self, rna: RNA, threshold_results: list[tuple]) -> None:
+        fig, (ax_ann, ax_depth) = plt.subplots(
+            2, 1,
+            figsize=(FIGURE_WIDTH, FIGURE_HEIGHT),
+            sharex=True,
+            gridspec_kw={"height_ratios": [HEIGHT_RATIO_ANNOTATION, HEIGHT_RATIO_DEPTH]},
         )
-        ax.add_patch(rect)
+        fig.subplots_adjust(hspace=0)
 
-        if not args.no_label:
-            lx = (start + end) / 2
-            length = end - start
-            if length < SMALL_FEATURE_THRESHOLD:
-                ly = (y + ANNOTATION_HEIGHT * 1.5 if alternate
-                      else y - ANNOTATION_HEIGHT * 0.5)
-            else:
-                ly = y + ANNOTATION_HEIGHT / 2
-            ax.text(lx, ly, product, ha="center", va="center",
-                    fontsize=settings.annotation_fontsize, color="black")
+        extra_artists = self._draw_annotations(ax_ann, rna)
 
-        alternate = not alternate
+        tracks, total = self._prepared_tracks(rna)
+        layers = self._draw_depth(ax_depth, rna, tracks, total)
 
-    ax.set_xlim(0, seq_len)
-    ax.set_ylim(-1.5, 2.0)
-    ax.axis("off")
-    return p5, p3
+        if self.args.legend:
+            self._add_legend(ax_depth, layers, rna.labels)
 
+        if self.args.shade_breaks:
+            self._shade_gaps(ax_depth, threshold_results)
 
-def _draw_depth(ax: plt.Axes, x_full: np.ndarray, y_list: list[np.ndarray],
-                settings: Settings, args: argparse.Namespace) -> list:
-    """Plot depth as a single line+fill or stacked area chart.
+        self._style_depth_axis(ax_depth, total)
 
-    Returns the layer artists for legend construction.
-    """
-    y_list_plot = [smooth_depth(y, window_size=SMOOTH_WINDOW) for y in y_list] if args.smooth else list(y_list)
+        extra_artists.append(self._add_title(fig))
 
-    y_plot = np.sum(y_list_plot, axis=0) if len(y_list_plot) > 1 else y_list_plot[0]
+        self._save(fig, extra_artists)
+        plt.close(fig)
 
-    if args.normalize:
-        denom = y_plot.max() or 1.0
-        y_list_plot = [y / denom for y in y_list_plot]
-        y_plot = y_plot / denom
+    # --- panels -------------------------------------------------------------
 
-    if len(y_list_plot) == 1:
-        layers = ax.plot(x_full, y_plot, color=settings.depth_line_color,
-                         linewidth=0.8, alpha=0.9)
-        ax.fill_between(x_full, y_plot, color=settings.depth_line_color, alpha=0.3)
-    else:
-        k = len(y_list_plot)
-        colors = settings.stacked_area_colors[:k] + [settings.default_color] * max(0, k - len(settings.stacked_area_colors))
-        layers = ax.stackplot(x_full, *reversed(y_list_plot), colors=colors,
-                              alpha=0.9, step="pre")
-        ax.plot(x_full, y_plot, color="black", linewidth=0.3, alpha=0.8,
-                label="Combined depth")
+    def _draw_annotations(self, ax: plt.Axes, rna: RNA) -> list:
+        """Genome line, 5'/3' marks and feature rectangles.
 
-    ax.set_xlim(x_full[0], x_full[-1])
-    return layers
+        Returns the end-mark artists so the saved bbox includes them.
+        """
+        args = self.args
+        seq_len = rna.length
+        pad = int(seq_len * LABEL_PAD_FRACTION)
 
+        ax.plot([-pad, seq_len + pad], [ANNOTATION_Y_BASE, ANNOTATION_Y_BASE],
+                color="black", linewidth=1.2)
+        p5 = ax.text(-pad * 0.4, ANNOTATION_Y_BASE, "5'", va="center", ha="right",
+                     fontsize=10, fontweight="bold")
+        p3 = ax.text(seq_len + pad * 0.4, ANNOTATION_Y_BASE, "3'", va="center", ha="left",
+                     fontsize=10, fontweight="bold")
 
-def _add_legend(ax: plt.Axes, layers: list, labels: list[str],
-                settings: Settings) -> None:
-    """Add a legend to the depth axis."""
-    legend = ax.legend(
-        handles=reversed(layers),
-        labels=labels,
-        loc=settings.legend_location,
-        fontsize=8,
-        frameon=True,
-        fancybox=False,
-        framealpha=1.0,
-        facecolor="white",
-        edgecolor="black",
-    )
-    legend.get_frame().set_linewidth(0.5)
+        for i, feat in enumerate(rna.features):
+            upper = i % 2 == 0
+            y = ANNOTATION_Y_BASE if upper else ANNOTATION_Y_BASE - ANNOTATION_HEIGHT
+            rect = Rectangle(
+                (feat.start, y), feat.length, ANNOTATION_HEIGHT,
+                facecolor=self._feature_color(feat.product),
+                edgecolor="none" if args.no_border else "black",
+            )
+            ax.add_patch(rect)
 
+            if not args.no_label:
+                if feat.length < SMALL_FEATURE_THRESHOLD:
+                    ly = (y + ANNOTATION_HEIGHT * 1.5 if upper
+                          else y - ANNOTATION_HEIGHT * 0.5)
+                else:
+                    ly = y + ANNOTATION_HEIGHT / 2
+                ax.text(feat.midpoint, ly, feat.product, ha="center", va="center",
+                        fontsize=self.settings.annotation_fontsize, color="black")
 
-def _save_figure(fig: plt.Figure, args: argparse.Namespace,
-                 title_artist, prime_5, prime_3) -> None:
-    """Determine output path/format and save the figure."""
-    os.makedirs(args.outdir, exist_ok=True)
+        ax.set_xlim(0, seq_len)
+        ax.set_ylim(-1.5, 2.0)
+        ax.axis("off")
+        return [p5, p3]
 
-    extra = [a for a in (title_artist, prime_5, prime_3) if a is not None]
-    save_kwargs = dict(bbox_inches="tight", bbox_extra_artists=extra, pad_inches=0.05)
+    def _draw_depth(self, ax: plt.Axes, rna: RNA,
+                    tracks: list[np.ndarray], total: np.ndarray) -> list:
+        """Single line+fill, or stacked areas for several tracks.
 
-    ext = args.format
-    if ext == "png":
-        save_kwargs["dpi"] = PNG_DPI
+        Returns the layer artists for legend construction.
+        """
+        s = self.settings
+        x = rna.positions
 
-    output_path = os.path.join(args.outdir, f"{args.name}.{ext}")
+        if len(tracks) == 1:
+            layers = ax.plot(x, total, color=s.depth_line_color, linewidth=0.8, alpha=0.9)
+            ax.fill_between(x, total, color=s.depth_line_color, alpha=0.3)
+        else:
+            k = len(tracks)
+            colors = (s.stacked_area_colors[:k]
+                      + [s.default_color] * max(0, k - len(s.stacked_area_colors)))
+            layers = ax.stackplot(x, *reversed(tracks), colors=colors, alpha=0.9, step="pre")
+            ax.plot(x, total, color="black", linewidth=0.3, alpha=0.8, label="Combined depth")
 
-    if os.path.exists(output_path):
-        ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        alt = f"{args.name}-{ts}.{ext}"
-        output_path = os.path.join(args.outdir, alt)
-        log.warning("File already exists. Saving to file: %s", alt)
-    else:
-        log.info("Saving to file: %s", os.path.basename(output_path))
+        ax.set_xlim(x[0], x[-1])
+        return layers
 
-    fig.savefig(output_path, format=ext, **save_kwargs)
-    log.info("Plot saved to: %s", output_path)
+    def _shade_gaps(self, ax: plt.Axes, threshold_results: list[tuple]) -> None:
+        for _, _, gaps, _ in threshold_results:
+            for g in gaps:
+                ax.axvspan(g["start_bp"], g["end_bp"],
+                           color=self.settings.shade_color, alpha=0.15, lw=0)
+
+    def _style_depth_axis(self, ax: plt.Axes, total: np.ndarray) -> None:
+        args = self.args
+        ax.set_ylabel("Read Depth", fontsize=10)
+        ax.set_xlabel("Genome Position (bp)", fontsize=10)
+
+        if args.yscale == "symlog":
+            ax.set_yscale("symlog", linthresh=args.linthresh, linscale=1)
+
+        ax.set_ylim(0, total.max() * Y_HEADROOM if total.size else 1)
+
+        if args.grid:
+            ax.grid(True, linestyle="--", linewidth=0.3)

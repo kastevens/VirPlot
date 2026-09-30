@@ -7,12 +7,11 @@ import logging
 import os
 import sys
 
-import numpy as np
-
 from virplot import __version__
 from virplot.analysis import call_blocks, write_csvs
+from virplot.models import RNA
 from virplot.parsers import parse_gff, parse_depth
-from virplot.plotting import plot
+from virplot.plotting import LinearPlotter
 from virplot.settings import load_settings
 
 log = logging.getLogger(__name__)
@@ -103,34 +102,30 @@ def main(argv: list[str] | None = None) -> None:
     # --- parse ---
     sequence_length, features = parse_gff(args.gff)
     log.info("Parsed %d features from GFF", len(features))
+    rna = RNA(name=args.name, length=sequence_length, features=features)
 
-    y_list: list[np.ndarray] = []
+    labels = args.labels or [
+        os.path.splitext(os.path.basename(f))[0] for f in args.depth
+    ]
     counts: set[int] = set()
-    for df in args.depth:
-        y, n = parse_depth(df, sequence_length)
+    for label, df in zip(labels, args.depth):
+        y, n = parse_depth(df, rna.length)
         log.info("Parsed %d depth entries from %s", n, df)
-        y_list.append(y)
+        rna.add_depth(label, y)
         counts.add(n)
 
     if len(counts) != 1:
         log.error("Mismatching position count across depth files: %s", counts)
         sys.exit(1)
 
-    labels = args.labels or [
-        os.path.splitext(os.path.basename(f))[0] for f in args.depth
-    ]
-
     settings = load_settings(args.yaml)
     log.info("Loaded settings from %s", args.yaml)
 
-    # --- build arrays ---
-    x_full = np.arange(1, sequence_length + 1, dtype=int)
-    y_sum = np.sum(y_list, axis=0) if len(y_list) > 1 else y_list[0]
-
     # --- thresholds ---
+    y_sum = rna.total_depth().astype(int)
     threshold_results: list[tuple] = []
     for T in args.thresholds:
-        intervals, gaps, pct = call_blocks(y_sum.astype(int), T)
+        intervals, gaps, pct = call_blocks(y_sum, T)
         threshold_results.append((T, intervals, gaps, pct))
         log.info("T=%d: %d intervals, %d breaks, %.2f%% genome >=%dx",
                  T, len(intervals), len(gaps), pct, T)
@@ -140,13 +135,4 @@ def main(argv: list[str] | None = None) -> None:
             write_csvs(intervals, gaps, args.outdir, args.name, T)
 
     # --- plot ---
-    plot(
-        sequence_length=sequence_length,
-        features=features,
-        x_full=x_full,
-        y_list=y_list,
-        threshold_results=threshold_results,
-        settings=settings,
-        labels=labels,
-        args=args,
-    )
+    LinearPlotter(settings, args).render(rna, threshold_results)

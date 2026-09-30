@@ -7,12 +7,14 @@ import sys
 
 import numpy as np
 
+from virplot.models import Feature
+
 log = logging.getLogger(__name__)
 
 
-def parse_gff(gff_path: str) -> tuple[int, list[dict]]:
-    """Parse a GFF3 file, returning (sequence_length, features_list)."""
-    features: list[dict] = []
+def parse_gff(gff_path: str) -> tuple[int, list[Feature]]:
+    """Parse a GFF3 file, returning (sequence_length, features)."""
+    features: list[Feature] = []
     sequence_length: int | None = None
 
     with open(gff_path) as fp:
@@ -38,12 +40,12 @@ def parse_gff(gff_path: str) -> tuple[int, list[dict]]:
                 kv.split("=", 1) for kv in attributes.split(";") if "=" in kv
             )
 
-            features.append({
-                "start": int(start),
-                "end": int(end),
-                "strand": strand,
-                "product": info.get("product", "unknown"),
-            })
+            features.append(Feature(
+                start=int(start),
+                end=int(end),
+                strand=strand,
+                product=info.get("product", "unknown"),
+            ))
 
     if sequence_length is None:
         log.error("No 'region' feature found in GFF: %s", gff_path)

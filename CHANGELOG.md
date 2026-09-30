@@ -6,6 +6,23 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- Internal refactor toward an object model (no user-facing changes; output is
+  pixel-identical):
+  - New `virplot.models` module with `Feature`, `DepthTrack` and `RNA`
+    dataclasses. `RNA.circular` is a placeholder flag for future circular-RNA
+    support.
+  - `parse_gff` now returns `Feature` objects instead of dicts.
+  - `plotting.plot()` replaced by a `Plotter` base class and `LinearPlotter`;
+    `cli.main()` builds one `RNA` and calls `LinearPlotter(...).render(rna, ...)`.
+  - Smoothing/normalisation is computed once (`Plotter._prepared_tracks`)
+    instead of separately for the depth panel and the y-limit.
+- Added `docs/class_layout.svg` showing the current classes and the seams left
+  open for circular RNAs and segmented (multi-RNA) genomes.
+
 ## [2.0.0] — 2026-05-03
 
 ### Added

@@ -20,10 +20,10 @@ def test_parse_gff_basic(tmp_path):
     seq_len, features = parse_gff(str(gff))
     assert seq_len == 1000
     assert len(features) == 2
-    assert features[0]["product"] == "RdRp"
-    assert features[0]["start"] == 100
-    assert features[0]["end"] == 400
-    assert features[1]["product"] == "CP"
+    assert features[0].product == "RdRp"
+    assert features[0].start == 100
+    assert features[0].end == 400
+    assert features[1].product == "CP"
 
 
 def test_parse_gff_unknown_product(tmp_path):
@@ -33,7 +33,7 @@ def test_parse_gff_unknown_product(tmp_path):
         seq1\t.\tCDS\t10\t200\t.\t+\t0\tID=cds1
     """))
     _, features = parse_gff(str(gff))
-    assert features[0]["product"] == "unknown"
+    assert features[0].product == "unknown"
 
 
 def test_parse_gff_no_region(tmp_path):

@@ -35,3 +35,6 @@ backup/
 *.pdf
 *.csv
 *.log
+
+# Documentation figures are tracked even though plot outputs are not
+!docs/*.svg
