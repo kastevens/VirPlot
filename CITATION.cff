@@ -6,14 +6,14 @@ date-released: 2026-05-03
 authors:
   - family-names: Li
     given-names: Haoran
-    affiliation: "Foundation Plant Services and Department of Computer Science, University of California, Davis"
+    affiliation: "Department of Computer Science and Foundation Plant Services, University of California, Davis"
     orcid: "https://orcid.org/0009-0003-6643-9788"
   - family-names: Yuan
     given-names: Ruihan
-    affiliation: "Foundation Plant Services and Department of Computer Science, University of California, Davis"
+    affiliation: "Department of Computer Science and Foundation Plant Services, University of California, Davis"
   - family-names: Stevens
     given-names: Kristian
-    affiliation: "Foundation Plant Services, Department of Computer Science, and Department of Evolution and Ecology, University of California, Davis"
+    affiliation: "Department of Computer Science, Department of Evolution and Ecology, and Foundation Plant Services, University of California, Davis"
     email: kastevens@ucdavis.edu
 contact:
   - family-names: Stevens
@@ -26,14 +26,14 @@ preferred-citation:
   authors:
     - family-names: Li
       given-names: Haoran
-      affiliation: "Foundation Plant Services and Department of Computer Science, University of California, Davis"
+      affiliation: "Department of Computer Science and Foundation Plant Services, University of California, Davis"
       orcid: "https://orcid.org/0009-0003-6643-9788"
     - family-names: Yuan
       given-names: Ruihan
-      affiliation: "Foundation Plant Services and Department of Computer Science, University of California, Davis"
+      affiliation: "Department of Computer Science and Foundation Plant Services, University of California, Davis"
     - family-names: Stevens
       given-names: Kristian
-      affiliation: "Foundation Plant Services, Department of Computer Science, and Department of Evolution and Ecology, University of California, Davis"
+      affiliation: "Department of Computer Science, Department of Evolution and Ecology, and Foundation Plant Services, University of California, Davis"
       email: kastevens@ucdavis.edu
   title: "VirPlot"
   version: 2.0.0
