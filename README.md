@@ -4,6 +4,12 @@ This tool generates **SVG, PDF, or PNG plots** that combine viral genome feature
 
 [![RNA-seq read depth across the Beet yellows virus genome](https://i.imgur.com/bDxrx1I.png)](https://i.imgur.com/bDxrx1I.png)
 
+| Linear, one strand — BYV (`examples/byv.gff3`) | Circular, two strands — GRBV (`examples/grbv.gff3`) |
+|---|---|
+| ![BYV](docs/figures/byv_linear.svg) | ![GRBV circular](docs/figures/grbv_circular.svg) |
+
+Reads in the examples are simulated; the annotations are real RefSeq records. More renders in [`docs/figures/`](docs/figures/).
+
 Developed and maintained by Haoran (Henry) Li for [Foundation Plant Services](https://fps.ucdavis.edu/index.cfm) at [UC Davis](https://www.ucdavis.edu/).
 
 Built in Python using `matplotlib`, `pyyaml`, and `numpy`.
@@ -207,6 +213,26 @@ All visual elements are customizable via the YAML file:
 See `examples/spec.yml` for a complete template.
 
 ---
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the code is organised: data model, pipeline, **class diagram**, the behaviours that are easy to get wrong, how to extend it, the test suites |
+| [`docs/ictv_drawing_conventions.md`](docs/ictv_drawing_conventions.md) | The genome-map drawing rules the annotation track follows, their implementation status, and how they compare with the published ICTV figures |
+| [`docs/class_layout.svg`](docs/class_layout.svg) | The class layout as a static diagram |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed, by release |
+
+## Development
+
+```bash
+git clone https://github.com/kastevens/VirPlot
+cd VirPlot
+pip install -e . pytest
+pytest                      # ~120 tests, no network or external tools needed
+```
+
+The package lives in `src/virplot/`; `python -m virplot` runs the CLI from a checkout. Rendering changes should be checked by re-plotting the examples and comparing with the previous output — every depth-panel change on the current branch has been verified pixel-identical that way. See `docs/ARCHITECTURE.md` §6 for where to plug in a new renderer, depth source or placement rule.
 
 ## Supplementary Scripts
 

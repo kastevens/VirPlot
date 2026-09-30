@@ -66,6 +66,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   `name (length nts)`. Section 6 of the document records what changed and
   what the spec still needs.
 
+- `docs/ARCHITECTURE.md`: module map, pipeline and class diagrams (Mermaid,
+  rendered by GitHub), a step-by-step run, the behaviours that are easy to
+  get wrong, extension points and the test suites. `docs/figures/`: example
+  renders linked from the README.
+
 ### Changed (output)
 
 - Linear annotation track: boxes no longer alternate above/below by index;

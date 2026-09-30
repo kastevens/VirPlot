@@ -38,3 +38,4 @@ backup/
 
 # Documentation figures are tracked even though plot outputs are not
 !docs/*.svg
+!docs/figures/*.svg
