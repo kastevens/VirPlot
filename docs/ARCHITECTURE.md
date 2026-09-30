@@ -15,6 +15,8 @@ Pure Python: `numpy`, `matplotlib`, `pyyaml` and the standard library. No
 ```mermaid
 flowchart LR
     GFF[genome.gff3] --> P1[parsers.parse_gff_rnas]
+    FQ["FASTQ + reference FASTA<br/>(-U / -1 -2, -x)"] --> B[analysis.map_reads<br/>bowtie2]
+    B -->|.sam| DEP
     DEP["depth sources<br/>(.dep · .sam · .bam)"] --> P2[parsers.load_depth]
     YML[spec.yml] --> S[settings.load_settings]
     P1 --> R["list[RNA]<br/>Feature · DepthTrack"]
@@ -37,7 +39,7 @@ module is importable and testable on its own.
 | `models.py` | The data model: `Feature`, `DepthTrack`, `RNA`. Coordinate helpers that know about circularity (`feature_spans`). | numpy |
 | `parsers.py` | GFF3 → `list[RNA]`; `samtools depth` text → array; `load_depth` dispatches any depth source by type. | models, alignments |
 | `alignments.py` | SAM and BAM readers (BAM through `gzip`), CIGAR walk → per-base depth with `samtools depth -a` semantics, origin wrapping for circular genomes, reference-name resolution. | numpy, stdlib |
-| `analysis.py` | Pure functions over depth arrays: moving-average smoothing, interval/gap calling at a threshold, CSV reports. | numpy |
+| `analysis.py` | Two halves. Pure functions over depth arrays: moving-average smoothing, interval/gap calling at a threshold, CSV reports. And read mapping: `ReadSet`, bowtie2 index building and caching, `map_reads` running bowtie2 to a SAM that the depth pipeline then consumes. | numpy, subprocess |
 | `settings.py` | `Settings` dataclass from YAML; the ICTV function palette and the product-name classifier behind `Settings.feature_color`. | pyyaml |
 | `layout.py` | Where each feature glyph goes: `place_features` implements the flip / tier / nest rules and returns `Placement`s. Pure; no matplotlib. | models |
 | `plotting.py` | `Plotter` base (shared scaling, legend, title, save) and the two renderers, `LinearPlotter` and `CircularPlotter`. | analysis, layout, models, settings, matplotlib |
@@ -167,11 +169,24 @@ classDiagram
         +is_alignment_file(path) bool
     }
 
+    class ReadSet {
+        <<dataclass>>
+        +str label
+        +list~str~ unpaired
+        +list~str~ mate1
+        +list~str~ mate2
+        +paired() bool
+        +validate()
+    }
+
     class analysis {
         <<module>>
         +smooth_depth(y, window) ndarray
         +call_blocks(y, threshold)
         +write_csvs(intervals, gaps, outdir, base, T)
+        +ensure_bowtie2_index(fasta, outdir, threads) str
+        +map_reads(reads, index, out_sam, threads) str
+        +fasta_lengths(fasta) dict
     }
 
     RNA "1" *-- "0..*" Feature : features
@@ -187,6 +202,7 @@ classDiagram
     Plotter ..> analysis : smooth_depth
     parsers ..> RNA : builds
     parsers ..> alignments : load_depth
+    analysis ..> ReadSet : map_reads
 ```
 
 The same picture as a static image, with data flow left to right:
@@ -212,26 +228,32 @@ accident:
 
 `cli.main()` does the following, in order:
 
-1. **Validate inputs** — files exist, label count matches depth-source count.
+1. **Validate inputs** — files exist, label count matches depth-source count
+   (`-d` sources plus one per `-U` / `-1`+`-2` sample).
 2. **Parse annotation** — `parse_gff_rnas` returns one `RNA` per GFF
    `region` line, in file order, with `circular` set from the
    `Is_circular=true` attribute. `--rnas` selects and orders a subset;
    `--topology` overrides circularity for all of them.
-3. **Load depth** — for each RNA and each `-d` source, `load_depth` sniffs
+3. **Map reads** — if `-U`/`-1`/`-2` were given, `_map_read_sets` checks
+   bowtie2 is on `PATH`, warns where the reference FASTA's lengths disagree
+   with the GFF, gets an index (`ensure_bowtie2_index`: beside the FASTA,
+   else built and cached under `--outdir`), and runs bowtie2 once per sample
+   to `<name>.<label>.sam`. Those SAMs are appended to the depth sources.
+4. **Load depth** — for each RNA and each depth source, `load_depth` sniffs
    the file (`.sam`/`.bam` by extension, then gzip magic, then a leading `@`)
    and either parses `samtools depth` text or walks the alignments. The
    RNA's `seqid` picks the reference; a file with exactly one reference is
    accepted under any name; anything ambiguous is an error naming the
    candidates (`resolve_reference`). For a circular RNA, alignment blocks
    that run off the end wrap round to position 1.
-4. **Settings** — `load_settings` reads the YAML, warns on unknown keys,
+5. **Settings** — `load_settings` reads the YAML, warns on unknown keys,
    resolves `overlap_mode` and merges the function palette.
-5. **Prepare plotters** — one `LinearPlotter` and one `CircularPlotter`, each
+6. **Prepare plotters** — one `LinearPlotter` and one `CircularPlotter`, each
    with `prepare(rnas)`: across all RNAs it fixes the shared depth y-limit,
    the `--normalize` denominator and the reference length for
    width-proportional figures, so separate files compose honestly.
    `--free-y` / `--equal-width` opt out.
-6. **Per RNA** — `call_blocks` on the total depth at each `-t` threshold
+7. **Per RNA** — `call_blocks` on the total depth at each `-t` threshold
    (logged, and written as CSVs with `--report`); then the renderer chosen by
    `--layout` (`linear`, `circular`, or `auto` = circular for circular RNAs)
    renders to `<name>.<seqid>.<fmt>`, or plain `<name>.<fmt>` for a single RNA.
@@ -295,6 +317,13 @@ smoothed/normalised depth, `self._add_legend`, `self._add_title`,
 `StackedPlotter` for segmented genomes would draw N rows sharing one x-scale
 and needs nothing new from the model.
 
+**Mapping** is deliberately thin: `map_reads` builds a bowtie2 command and
+reads its exit status and stderr; VirPlot never parses bowtie2's output beyond
+logging the summary, and the SAM goes through the same `load_depth` as any
+other. Swapping in another aligner is a second `map_*` function and a CLI
+switch. Tests run without bowtie2 by passing a fake `runner` and, for the CLI,
+putting stub executables on `PATH`.
+
 **A new depth source.** Add a reader returning `(ndarray of length L,
 n)` and a branch in `parsers.load_depth`. Honour `seqid`/`ref` through
 `resolve_reference` and `circular` by wrapping, and the CLI needs no change.
@@ -325,6 +354,7 @@ Suites and what they pin down:
 | `test_parsers.py` | GFF3 and depth-file parsing, malformed input exits |
 | `test_alignments.py` | Every CIGAR op, each skip flag, MAPQ, reference resolution, an in-memory BAM equal to its SAM twin, randomised brute-force cross-check |
 | `test_analysis.py` | Smoothing and interval/gap calling |
+| `test_mapping.py` | Read-set validation, labels, FASTA lengths, index reuse/build/cache, the exact bowtie2 command lines, failure reporting, and the CLI end to end against stub `bowtie2` executables |
 | `test_multi_rna.py` | Multi-region GFF, per-seqid depth, shared scaling, CLI writes one file per RNA |
 | `test_circular.py` | `Is_circular` detection, wrapping at the origin, GRBV example end to end |
 | `test_circular_plot.py` | Polar geometry, origin-crossing arcs, pinned radial range, `--layout` selection |

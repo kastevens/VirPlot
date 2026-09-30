@@ -1,6 +1,6 @@
 # VirPlot
 
-This tool generates **SVG, PDF, or PNG plots** that combine viral genome feature annotations from a GFF3 file and sequencing depth from a `samtools depth` file or directly from SAM/BAM alignments.
+This tool generates **SVG, PDF, or PNG plots** that combine viral genome feature annotations from a GFF3 file and sequencing depth — from a `samtools depth` file, from SAM/BAM alignments, or straight from FASTQ reads that VirPlot maps to the reference with bowtie2.
 
 [![RNA-seq read depth across the Beet yellows virus genome](https://i.imgur.com/bDxrx1I.png)](https://i.imgur.com/bDxrx1I.png)
 
@@ -82,7 +82,8 @@ cp examples/spec.yml my_project.yml
 Three input files are required:
 
 1. **GFF3 file** — genome annotations containing CDS features and a `region` entry per RNA giving its length
-2. **Depth source** — either
+2. **Depth source** — one of
+   - FASTQ reads plus a reference FASTA (`-x`, `-U`/`-1`/`-2`); VirPlot runs bowtie2 and reads its SAM, **or**
    - tab-delimited output from `samtools depth -a`, **or**
    - a **SAM or BAM** file; VirPlot computes per-base depth from the alignments itself (no `samtools`/`pysam` needed)
 3. **YAML file** — color mapping and style settings (see [Customization](#customization))
@@ -131,6 +132,23 @@ Layout and topology are independent. `--topology` decides whether depth wraps at
 
 `--yscale symlog` has no meaning on a radial axis and is ignored in this layout.
 
+### Depth from FASTQ reads (bowtie2)
+
+Give reads and a reference and VirPlot maps them for you. The options mirror bowtie2's: `-U` for unpaired reads, `-1`/`-2` for mates, `-p` for threads. Each `-U` (or `-1`/`-2` pair) is one sample; comma-separate files that belong to the same sample, as bowtie2 does. `-x` takes the reference **FASTA** — an existing bowtie2 index beside it is used, otherwise one is built under `--outdir` and reused.
+
+```bash
+# one unpaired sample
+virplot -g grbv.gff3 -x grbv.fasta -U vine7.fastq.gz -y examples/grbv.yml -p 8 --smooth
+
+# two paired samples plus an existing depth file, stacked
+virplot -g byv.gff3 -x byv.fasta -1 a_R1.fq.gz -2 a_R2.fq.gz -1 b_R1.fq.gz -2 b_R2.fq.gz \
+        -d earlier.dep -l earlier a b -y examples/byv.yml --legend
+```
+
+The SAM bowtie2 writes is kept as `<name>.<label>.sam` in the output directory, and bowtie2's alignment summary is logged. `--bowtie2-args "--local --very-sensitive"` passes options through verbatim. Needs `bowtie2` and `bowtie2-build` on `PATH` (`conda install -c bioconda bowtie2`); nothing else in VirPlot depends on them.
+
+Two notes. Labels from `-l` apply to `-d` sources first, then to each sample in command-line order. And bowtie2 treats every reference as linear: for a circular genome, reads across the origin are soft-clipped or lost unless you pad the reference by a read length first — VirPlot will wrap a padded alignment back correctly (see *Circular genomes*), but it does not pad the FASTA for you yet.
+
 ### Depth from SAM/BAM
 
 ```bash
@@ -150,7 +168,9 @@ The reference to plot is taken from the GFF `region` line's sequence id. If the 
 ## Usage
 
 ```txt
-virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
+virplot [-h] [-V] -g GFF [-d DEPTH [DEPTH ...]] [-l LABELS [LABELS ...]]
+        [-x FASTA] [-U FASTQ[,FASTQ...]] [-1 FASTQ[,FASTQ...]] [-2 FASTQ[,FASTQ...]]
+        [-p THREADS] [--bowtie2-args ARGS]
         [--ref REF] [--rnas SEQID [SEQID ...]] [--topology {auto,circular,linear}]
         [--layout {linear,circular,auto}] [--free-y] [--equal-width]
         [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
@@ -165,7 +185,12 @@ virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
 | Flag                 | Description                                                    |
 | -------------------- | -------------------------------------------------------------- |
 | `-g`, `--gff`        | Path to GFF3 annotation file                                   |
-| `-d`, `--depth`      | One or more depth sources — `samtools depth` files or SAM/BAM (stacked if multiple) |
+| `-d`, `--depth`      | Depth sources — `samtools depth` files or SAM/BAM (stacked if multiple); optional when reads are given |
+| `-x`, `--reference`  | Reference FASTA for mapping reads with bowtie2 (index built and cached under `--outdir`) |
+| `-U`                 | Unpaired FASTQ for one sample; repeat for more samples; comma-separate files of one sample |
+| `-1`, `-2`           | Mate-1 / mate-2 FASTQ for one paired sample; repeat the pair for more samples |
+| `-p`, `--threads`    | Threads for bowtie2 and bowtie2-build (default: 1) |
+| `--bowtie2-args`     | Extra options passed to bowtie2 verbatim |
 | `-l`, `--labels`     | Label(s) for each depth source (same order as `--depth`)       |
 | `--ref`              | Reference name to use from SAM/BAM/depth files when it differs from the GFF sequence id (single-RNA GFF only) |
 | `--rnas`             | Plot only these GFF sequence ids, in this order (default: every `region`) |

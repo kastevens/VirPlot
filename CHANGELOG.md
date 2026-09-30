@@ -10,6 +10,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Map reads with bowtie2.** `-x FASTA` plus `-U` (unpaired) or `-1`/`-2`
+  (paired) per sample, `-p` threads and `--bowtie2-args`, mirroring bowtie2's
+  own options. VirPlot builds and caches the index under `--outdir` (or uses
+  one beside the FASTA), runs bowtie2 once per sample, logs its alignment
+  summary, keeps the SAM as `<name>.<label>.sam`, and feeds it into the
+  depth pipeline; `-d` sources and read samples can be mixed. Warns when the
+  FASTA and GFF disagree on a sequence length. Code in `virplot.analysis`;
+  bowtie2 is needed only when reads are given.
 - **SAM/BAM input.** `-d/--depth` now accepts SAM or BAM files alongside
   `samtools depth` output; VirPlot computes per-base depth from the
   alignments itself (`virplot.alignments`, standard library only — BAM is

@@ -8,7 +8,9 @@ import os
 import sys
 
 from virplot import __version__
-from virplot.analysis import call_blocks, write_csvs
+from virplot.analysis import (MappingError, ReadSet, call_blocks, default_read_label,
+                              ensure_bowtie2_index, fasta_lengths, map_reads,
+                              missing_bowtie2_tools, write_csvs)
 from virplot.models import RNA
 from virplot.alignments import AlignmentError
 from virplot.parsers import default_label, load_depth, parse_gff_rnas
@@ -36,11 +38,31 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-V", "--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("-g", "--gff", required=True,
                    help="Path to GFF3 annotation file")
-    p.add_argument("-d", "--depth", nargs="+", required=True,
-                   help="One or more depth sources: samtools depth output, or "
-                        "SAM/BAM alignments (stacked if multiple)")
+    p.add_argument("-d", "--depth", nargs="+", default=[],
+                   help="Depth sources: samtools depth output, or SAM/BAM alignments "
+                        "(stacked if multiple). Can be combined with reads below")
     p.add_argument("-l", "--labels", nargs="+",
-                   help="Label(s) for depth line (same order as --depth)")
+                   help="Label(s) for the depth tracks: -d sources first, then each "
+                        "-U sample, then each -1/-2 pair, in command-line order")
+
+    reads = p.add_argument_group(
+        "map reads with bowtie2 (options mirror bowtie2)",
+        "Give FASTQ instead of, or as well as, -d. Each -U is one unpaired sample and "
+        "each -1/-2 pair one paired sample; comma-separate files that belong to the "
+        "same sample, as bowtie2 does. Needs bowtie2 and bowtie2-build on PATH.")
+    reads.add_argument("-x", "--reference", metavar="FASTA",
+                       help="Reference genome FASTA; a bowtie2 index beside it is used, "
+                            "otherwise one is built under --outdir and reused")
+    reads.add_argument("-U", dest="unpaired", action="append", metavar="FASTQ[,FASTQ...]",
+                       help="Unpaired reads for one sample (repeat for more samples)")
+    reads.add_argument("-1", dest="mate1", action="append", metavar="FASTQ[,FASTQ...]",
+                       help="Mate-1 reads for one paired sample (repeat for more samples)")
+    reads.add_argument("-2", dest="mate2", action="append", metavar="FASTQ[,FASTQ...]",
+                       help="Mate-2 reads, one -2 per -1")
+    reads.add_argument("-p", "--threads", type=int, default=1,
+                       help="Threads for bowtie2 and bowtie2-build [%(default)s]")
+    reads.add_argument("--bowtie2-args", default="",
+                       help="Extra options passed to bowtie2 verbatim, e.g. \"--local --very-sensitive\"")
     p.add_argument("--ref",
                    help="Reference name to use from SAM/BAM/depth files when the GFF "
                         "sequence id does not match (single-RNA GFF only)")
@@ -96,6 +118,56 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _read_sets(args) -> list[ReadSet]:
+    """Turn -U / -1 / -2 occurrences into one ReadSet per sample."""
+    sets: list[ReadSet] = []
+    for spec in args.unpaired or []:
+        files = spec.split(",")
+        sets.append(ReadSet(label=default_read_label(files), unpaired=files))
+    m1, m2 = args.mate1 or [], args.mate2 or []
+    if len(m1) != len(m2):
+        log.error("-1 given %d time(s) but -2 %d time(s); each paired sample needs one of each",
+                  len(m1), len(m2))
+        sys.exit(1)
+    for a, b in zip(m1, m2):
+        fa, fb = a.split(","), b.split(",")
+        sets.append(ReadSet(label=default_read_label(fa), mate1=fa, mate2=fb))
+    if sets and not args.reference:
+        log.error("Reads were given (-U/-1/-2) but no reference: add -x FASTA")
+        sys.exit(1)
+    return sets
+
+
+def _map_read_sets(args, read_sets: list[ReadSet], rnas) -> list[str]:
+    """Run bowtie2 for every sample; return the SAM paths in sample order."""
+    missing = missing_bowtie2_tools()
+    if missing:
+        raise MappingError(f"{', '.join(missing)} not found on PATH; install bowtie2 "
+                           "(e.g. conda install -c bioconda bowtie2)")
+    for r in read_sets:
+        r.validate()
+
+    # the FASTA is the truth about length; warn early if the GFF disagrees
+    lengths = fasta_lengths(args.reference)
+    for rna in rnas:
+        if rna.seqid in lengths and lengths[rna.seqid] != rna.length:
+            log.warning("%s is %d bp in the GFF but %d bp in %s",
+                        rna.seqid, rna.length, lengths[rna.seqid],
+                        os.path.basename(args.reference))
+    absent = [r.seqid for r in rnas if r.seqid not in lengths]
+    if absent and len(lengths) > 1:
+        log.warning("Not in the reference FASTA: %s (headers there: %s)",
+                    ", ".join(absent), ", ".join(list(lengths)[:6]))
+
+    index = ensure_bowtie2_index(args.reference, args.outdir, threads=args.threads)
+    extra = args.bowtie2_args.split() if args.bowtie2_args else []
+    sams = []
+    for r in read_sets:
+        out_sam = os.path.join(args.outdir, f"{args.name}.{r.label}.sam")
+        sams.append(map_reads(r, index, out_sam, threads=args.threads, extra_args=extra))
+    return sams
+
+
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     handler = logging.StreamHandler()
@@ -114,9 +186,15 @@ def main(argv: list[str] | None = None) -> None:
         if not os.path.isfile(f):
             log.error("Depth file not found: %s", f)
             sys.exit(1)
-    if args.labels and len(args.labels) != len(args.depth):
-        log.error("Mismatching number of labels [%d] to depth files [%d]",
-                  len(args.labels), len(args.depth))
+
+    read_sets = _read_sets(args)
+    if not args.depth and not read_sets:
+        log.error("Give at least one depth source (-d) or reads to map (-U or -1/-2)")
+        sys.exit(1)
+    n_tracks = len(args.depth) + len(read_sets)
+    if args.labels and len(args.labels) != n_tracks:
+        log.error("Mismatching number of labels [%d] to depth tracks [%d]",
+                  len(args.labels), n_tracks)
         sys.exit(1)
 
     # --- parse annotations ---
@@ -147,11 +225,26 @@ def main(argv: list[str] | None = None) -> None:
             log.info("Parsed %d features from GFF (%d bp, %s)",
                      len(rna.features), rna.length, shape)
 
+    # --- labels: -d sources first, then samples; -l overrides both and names the SAMs ---
+    labels = args.labels or ([default_label(f) for f in args.depth]
+                             + [r.label for r in read_sets])
+    for r, label in zip(read_sets, labels[len(args.depth):]):
+        r.label = label
+
+    # --- map reads, if any, so they join the depth sources as SAM files ---
+    depth_sources = list(args.depth)
+    if read_sets:
+        os.makedirs(args.outdir, exist_ok=True)
+        try:
+            depth_sources += _map_read_sets(args, read_sets, rnas)
+        except MappingError as exc:
+            log.error("%s", exc)
+            sys.exit(1)
+
     # --- depth tracks ---
-    labels = args.labels or [default_label(f) for f in args.depth]
     for rna in rnas:
         counts: set[int] = set()
-        for label, df in zip(labels, args.depth):
+        for label, df in zip(labels, depth_sources):
             try:
                 y, n, kind = load_depth(df, rna.length, seqid=rna.seqid,
                                         ref=args.ref, min_mapq=args.min_mapq,
