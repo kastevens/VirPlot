@@ -12,7 +12,7 @@ from virplot.analysis import call_blocks, write_csvs
 from virplot.models import RNA
 from virplot.alignments import AlignmentError
 from virplot.parsers import default_label, load_depth, parse_gff_rnas
-from virplot.plotting import LinearPlotter
+from virplot.plotting import CircularPlotter, LinearPlotter
 from virplot.settings import load_settings
 
 log = logging.getLogger(__name__)
@@ -50,6 +50,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--topology", choices=["auto", "circular", "linear"], default="auto",
                    help="Treat the genome(s) as circular or linear; 'auto' follows the "
                         "GFF region line's Is_circular attribute [%(default)s]")
+    p.add_argument("--layout", choices=["linear", "circular", "auto"], default="linear",
+                   help="Figure layout: a linear track, a circular (polar) plot, or "
+                        "'auto' to draw circular genomes as circles [%(default)s]")
     p.add_argument("--free-y", action="store_true",
                    help="With several RNAs, let each figure pick its own depth y-limit "
                         "instead of sharing one")
@@ -174,8 +177,12 @@ def main(argv: list[str] | None = None) -> None:
     log.info("Loaded settings from %s", args.yaml)
 
     os.makedirs(args.outdir, exist_ok=True)
-    plotter = LinearPlotter(settings, args)
-    plotter.prepare(rnas)
+    # One prepared plotter per layout, so cross-RNA scaling is shared; --layout
+    # 'auto' can mix the two when a GFF holds both circular and linear RNAs.
+    linear_plotter = LinearPlotter(settings, args)
+    linear_plotter.prepare(rnas)
+    circular_plotter = CircularPlotter(settings, args)
+    circular_plotter.prepare(rnas)
 
     for rna in rnas:
         out_base = f"{args.name}.{rna.seqid}" if multi else args.name
@@ -195,4 +202,7 @@ def main(argv: list[str] | None = None) -> None:
                 write_csvs(intervals, gaps, args.outdir, out_base, T)
 
         # --- plot ---
-        plotter.render(rna, threshold_results, out_base)
+        circular_layout = args.layout == "circular" or (
+            args.layout == "auto" and rna.circular)
+        (circular_plotter if circular_layout else linear_plotter).render(
+            rna, threshold_results, out_base)

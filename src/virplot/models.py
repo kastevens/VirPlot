@@ -85,3 +85,23 @@ class RNA:
     def positions(self) -> np.ndarray:
         """1-based genome positions, ``[1, 2, ..., length]``."""
         return np.arange(1, self.length + 1, dtype=int)
+
+    def feature_spans(self, feature: Feature) -> list[tuple[int, int]]:
+        """Drawable 1-based inclusive spans for a feature.
+
+        Normally one span. On a circular molecule a feature crossing the
+        origin — written either as ``start > end`` or with an ``end`` past the
+        genome length, both of which occur in the wild — becomes two spans so
+        it can be drawn continuously.
+        """
+        start, end = feature.start, feature.end
+        if not self.circular:
+            return [(start, end)]
+        if end > self.length:
+            wrapped = end - self.length
+            if wrapped >= start:                   # wraps right round
+                return [(1, self.length)]
+            return [(start, self.length), (1, wrapped)]
+        if start > end:
+            return [(start, self.length), (1, end)]
+        return [(start, end)]

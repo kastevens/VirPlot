@@ -36,6 +36,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   length, so depth is continuous across the origin for a BAM produced by
   padding the reference and wrapping coordinates back. The annotation track
   drops the 5'/3' marks and shows the backbone continuing past both edges.
+- **Circular layout.** `--layout circular` draws a genome as a circle on a
+  single polar axes: feature arcs in a two-lane outer ring, depth as a filled
+  band inside it, position 1 at the top running clockwise. `--layout auto`
+  picks it for genomes marked circular; the default stays `linear`. A feature
+  crossing the origin is drawn as the two arcs it occupies
+  (`RNA.feature_spans`). `--yscale symlog` is ignored in this layout.
 - `examples/grbv.gff3`, `examples/grbv.sam`, `examples/grbv.yml` — grapevine
   red blotch virus (RefSeq NC_022002.1, 3206 nt circular): real RefSeq
   annotation with simulated, origin-spanning reads

@@ -108,7 +108,22 @@ virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml --legend
 virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml --topology linear
 ```
 
-On a circular genome the annotation track drops the 5′/3′ marks and shows the backbone continuing past both edges instead.
+On a circular genome the linear layout drops the 5′/3′ marks and shows the backbone continuing past both edges instead.
+
+#### Circular layout
+
+`--layout circular` draws the genome as a circle instead: feature arcs in an outer ring (two lanes, so overlapping ORFs stay legible), read depth as a filled band inside it, position 1 at the top and coordinates running clockwise. A feature crossing the origin is drawn as the two arcs it occupies rather than being clipped.
+
+```bash
+virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml \
+  --layout circular --legend --title
+```
+
+`--layout auto` uses the circle for genomes the GFF marks circular and the linear tracks for the rest, which is what you want when one GFF holds both. The default stays `linear`: a circle is the honest picture of the molecule, but a linear track carries far more feature labels legibly, so it remains the better default for a densely annotated genome.
+
+Layout and topology are independent. `--topology` decides whether depth wraps at the origin (the arithmetic); `--layout` decides how it is drawn. Drawing a circular genome with `--topology linear` renders the false origin dip as a wedge cut out of the ring at 12 o'clock — a quick way to see whether your pipeline handled the origin.
+
+`--yscale symlog` has no meaning on a radial axis and is ignored in this layout.
 
 ### Depth from SAM/BAM
 
@@ -131,7 +146,7 @@ The reference to plot is taken from the GFF `region` line's sequence id. If the 
 ```txt
 virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
         [--ref REF] [--rnas SEQID [SEQID ...]] [--topology {auto,circular,linear}]
-        [--free-y] [--equal-width]
+        [--layout {linear,circular,auto}] [--free-y] [--equal-width]
         [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
         [--yscale {linear,symlog}] [--linthresh LINTHRESH]
         [--name NAME] [--no-label] [--no-border]
@@ -152,6 +167,7 @@ virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
 | `--equal-width`      | With several RNAs, draw every figure at full width               |
 | `--min-mapq`         | Skip SAM/BAM reads with MAPQ below this (default: 0)           |
 | `--topology`         | `auto` (from the GFF `Is_circular` attribute), `circular` or `linear` |
+| `--layout`           | `linear` (default), `circular`, or `auto` to draw circular genomes as circles |
 | `-y`, `--yaml`       | YAML file for color mapping and other specs                    |
 | `-o`, `--outdir`     | Output directory (default: `.`)                                |
 | `-f`, `--format`     | Output format: `svg`, `pdf`, or `png` (default: `svg`)         |

@@ -38,6 +38,16 @@ FIGURE_HEIGHT = 4
 HEIGHT_RATIO_ANNOTATION = 1
 HEIGHT_RATIO_DEPTH = 1
 
+# circular layout: radii as a fraction of the plotted radius, inside out
+CIRC_FIGSIZE = 8
+CIRC_R_DEPTH_BASE = 0.30        # depth baseline (zero coverage)
+CIRC_R_DEPTH_MAX = 0.72         # depth at the y-limit
+CIRC_R_ANN_LANES = (0.80, 0.895)  # bottom radius of the inner / outer feature lane
+CIRC_ANN_HEIGHT = 0.085
+CIRC_R_OUTSIDE_LABEL = 1.01     # labels for features too narrow to hold text
+CIRC_RMAX = 1.22                # leaves room for position ticks; rim is hidden
+CIRC_SMALL_FEATURE_FRACTION = 0.055  # of the circle; below this the label goes outside
+
 
 class Plotter:
     """Base renderer: shared state and geometry-independent helpers.
@@ -280,3 +290,198 @@ class LinearPlotter(Plotter):
 
         if args.grid:
             ax.grid(True, linestyle="--", linewidth=0.3)
+
+
+class CircularPlotter(Plotter):
+    """One polar axes: feature arcs in an outer ring, depth as an inner band.
+
+    Position *p* maps to θ = 2π(p−1)/L, with position 1 at the top and
+    increasing clockwise, so the whole molecule closes on itself and a
+    feature or a read crossing the origin is drawn continuously.
+    """
+
+    def render(self, rna: RNA, threshold_results: list[tuple], out_base: str) -> None:
+        fig = plt.figure(figsize=(CIRC_FIGSIZE, CIRC_FIGSIZE))
+        ax = fig.add_subplot(projection="polar")
+        ax.set_theta_zero_location("N")
+        ax.set_theta_direction(-1)
+        ax.set_rorigin(0)
+        ax.set_ylim(0, CIRC_RMAX)          # pin it: autoscale pads below the
+                                           # smallest radius and shows an inner spine
+        ax.set_yticks([])
+        ax.spines["polar"].set_visible(False)
+
+        if self.args.yscale == "symlog":
+            log.warning("--yscale symlog is ignored in the circular layout")
+
+        extra_artists = self._draw_annotations(ax, rna)
+
+        tracks, total = self._prepared_tracks(rna)
+        layers = self._draw_depth(ax, rna, tracks, total)
+
+        if self.args.shade_breaks:
+            self._shade_gaps(ax, rna, threshold_results)
+
+        self._draw_axis(ax, rna, total)
+
+        if self.args.legend:
+            self._add_legend(ax, layers, rna.labels)
+
+        extra_artists.append(self._add_title(fig))
+
+        self._save(fig, extra_artists, out_base)
+        plt.close(fig)
+
+    # --- geometry -----------------------------------------------------------
+
+    @staticmethod
+    def _theta(pos, seq_len: int):
+        """1-based genome position -> angle in radians."""
+        return 2 * np.pi * (np.asarray(pos) - 1) / seq_len
+
+    def _depth_radius(self, values: np.ndarray, ymax: float) -> np.ndarray:
+        """Scale depth into the radial band [base, max]."""
+        span = CIRC_R_DEPTH_MAX - CIRC_R_DEPTH_BASE
+        scaled = np.clip(values / ymax, 0.0, 1.0) if ymax else np.zeros_like(values)
+        return CIRC_R_DEPTH_BASE + scaled * span
+
+    @staticmethod
+    def _close(theta: np.ndarray, *arrays: np.ndarray):
+        """Repeat the first sample at θ=2π so filled areas close at the origin."""
+        theta_c = np.append(theta, 2 * np.pi)
+        return (theta_c, *(np.append(a, a[0]) for a in arrays))
+
+    # --- panels -------------------------------------------------------------
+
+    def _draw_annotations(self, ax, rna: RNA) -> list:
+        """Feature arcs in two lanes, plus the origin marker."""
+        args = self.args
+        extra: list = []
+
+        for i, feat in enumerate(rna.features):
+            lane = CIRC_R_ANN_LANES[i % 2]
+            color = self._feature_color(feat.product)
+            for start, end in rna.feature_spans(feat):
+                width = self._theta(end + 1, rna.length) - self._theta(start, rna.length)
+                centre = self._theta(start, rna.length) + width / 2
+                ax.bar(centre, CIRC_ANN_HEIGHT, width=width, bottom=lane,
+                       facecolor=color, edgecolor="none" if args.no_border else "black",
+                       linewidth=0.6, align="center", zorder=3)
+
+            if not args.no_label:
+                extra.append(self._label_feature(ax, rna, feat, lane,
+                                                 rna.feature_spans(feat)))
+
+        # origin: a radial tick at position 1
+        ax.plot([0, 0], [CIRC_R_DEPTH_BASE, CIRC_R_ANN_LANES[1] + CIRC_ANN_HEIGHT],
+                color="black", linewidth=0.8, linestyle=(0, (3, 2)), zorder=4)
+        return [a for a in extra if a is not None]
+
+    def _label_feature(self, ax, rna: RNA, feat, lane: float,
+                       spans: list[tuple[int, int]]):
+        """Label along the arc, or radially outside it when the arc is narrow."""
+        fontsize = self.settings.annotation_fontsize
+        covered = sum(e - s + 1 for s, e in spans)
+        # midway along the covered arc, which may run through the origin
+        mid = ((spans[0][0] - 1 + covered / 2) % rna.length) + 1
+        theta = float(self._theta(mid, rna.length))
+        deg = np.degrees(theta)
+        fraction = min(covered, rna.length) / rna.length
+
+        if fraction >= CIRC_SMALL_FEATURE_FRACTION:
+            rotation = -deg
+            if 90 < (deg % 360) < 270:          # keep text the right way up
+                rotation += 180
+            return ax.text(theta, lane + CIRC_ANN_HEIGHT / 2, feat.product,
+                           ha="center", va="center", rotation=rotation,
+                           rotation_mode="anchor", fontsize=fontsize, zorder=5)
+
+        # narrow feature: read outwards from the rim
+        left = 90 < (deg % 360) < 270
+        return ax.text(theta, CIRC_R_OUTSIDE_LABEL, feat.product,
+                       ha="right" if left else "left", va="center",
+                       rotation=(-deg + 180) if left else -deg,
+                       rotation_mode="anchor", fontsize=fontsize,
+                       clip_on=False, zorder=5)
+
+    def _draw_depth(self, ax, rna: RNA, tracks: list[np.ndarray],
+                    total: np.ndarray) -> list:
+        """Depth as a filled radial band; several tracks stack cumulatively."""
+        s = self.settings
+        ymax = (self.shared_ymax if self.shared_ymax is not None else total.max()) or 1.0
+        ymax *= Y_HEADROOM
+        theta = self._theta(rna.positions, rna.length)
+        base = CIRC_R_DEPTH_BASE
+
+        ax.plot(*self._close(theta, np.full_like(total, base, dtype=float)),
+                color="black", linewidth=0.5, alpha=0.4, zorder=1)
+
+        if len(tracks) == 1:
+            r = self._depth_radius(total, ymax)
+            th, rc = self._close(theta, r)
+            ax.fill_between(th, base, rc, color=s.depth_line_color, alpha=0.3, zorder=2)
+            layers = ax.plot(th, rc, color=s.depth_line_color, linewidth=0.8,
+                             alpha=0.9, zorder=2)
+        else:
+            k = len(tracks)
+            colors = (s.stacked_area_colors[:k]
+                      + [s.default_color] * max(0, k - len(s.stacked_area_colors)))
+            layers = []
+            lower = np.zeros_like(total, dtype=float)
+            for track, color in zip(reversed(tracks), colors):
+                upper = lower + track
+                th, rl, ru = self._close(theta,
+                                         self._depth_radius(lower, ymax),
+                                         self._depth_radius(upper, ymax))
+                layers.append(ax.fill_between(th, rl, ru, color=color, alpha=0.9, zorder=2))
+                lower = upper
+            th, rc = self._close(theta, self._depth_radius(total, ymax))
+            ax.plot(th, rc, color="black", linewidth=0.3, alpha=0.8, zorder=3,
+                    label="Combined depth")
+
+        self._depth_ymax = ymax
+        return layers
+
+    def _shade_gaps(self, ax, rna: RNA, threshold_results: list[tuple]) -> None:
+        height = CIRC_R_DEPTH_MAX - CIRC_R_DEPTH_BASE
+        for _, _, gaps, _ in threshold_results:
+            for g in gaps:
+                start, end = g["start_bp"], g["end_bp"]
+                width = self._theta(end + 1, rna.length) - self._theta(start, rna.length)
+                centre = self._theta(start, rna.length) + width / 2
+                ax.bar(centre, height, width=width, bottom=CIRC_R_DEPTH_BASE,
+                       color=self.settings.shade_color, alpha=0.15, linewidth=0, zorder=1)
+
+    def _draw_axis(self, ax, rna: RNA, total: np.ndarray) -> None:
+        """Genome-position ticks round the rim, and a depth scale at the origin."""
+        step = _nice_step(rna.length / 8)
+        ticks = np.arange(0, rna.length, step)
+        ax.set_xticks(self._theta(ticks + 1, rna.length))
+        ax.set_xticklabels([f"{int(t):,}" if t else "1" for t in ticks], fontsize=8)
+        ax.tick_params(axis="x", pad=2)
+        ax.grid(self.args.grid, axis="x", linestyle="--", linewidth=0.3, alpha=0.6)
+
+        # depth scale: floor and ceiling on the origin radius, so the radial
+        # extent is readable without a second axis
+        ymax = getattr(self, "_depth_ymax", total.max() or 1.0)
+        fmt = (lambda v: f"{v:.2g}") if self.args.normalize else (lambda v: f"{v:.0f}")
+        unit = "" if self.args.normalize else "\u00d7"
+        for radius, text in ((CIRC_R_DEPTH_BASE, f" {fmt(0.0)}"),
+                             (CIRC_R_DEPTH_MAX, f" {fmt(ymax)}{unit} depth")):
+            ax.text(0, radius, text, ha="left", va="bottom",
+                    fontsize=7, color="0.35", zorder=5)
+
+        # the hub is empty: name the molecule there rather than over the trace
+        ax.text(0, 0, f"{rna.name}\n{rna.length:,} nt", ha="center", va="center",
+                fontsize=9, color="0.35", linespacing=1.5, zorder=5)
+
+
+def _nice_step(target: float) -> int:
+    """Round a tick spacing up to 1, 2 or 5 x a power of ten."""
+    if target <= 0:
+        return 1
+    exp = 10 ** int(np.floor(np.log10(target)))
+    for mult in (1, 2, 5, 10):
+        if mult * exp >= target:
+            return int(mult * exp)
+    return int(10 * exp)
