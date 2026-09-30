@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 ANNOTATION_Y_BASE = 0.5
 ANNOTATION_HEIGHT = 0.6
 ARROW_HEAD_FRACTION = 0.012     # of genome length; arrowhead length cap
+NEAR_GAP_FRACTION = 0.01        # same-colour neighbours closer than this flip apart
 ORF_LABEL_FONTSIZE = 7          # ORF name written outside the glyph
 LABEL_PAD_FRACTION = 0.02
 SMALL_FEATURE_THRESHOLD = 500  # bp; features shorter than this get external labels
@@ -121,14 +122,23 @@ class Plotter:
     def _feature_color(self, product: str) -> str:
         return self.settings.feature_color(product)
 
-    def _edge_color(self) -> str:
-        """ORF glyph outline: none by default (as the ICTV figures), black with --border."""
-        return "black" if getattr(self.args, "border", False) else "none"
 
     def _placements(self, rna: RNA, circular: bool) -> tuple[list[Placement], str]:
-        """Lay the features out; returns (placements, rule used)."""
+        """Lay the features out; returns (placements, rule used).
+
+        In flip mode a glyph also flips when its upstream neighbour is the same
+        colour and closer than ``NEAR_GAP_FRACTION`` of the genome: without an
+        outline two such boxes would merge into one (ICTV draws BYV's CP
+        below CPm for exactly this reason).
+        """
         mode = "nest" if circular else resolve_mode(self.settings.overlap_mode, rna.two_strand)
-        return place_features(rna.features, rna.feature_spans, mode), mode
+        near = NEAR_GAP_FRACTION * rna.length
+
+        def crowded(prev, feat) -> bool:
+            gap = feat.start - prev.end
+            return 0 <= gap < near and self._feature_color(prev.product) == self._feature_color(feat.product)
+
+        return place_features(rna.features, rna.feature_spans, mode, flip_if=crowded), mode
 
     @staticmethod
     def _head_length(span_len: int, seq_len: int) -> float:
@@ -245,17 +255,15 @@ class LinearPlotter(Plotter):
             feat = pl.feature
             yb = y0 + pl.tier * H if pl.side == ABOVE else y0 - (pl.tier + 1) * H
             color = self._feature_color(feat.product)
-            edge = self._edge_color()
             spans = rna.feature_spans(feat)
             head_span = spans[-1] if feat.forward else spans[0]
             for (s_, e_) in spans:
                 if arrows and (s_, e_) == head_span:
                     ax.add_patch(Polygon(self._arrow_points(s_, e_, yb, H, feat.forward, seq_len),
-                                         closed=True, facecolor=color, edgecolor=edge,
-                                         linewidth=0.8))
+                                         closed=True, facecolor=color, edgecolor="none"))
                 else:
                     ax.add_patch(Rectangle((s_, yb), e_ - s_, H,
-                                           facecolor=color, edgecolor=edge))
+                                           facecolor=color, edgecolor="none"))
 
             if args.no_label:
                 continue
@@ -458,26 +466,13 @@ class CircularPlotter(Plotter):
             tier = min(pl.tier, CIRC_MAX_TIERS - 1)
             lane = lane0 - tier * CIRC_LANE_STEP
             color = self._feature_color(feat.product)
-            edge = self._edge_color()
             spans = rna.feature_spans(feat)
             head_span = spans[-1] if feat.forward else spans[0]
             for (s_, e_) in spans:
                 th0, th1 = self._theta(s_, L), self._theta(e_ + 1, L)
                 head = self._theta(1 + self._head_length(e_ - s_ + 1, L), L) if (s_, e_) == head_span else 0.0
-                body0, body1 = (th0, th1 - head) if feat.forward else (th0 + head, th1)
-                if body1 > body0:
-                    ax.bar((body0 + body1) / 2, CIRC_ANN_HEIGHT, width=body1 - body0,
-                           bottom=lane, facecolor=color, edgecolor=edge, linewidth=0.6,
-                           align="center", zorder=3)
-                if head:
-                    r_lo, r_hi = lane - CIRC_ANN_HEIGHT * 0.18, lane + CIRC_ANN_HEIGHT * 1.18
-                    r_mid = lane + CIRC_ANN_HEIGHT / 2
-                    if feat.forward:
-                        pts_t, pts_r = [body1, th1, body1], [r_lo, r_mid, r_hi]
-                    else:
-                        pts_t, pts_r = [body0, th0, body0], [r_lo, r_mid, r_hi]
-                    ax.fill(pts_t, pts_r, facecolor=color, edgecolor=edge,
-                            linewidth=0.6, zorder=3)
+                th, r = self._arc_arrow(th0, th1, lane, CIRC_ANN_HEIGHT, feat.forward, head)
+                ax.fill(th, r, facecolor=color, edgecolor="none", zorder=3)
 
             if not args.no_label:
                 extra.append(self._label_feature(ax, rna, feat, lane, spans))
@@ -495,6 +490,33 @@ class CircularPlotter(Plotter):
         ax.plot([0], [stem_top + 0.055], marker="o", markersize=5, markerfacecolor="white",
                 markeredgecolor="black", markeredgewidth=1.0, zorder=4, clip_on=False)
         return [a for a in extra if a is not None]
+
+    @staticmethod
+    def _arc_arrow(th0: float, th1: float, lane: float, height: float,
+                   forward: bool, head: float) -> tuple[np.ndarray, np.ndarray]:
+        """One closed polar path for an arc with an optional arrowhead.
+
+        Body and head used to be two patches, which left a hairline seam and a
+        flat head base against a curved wedge. A single densely sampled
+        outline (outer arc, head, inner arc back) has neither.
+        """
+        r_in, r_out = lane, lane + height
+        r_lo, r_hi, r_mid = lane - height * 0.18, lane + height * 1.18, lane + height / 2
+        head = min(head, th1 - th0)
+        b0, b1 = (th0, th1 - head) if forward else (th0 + head, th1)
+        n = max(4, int(np.degrees(b1 - b0) * 2))          # ~2 samples per degree
+        outer = np.linspace(b0, b1, n)
+        inner = outer[::-1]
+        if head <= 0:
+            th = np.concatenate([outer, inner])
+            r = np.concatenate([np.full(n, r_out), np.full(n, r_in)])
+        elif forward:                                      # tip at th1 (clockwise end)
+            th = np.concatenate([outer, [b1, th1, b1], inner])
+            r = np.concatenate([np.full(n, r_out), [r_hi, r_mid, r_lo], np.full(n, r_in)])
+        else:                                              # tip at th0 (anticlockwise end)
+            th = np.concatenate([outer, inner, [b0, th0, b0]])
+            r = np.concatenate([np.full(n, r_out), np.full(n, r_in), [r_lo, r_mid, r_hi]])
+        return th, r
 
     def _label_outside(self, ax, rna: RNA, text: str, spans, fontsize: int):
         """Radial text just outside the arc ring, reading outwards."""

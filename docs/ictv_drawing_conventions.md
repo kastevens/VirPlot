@@ -40,6 +40,10 @@ or a grey oval `VPg`; 3′ end `3′OH` or `A(n)`.
 - An ORF that overlaps its upstream neighbour flips to the opposite side.
   Non-overlapping neighbours stay on the same side. Overlapping runs therefore
   alternate above/below (BYV, CTV, ASGV, luteovirids, tombusvirids).
+- An ORF that is the **same colour** as its upstream neighbour and within
+  ~1 % of the genome length of it also flips, so two flat boxes do not read
+  as one (BYV CPm/CP, 70 nt apart, both magenta). Added after checking the
+  figures — see §7.
 - Reading frame is **not** encoded by vertical position (Caulimoviridae is the
   one family that tiers by frame).
 
@@ -133,6 +137,15 @@ showed the spec itself needs a change. Rule numbers refer to the sections above.
 
 ### Changes the document needs
 
+**A′. §2 L1 — the flip rule needs a legibility clause.** Boxes carry no
+outline, so two adjacent same-colour boxes merge. The figures flip such a pair
+even without overlap (BYV CP below CPm). Implemented as: flip when the
+upstream neighbour resolves to the same colour and the gap is under
+`NEAR_GAP_FRACTION` (1 %) of the genome. With the figure's palette
+(`examples/byv.yml`) this makes BYV agree with Closteroviridae Fig 2 on all
+nine ORFs — including ORF1a→RdRp, which flips because both are replicase
+yellow and 2 nt apart, not because the code knows about the frameshift.
+
 **A. §2 L1 — the flip rule can overprint.** "Flip when overlapping the upstream
 neighbour" only looks one feature back. With a long upstream ORF (a polyprotein
 spanning several small downstream ORFs) the flipped side can already be
@@ -212,7 +225,7 @@ compared too, and a real fixture added.
 
 | Rule (§) | Holds in | Breaks in |
 |---|---|---|
-| L1 flip only on overlap (§2) | BYV: RdRp→p6 (50 nt gap) stay together below; every overlapping pair flips. CTV likewise. | BYV: CP is flipped below CPm despite a 70 nt gap (same colour, close — flipped for legibility). LIYV RNA-1: p31 is above though RdRp below and no overlap. |
+| L1 flip only on overlap (§2) | BYV: RdRp→p6 (50 nt gap) stay together below; every overlapping pair flips. CTV likewise. | BYV: CP is flipped below CPm despite a 70 nt gap (same colour, close — flipped for legibility; now a rule, see A′). LIYV RNA-1: p31 is above though RdRp below and no overlap. |
 | First (5′-most) ORF above (§2) | BYV, LIYV, BYDV | **CTV: ORF1a is below, RdRp above.** Starting side is arbitrary; alternation is what matters. |
 | Frameshift = step + `+1 FS` label (§1) | CTV (label present). | BYV shows the same step with no label. The step is simply the flip; the flip happens although the two boxes abut (7997/7999) rather than overlap — so **frameshift continuation flips even without overlap**. |
 | Readthrough = one box + bar (§1) | — | BYDV-PAV: ORF3→ORF5 readthrough is two abutting boxes on the **same** side, no bar. And ORF5 stays above although the rule would put it below with ORF4. So **readthrough continuation does not flip, frameshift does** — opposite behaviours the coordinates alone cannot distinguish. |
@@ -227,12 +240,15 @@ compared too, and a real fixture added.
 
 ### 7.2 What VirPlot does about it
 
-* **Flip rule** — kept as specified; it reproduces every overlap-driven flip
-  in BYV and CTV. The two BYV divergences are not derivable from
-  coordinates: RdRp needs frameshift semantics (stage 4), CP was a
-  legibility call. Since the figures do not agree with each other on the
-  starting side, "first ORF above" is treated as a convention of ours, not
-  theirs.
+* **Flip rule** — overlap, plus the same-colour-and-close clause (A′).
+  Together they reproduce all nine BYV placements with the figure's palette;
+  with a palette that gives CP and CPm different colours, CP stays beside CPm,
+  which is then the legible choice. Since the figures do not agree with each
+  other on the starting side, "first ORF above" is treated as a convention of
+  ours, not theirs.
+* **No outlines** — glyphs are flat colour, as in the figures and the original
+  VirPlot output; there is no option to add an outline. Separation between
+  neighbours comes from colour and from the flip rule above.
 * **Frameshift / readthrough** — must come from data. Proposed encoding for
   stage 4: `Note=+1 frameshift` (or a `frameshift=+1` attribute) on the
   downstream CDS ⇒ flip and label; `Note=readthrough` ⇒ stay on the same
@@ -264,11 +280,12 @@ compared too, and a real fixture added.
   read as an ICTV comparison. It remains a fine depth-plotting fixture.
 * `examples/byv.gff3` (new) carries the real NC_001598.1 coordinates with
   the ICTV ORF names and short products; `examples/byv.sam` is a flat
-  simulated read set from `examples/make_reads.py`. Against Closteroviridae
-  Fig 2 it reproduces seven of the nine placements, the two exceptions being
-  the frameshift and the legibility flip above.
-  `tests/test_conventions.py::test_byv_fixture_layout_versus_ictv_figure`
-  pins this.
+  simulated read set from `examples/make_reads.py`; `examples/byv.yml` is
+  the Closteroviridae Fig 2 palette. Rendered with that palette it
+  reproduces all nine placements of the figure
+  (`tests/test_conventions.py::test_byv_with_figure_palette_matches_ictv_on_every_orf`);
+  the pure overlap rule alone gets seven
+  (`test_byv_fixture_layout_versus_ictv_figure`).
 * `examples/grbv.gff3` is a Grablovirus, not in the 9th Report; its nearest
   figure is Begomovirus DNA-A. The C2 conventions (V clockwise right, C
   anticlockwise left, nesting) hold; RefSeq names `V1 protein` etc. carry no

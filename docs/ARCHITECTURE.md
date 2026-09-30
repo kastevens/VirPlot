@@ -261,9 +261,13 @@ raw `start`/`end`.
 **Layout rules (see the conventions doc for the source figures).**
 `resolve_mode("auto", two_strand)` picks `flip` for one-strand genomes and
 `tier` for two-strand ones; circular renderers always use `nest`.
-- `flip`: 5′-most feature above; flip across the line only when overlapping
-  the upstream neighbour; if the wanted side is already occupied there, try
-  the other side, then tier outward.
+- `flip`: 5′-most feature above; flip across the line when overlapping the
+  upstream neighbour, or when that neighbour is the same colour and closer
+  than `NEAR_GAP_FRACTION` (1 %) of the genome — glyphs have no outline, so
+  two adjacent same-colour boxes would otherwise merge (the plotter passes
+  this test in as `flip_if`, keeping `layout.py` colour-blind); if the
+  wanted side is already occupied there, try the other side, then tier
+  outward.
 - `tier`: side fixed by strand (+ above, − below); same-side overlap tiers
   further from the line; glyphs are arrows.
 - `nest`: placed largest first on the outer lane; an arc overlapping one
@@ -339,7 +343,7 @@ when the ICTV placement rules replaced index alternation.
 |---|---|---|
 | `sample.gff3`, `sample.dep`, `sample.sam`, `spec.yml` | Synthetic 8 kb genome loosely modelled on BYV; nine non-overlapping ORFs | Depth plotting, thresholds, stacked samples. Cannot exercise overlap rules. |
 | `sample_multi.gff3` | The above plus a 3 kb second segment (reads for both in `sample.sam`) | Multi-RNA output and shared scaling |
-| `byv.gff3`, `byv.sam` | Beet yellows virus, real NC_001598.1 coordinates with ICTV ORF names; flat simulated reads | The L1 flip rule against a published figure |
+| `byv.gff3`, `byv.sam`, `byv.yml` | Beet yellows virus, real NC_001598.1 coordinates with ICTV ORF names; flat simulated reads; the Closteroviridae Fig 2 palette | The L1 flip rule against a published figure — matches it on every ORF |
 | `grbv.gff3`, `grbv.sam`, `grbv.yml` | Grapevine red blotch virus, real NC_022002.1 annotation (circular, both strands); simulated reads continuous across the origin | Circular wrapping, C2 layout, two-strand linear layout |
 | `make_reads.py`, `make_grbv_sam.py`, `make_sample_sam.py` | Deterministic read simulators (SEQ/QUAL are `*`) | Regenerating the `.sam` fixtures |
 

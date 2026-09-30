@@ -4,7 +4,7 @@ This tool generates **SVG, PDF, or PNG plots** that combine viral genome feature
 
 [![RNA-seq read depth across the Beet yellows virus genome](https://i.imgur.com/bDxrx1I.png)](https://i.imgur.com/bDxrx1I.png)
 
-| Linear, one strand — BYV (`examples/byv.gff3`) | Circular, two strands — GRBV (`examples/grbv.gff3`) |
+| Linear, one strand — BYV (`examples/byv.gff3` + `byv.yml`) | Circular, two strands — GRBV (`examples/grbv.gff3`) |
 |---|---|
 | ![BYV](docs/figures/byv_linear.svg) | ![GRBV circular](docs/figures/grbv_circular.svg) |
 
@@ -34,7 +34,7 @@ Both plots are **aligned on a shared x-axis** and exported as vector-format grap
 
 ---
 
-Annotation-track drawing conventions follow the ICTV 9th Report family figures: colour encodes function, one-strand genomes flip a box across the line only where ORFs overlap, two-strand genomes draw + above and − below as arrows, and circular genomes nest overlapping arcs inward. See [`docs/ictv_drawing_conventions.md`](docs/ictv_drawing_conventions.md) for the spec, the implementation status, and the spec changes it turned up.
+Annotation-track drawing conventions follow the ICTV 9th Report family figures: colour encodes function, glyphs are flat colour without outlines, one-strand genomes flip a box across the line where ORFs overlap or where two same-colour boxes would otherwise merge, two-strand genomes draw + above and − below as arrows, and circular genomes nest overlapping arcs inward. See [`docs/ictv_drawing_conventions.md`](docs/ictv_drawing_conventions.md) for the spec, the implementation status, and the spec changes it turned up.
 
 ---
 
@@ -50,7 +50,7 @@ pip install .
 
 ## Quick Start
 
-Example data in `examples/`: a synthetic two-segment genome (`sample.gff3`, `sample_multi.gff3`, `sample.dep`, `sample.sam`, `spec.yml`); beet yellows virus with its real RefSeq NC_001598.1 coordinates and ICTV ORF names (`byv.gff3`, `byv.sam`); and a circular one — grapevine red blotch virus, real RefSeq NC_022002.1 annotation (`grbv.gff3`, `grbv.sam`, `grbv.yml`). Reads in the `.sam` files are simulated (`make_reads.py`, `make_grbv_sam.py`).
+Example data in `examples/`: a synthetic two-segment genome (`sample.gff3`, `sample_multi.gff3`, `sample.dep`, `sample.sam`, `spec.yml`); beet yellows virus with its real RefSeq NC_001598.1 coordinates, ICTV ORF names and the ICTV figure palette (`byv.gff3`, `byv.sam`, `byv.yml`); and a circular one — grapevine red blotch virus, real RefSeq NC_022002.1 annotation (`grbv.gff3`, `grbv.sam`, `grbv.yml`). Reads in the `.sam` files are simulated (`make_reads.py`, `make_grbv_sam.py`).
 
 ```bash
 # Basic plot
@@ -155,7 +155,7 @@ virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
         [--layout {linear,circular,auto}] [--free-y] [--equal-width]
         [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
         [--yscale {linear,symlog}] [--linthresh LINTHRESH]
-        [--name NAME] [--no-label] [--border]
+        [--name NAME] [--no-label]
         [-t THRESHOLDS [THRESHOLDS ...]] [-r] [--shade-breaks]
         [--legend] [--title] [-f {svg,pdf,png}] [-v]
 ```
@@ -184,7 +184,6 @@ virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
 | `--yscale`           | Y-axis scale: `linear` or `symlog` (default: `linear`)         |
 | `--linthresh`        | Symlog linear threshold around 0 (default: `10.0`)             |
 | `--no-label`         | Hide feature labels                                            |
-| `--border`          | Outline feature glyphs in black (default: no outline, as in the ICTV figures) |
 | `-t`, `--thresholds` | Coverage thresholds for interval/gap analysis (default: `1 5`) |
 | `-r`, `--report`     | Write CSV reports of intervals and gaps per threshold          |
 | `--shade-breaks`     | Shade coverage gaps on the depth plot                          |

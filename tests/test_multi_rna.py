@@ -92,7 +92,7 @@ def test_parse_depth_ref_override(tmp_path):
 def make_args(**over):
     base = dict(smooth=False, normalize=False, free_y=False, equal_width=False,
                 legend=False, shade_breaks=False, title=False, grid=False,
-                no_label=False, no_border=False, border=False, yscale="linear", linthresh=10.0,
+                no_label=False, yscale="linear", linthresh=10.0,
                 format="png", outdir=".", name="x")
     base.update(over)
     return argparse.Namespace(**base)

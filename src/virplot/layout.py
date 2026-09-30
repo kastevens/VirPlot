@@ -4,10 +4,14 @@ Implements the placement rules in docs/ictv_drawing_conventions.md:
 
 * ``flip`` (mode L1, one strand): the 5'-most ORF sits above the line; an ORF
   that overlaps its upstream neighbour flips to the other side, otherwise it
-  stays on the side of that neighbour.  If the chosen side is already taken
-  where it would land — a long upstream ORF can do this — the other side is
-  tried, and failing that the glyph tiers outward.  The document's rule never
-  leaves two boxes on top of each other this way.
+  stays on the side of that neighbour.  A caller may add a second trigger
+  through ``flip_if(prev, feat)`` — the plotter uses it to flip a glyph that
+  is close to, and the same colour as, its neighbour, which is what the ICTV
+  figures do for BYV's CPm/CP so two flat boxes do not read as one.  If the
+  chosen side is already taken where it would land — a long upstream ORF can
+  do this — the other side is tried, and failing that the glyph tiers
+  outward.  The document's rule never leaves two boxes on top of each other
+  this way.
 * ``tier`` (mode L2, both strands): side is fixed by strand (+ above, − below)
   and same-side overlap is resolved by tiering further from the line.
 * ``nest`` (modes C1/C2, circular): arcs are placed largest first on the
@@ -50,11 +54,19 @@ def resolve_mode(mode: str, two_strand: bool) -> str:
     return mode
 
 
-def place_features(features: Iterable[Feature], spans: SpanFn, mode: str) -> list[Placement]:
-    """Assign side and tier to every feature under ``mode`` (flip / tier / nest)."""
+FlipIf = Callable[[Feature, Feature], bool]
+
+
+def place_features(features: Iterable[Feature], spans: SpanFn, mode: str,
+                   flip_if: FlipIf | None = None) -> list[Placement]:
+    """Assign side and tier to every feature under ``mode`` (flip / tier / nest).
+
+    ``flip_if(prev, feat)`` is an extra reason to flip in ``flip`` mode, judged
+    between each feature and its upstream neighbour; ignored by other modes.
+    """
     ordered = sorted(features, key=lambda f: (f.start, f.end))
     if mode == "flip":
-        return _place_flip(ordered, spans)
+        return _place_flip(ordered, spans, flip_if)
     if mode == "tier":
         return _place_tier(ordered, spans, lambda f: ABOVE if f.forward else BELOW)
     if mode == "nest":
@@ -86,13 +98,15 @@ def _place_tier(ordered: list[Feature], spans: SpanFn,
     return placed
 
 
-def _place_flip(ordered: list[Feature], spans: SpanFn) -> list[Placement]:
+def _place_flip(ordered: list[Feature], spans: SpanFn,
+                flip_if: FlipIf | None = None) -> list[Placement]:
     placed: list[Placement] = []
     current = ABOVE
     prev: Feature | None = None
     for feat in ordered:
         wanted = current
-        if prev is not None and spans_overlap(spans(prev), spans(feat)):
+        if prev is not None and (spans_overlap(spans(prev), spans(feat))
+                                 or (flip_if is not None and flip_if(prev, feat))):
             wanted = -current
         # the document's rule, with a safety net for a long upstream ORF
         if _free_tier(placed, spans, feat, wanted) == 0:

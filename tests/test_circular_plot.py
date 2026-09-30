@@ -26,7 +26,7 @@ from virplot.settings import Settings
 def make_args(**over):
     base = dict(smooth=False, normalize=False, free_y=False, equal_width=False,
                 legend=False, shade_breaks=False, title=False, grid=False,
-                no_label=False, no_border=False, border=False, yscale="linear", linthresh=10.0,
+                no_label=False, yscale="linear", linthresh=10.0,
                 format="png", outdir=".", name="x", layout="circular")
     base.update(over)
     return argparse.Namespace(**base)
@@ -102,11 +102,9 @@ def test_origin_crossing_feature_draws_two_arcs():
     ax = fig.add_subplot(projection="polar")
     p = plotter()
     p._draw_annotations(ax, rna)
-    # one bar per arc, so a feature through the origin contributes two arcs
-    # plus a single arrowhead at its reading end
-    from matplotlib.patches import Polygon, Rectangle
-    assert sum(isinstance(a, Rectangle) for a in ax.patches) == 2
-    assert sum(isinstance(a, Polygon) for a in ax.patches) == 1
+    # one closed path per arc, so a feature through the origin contributes two
+    from matplotlib.patches import Polygon
+    assert sum(isinstance(a, Polygon) for a in ax.patches) == 2
     plt.close(fig)
 
 

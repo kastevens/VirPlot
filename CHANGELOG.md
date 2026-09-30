@@ -73,9 +73,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed (output)
 
-- Feature glyphs are drawn without a black outline by default, as in the
-  original VirPlot figure and the ICTV maps; `--border` restores the outline.
-  `--no-border` is still accepted and now a no-op.
+- Feature glyphs are drawn as flat colour with no outline, as in the
+  original VirPlot figure and the ICTV maps. The `--no-border` option is
+  removed (there is nothing to turn off). To keep adjacent same-colour boxes
+  apart, the one-strand flip rule now also flips a box whose upstream
+  neighbour is the same colour and within 1 % of the genome length — the
+  choice the ICTV BYV figure makes for CPm/CP. With `examples/byv.yml` (the
+  figure's palette) BYV now matches Closteroviridae Fig 2 on every ORF.
+- Circular arcs and their arrowheads are one path each, removing the
+  hairline seam between body and head.
 
 - Linear annotation track: boxes no longer alternate above/below by index;
   they follow the ICTV flip/tier rules. Genomes without overlapping ORFs now

@@ -185,7 +185,7 @@ def test_gene_attribute_parsed(tmp_path):
 def make_args(**over):
     base = dict(smooth=False, normalize=False, free_y=False, equal_width=False,
                 legend=False, shade_breaks=False, title=True, grid=False,
-                no_label=False, no_border=False, border=False, yscale="linear", linthresh=10.0,
+                no_label=False, yscale="linear", linthresh=10.0,
                 format="png", outdir=".", name="x", layout="linear")
     base.update(over)
     return argparse.Namespace(**base)
@@ -267,12 +267,33 @@ def test_byv_fixture_layout_versus_ictv_figure():
     assert side["CP"] == side["CPm"]                     # figure: flipped (no overlap)
 
 
-def test_glyph_outline_off_by_default_on_with_border():
-    from matplotlib.colors import to_rgba
-    fig, ax, _ = draw_linear(rna_with(F(1, 1000)))
-    assert to_rgba(ax.patches[0].get_edgecolor())[3] == 0          # transparent
-    plt.close(fig)
-    fig, ax = plt.subplots()
-    LinearPlotter(Settings(), make_args(border=True))._draw_annotations(ax, rna_with(F(1, 1000)))
-    assert to_rgba(ax.patches[0].get_edgecolor()) == to_rgba("black")
-    plt.close(fig)
+
+def test_same_colour_close_neighbour_flips():
+    """ICTV BYV: CP sits below CPm although they do not overlap."""
+    s = Settings(color_mapping={"CPm": "#e75480", "CP": "#e75480", "p20": "#f5b041"})
+    p = LinearPlotter(s, make_args())
+    r = rna_with(F(1, 1000, product="CPm"), F(1070, 1600, product="CP"),
+                 F(1670, 2000, product="p20"), length=15000)
+    out = {pl.feature.product: pl.side for pl, in zip(p._placements(r, circular=False)[0])}
+    assert out["CP"] == -out["CPm"]                  # same colour, 70 nt apart -> flipped
+    assert out["p20"] == out["CP"]                   # different colour, same gap -> stays
+
+
+def test_same_colour_far_neighbour_does_not_flip():
+    s = Settings(color_mapping={"a": "#e75480", "b": "#e75480"})
+    p = LinearPlotter(s, make_args())
+    r = rna_with(F(1, 1000, product="a"), F(1500, 2000, product="b"), length=15000)
+    out = {pl.feature.product: pl.side for pl, in zip(p._placements(r, circular=False)[0])}
+    assert out["a"] == out["b"]                      # 500 nt gap > 1% of 15 kb
+
+
+def test_byv_with_figure_palette_matches_ictv_on_every_orf():
+    """examples/byv.yml uses the Closteroviridae Fig. 2 palette; with the
+    same-colour-neighbour rule every placement agrees with the published panel."""
+    ex = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples")
+    (rna,) = parse_gff_rnas(os.path.join(ex, "byv.gff3"))
+    p = LinearPlotter(load_settings(os.path.join(ex, "byv.yml")), make_args())
+    side = {pl.feature.product: pl.side for pl in p._placements(rna, circular=False)[0]}
+    figure = {"L-Pro/Mtr/Hel": ABOVE, "RdRp": BELOW, "p6": BELOW, "Hsp70h": ABOVE,
+              "p64": BELOW, "CPm": ABOVE, "CP": BELOW, "p20": ABOVE, "p21": BELOW}
+    assert side == figure
