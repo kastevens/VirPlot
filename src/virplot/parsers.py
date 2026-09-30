@@ -1,4 +1,5 @@
-"""GFF3 and depth file parsers."""
+"""GFF3 and depth-file parsers, plus the dispatcher that turns any depth
+source (samtools depth text, SAM, BAM) into a per-base array."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ import sys
 
 import numpy as np
 
+from virplot.alignments import depth_from_alignments, is_alignment_file
 from virplot.models import Feature
 
 log = logging.getLogger(__name__)
@@ -54,6 +56,18 @@ def parse_gff(gff_path: str) -> tuple[int, list[Feature]]:
     return sequence_length, features
 
 
+def gff_seqid(gff_path: str) -> str | None:
+    """Return the sequence id (column 1) of the GFF's ``region`` line, if any."""
+    with open(gff_path) as fp:
+        for line in fp:
+            if line.startswith("#") or not line.strip():
+                continue
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) == 9 and parts[2] == "region":
+                return parts[0]
+    return None
+
+
 def parse_depth(depth_path: str, seq_len: int) -> tuple[np.ndarray, int]:
     """Parse a samtools depth file directly into a numpy array.
 
@@ -77,3 +91,24 @@ def parse_depth(depth_path: str, seq_len: int) -> tuple[np.ndarray, int]:
                 y[pos - 1] = cov
             n += 1
     return y, n
+
+
+def load_depth(
+    path: str,
+    seq_len: int,
+    *,
+    seqid: str | None = None,
+    ref: str | None = None,
+    min_mapq: int = 0,
+) -> tuple[np.ndarray, int, str]:
+    """Load one depth track from a depth file or a SAM/BAM file.
+
+    Returns ``(depth_array, n, kind)`` where ``n`` is the number of depth
+    entries read (text) or reads counted (alignments) and ``kind`` is
+    ``"depth"`` or ``"alignments"``.
+    """
+    if is_alignment_file(path):
+        y, n = depth_from_alignments(path, seq_len, seqid=seqid, ref=ref, min_mapq=min_mapq)
+        return y, n, "alignments"
+    y, n = parse_depth(path, seq_len)
+    return y, n, "depth"

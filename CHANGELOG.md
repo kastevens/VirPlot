@@ -8,6 +8,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **SAM/BAM input.** `-d/--depth` now accepts SAM or BAM files alongside
+  `samtools depth` output; VirPlot computes per-base depth from the
+  alignments itself (`virplot.alignments`, standard library only — BAM is
+  read through `gzip`; CRAM unsupported). Counting matches `samtools depth -a`
+  defaults: unmapped/secondary/QC-fail/duplicate reads skipped, only
+  `M`/`=`/`X` bases counted.
+- `--ref NAME` to choose the reference from a multi-reference SAM/BAM header
+  (default: the GFF sequence id, or the only `@SQ` entry).
+- `--min-mapq N` to drop low mapping-quality reads.
+- `examples/sample.sam` (synthetic; regenerate with `examples/make_sample_sam.py`).
+
 ### Changed
 
 - Internal refactor toward an object model (no user-facing changes; output is

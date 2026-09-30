@@ -1,6 +1,6 @@
 # VirPlot
 
-This tool generates **SVG, PDF, or PNG plots** that combine viral genome feature annotations from a GFF3 file and sequencing depth from a `samtools depth` file.
+This tool generates **SVG, PDF, or PNG plots** that combine viral genome feature annotations from a GFF3 file and sequencing depth from a `samtools depth` file or directly from SAM/BAM alignments.
 
 [![RNA-seq read depth across the Beet yellows virus genome](https://i.imgur.com/bDxrx1I.png)](https://i.imgur.com/bDxrx1I.png)
 
@@ -40,7 +40,7 @@ pip install .
 
 ## Quick Start
 
-A sample GFF3, depth file, and YAML configuration are included in `examples/`:
+A sample GFF3, depth file, SAM file, and YAML configuration are included in `examples/`:
 
 ```bash
 # Basic plot
@@ -72,10 +72,26 @@ cp examples/spec.yml my_project.yml
 Three input files are required:
 
 1. **GFF3 file** — genome annotations containing CDS features and a `region` entry for sequence length
-2. **Depth file** — tab-delimited output from `samtools depth -a`
+2. **Depth source** — either
+   - tab-delimited output from `samtools depth -a`, **or**
+   - a **SAM or BAM** file; VirPlot computes per-base depth from the alignments itself (no `samtools`/`pysam` needed)
 3. **YAML file** — color mapping and style settings (see [Customization](#customization))
 
-If multiple depth files are given, VirPlot combines them into a *stacked area chart* showing each sample's depth contribution under a combined depth line.
+If multiple depth sources are given, VirPlot combines them into a *stacked area chart* showing each sample's depth contribution under a combined depth line. Depth files and SAM/BAM files can be mixed.
+
+### Depth from SAM/BAM
+
+```bash
+virplot -g examples/sample.gff3 -d examples/sample.sam -y examples/spec.yml --smooth --shade-breaks
+```
+
+The file type is detected from the extension (`.sam`, `.bam`) or, failing that, from the content. Counting follows `samtools depth -a` defaults so results are directly comparable:
+
+- unmapped, secondary, QC-fail and duplicate reads are skipped;
+- only aligned bases (CIGAR `M`, `=`, `X`) count — deletions and `N` skips do not;
+- no mapping-quality filter unless `--min-mapq` is given.
+
+The reference to plot is taken from the GFF `region` line's sequence id. If the SAM/BAM header has a single `@SQ` entry that one is used regardless; if it has several and none matches, pass `--ref NAME`. BAM is read via the standard library's gzip module; CRAM is not supported.
 
 ---
 
@@ -83,7 +99,7 @@ If multiple depth files are given, VirPlot combines them into a *stacked area ch
 
 ```txt
 virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
-        -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
+        [--ref REF] [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
         [--yscale {linear,symlog}] [--linthresh LINTHRESH]
         [--name NAME] [--no-label] [--no-border]
         [-t THRESHOLDS [THRESHOLDS ...]] [-r] [--shade-breaks]
@@ -95,8 +111,10 @@ virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
 | Flag                 | Description                                                    |
 | -------------------- | -------------------------------------------------------------- |
 | `-g`, `--gff`        | Path to GFF3 annotation file                                   |
-| `-d`, `--depth`      | One or more depth files (stacked if multiple)                  |
-| `-l`, `--labels`     | Label(s) for each depth file (same order as `--depth`)         |
+| `-d`, `--depth`      | One or more depth sources — `samtools depth` files or SAM/BAM (stacked if multiple) |
+| `-l`, `--labels`     | Label(s) for each depth source (same order as `--depth`)       |
+| `--ref`              | Reference name to use from SAM/BAM headers (default: GFF sequence id, or the only reference) |
+| `--min-mapq`         | Skip SAM/BAM reads with MAPQ below this (default: 0)           |
 | `-y`, `--yaml`       | YAML file for color mapping and other specs                    |
 | `-o`, `--outdir`     | Output directory (default: `.`)                                |
 | `-f`, `--format`     | Output format: `svg`, `pdf`, or `png` (default: `svg`)         |

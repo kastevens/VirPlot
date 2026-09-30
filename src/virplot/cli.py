@@ -10,7 +10,8 @@ import sys
 from virplot import __version__
 from virplot.analysis import call_blocks, write_csvs
 from virplot.models import RNA
-from virplot.parsers import parse_gff, parse_depth
+from virplot.alignments import AlignmentError
+from virplot.parsers import gff_seqid, load_depth, parse_gff
 from virplot.plotting import LinearPlotter
 from virplot.settings import load_settings
 
@@ -36,9 +37,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-g", "--gff", required=True,
                    help="Path to GFF3 annotation file")
     p.add_argument("-d", "--depth", nargs="+", required=True,
-                   help="One or more depth files (stacked if multiple)")
+                   help="One or more depth sources: samtools depth output, or "
+                        "SAM/BAM alignments (stacked if multiple)")
     p.add_argument("-l", "--labels", nargs="+",
                    help="Label(s) for depth line (same order as --depth)")
+    p.add_argument("--ref",
+                   help="Reference name to use from SAM/BAM headers "
+                        "(default: the GFF sequence id, or the only reference)")
+    p.add_argument("--min-mapq", type=int, default=0,
+                   help="Skip SAM/BAM reads with MAPQ below this [%(default)s]")
     p.add_argument("-y", "--yaml", required=True,
                    help="YAML file for color mapping and other specs")
     p.add_argument("-o", "--outdir", default=".",
@@ -107,14 +114,23 @@ def main(argv: list[str] | None = None) -> None:
     labels = args.labels or [
         os.path.splitext(os.path.basename(f))[0] for f in args.depth
     ]
+    seqid = gff_seqid(args.gff)
     counts: set[int] = set()
     for label, df in zip(labels, args.depth):
-        y, n = parse_depth(df, rna.length)
-        log.info("Parsed %d depth entries from %s", n, df)
+        try:
+            y, n, kind = load_depth(df, rna.length, seqid=seqid,
+                                    ref=args.ref, min_mapq=args.min_mapq)
+        except AlignmentError as exc:
+            log.error("%s", exc)
+            sys.exit(1)
+        if kind == "alignments":
+            log.info("Counted %d aligned reads from %s", n, df)
+        else:
+            log.info("Parsed %d depth entries from %s", n, df)
+            counts.add(n)
         rna.add_depth(label, y)
-        counts.add(n)
 
-    if len(counts) != 1:
+    if len(counts) > 1:
         log.error("Mismatching position count across depth files: %s", counts)
         sys.exit(1)
 
