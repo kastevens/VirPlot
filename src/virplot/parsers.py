@@ -62,6 +62,7 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
                 end=int(end),
                 strand=strand,
                 product=info.get("product", "unknown"),
+                gene=info.get("gene") or None,
             )
             if seqid in rnas:
                 rnas[seqid].features.append(feat)

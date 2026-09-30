@@ -47,6 +47,27 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   annotation with simulated, origin-spanning reads
   (`examples/make_grbv_sam.py`).
 
+- **ICTV drawing conventions** (docs/ictv_drawing_conventions.md, stages
+  0–3 and 6). New `virplot.layout` places features by rule: one-strand genomes
+  flip a box across the line only when it overlaps its upstream neighbour;
+  two-strand genomes keep + above / − below as arrows and tier same-side
+  overlaps outward; circular genomes nest overlapping arcs inward, largest
+  outermost, with arrowheads clockwise for + and anticlockwise for − and a
+  stem-loop icon at the origin. Colour now encodes function: products not in
+  `color_mapping` are classified by name onto the ICTV palette ("putative" →
+  lighter tint). spec.yml gains `overlap_mode`, `end_5_label`/`end_3_label`
+  (`VPg` draws the grey oval) and `function_palette`. GFF `gene=` is drawn
+  outside the glyph as the ORF name. `--title` with no YAML title uses
+  `name (length nts)`. Section 6 of the document records what changed and
+  what the spec still needs.
+
+### Changed (output)
+
+- Linear annotation track: boxes no longer alternate above/below by index;
+  they follow the ICTV flip/tier rules. Genomes without overlapping ORFs now
+  draw every box above the line. Products with no explicit colour that match
+  a function class are coloured by that class instead of grey.
+
 ### Fixed
 
 - `--report` no longer fails when the output directory does not exist yet.

@@ -102,8 +102,11 @@ def test_origin_crossing_feature_draws_two_arcs():
     ax = fig.add_subplot(projection="polar")
     p = plotter()
     p._draw_annotations(ax, rna)
-    # one bar per arc, so a feature through the origin contributes two
-    assert len(ax.patches) == 2
+    # one bar per arc, so a feature through the origin contributes two arcs
+    # plus a single arrowhead at its reading end
+    from matplotlib.patches import Polygon, Rectangle
+    assert sum(isinstance(a, Rectangle) for a in ax.patches) == 2
+    assert sum(isinstance(a, Polygon) for a in ax.patches) == 1
     plt.close(fig)
 
 

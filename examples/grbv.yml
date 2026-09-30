@@ -1,28 +1,28 @@
 # Style for the grapevine red blotch virus example (examples/grbv.gff3).
-# Virion-sense ORFs (V1-V3) warm, complementary-sense ORFs (C1-C3) cool, so the
-# two transcriptional units read apart at a glance.
+#
+# Colour encodes predicted function, never strand (ICTV convention; see
+# docs/ictv_drawing_conventions.md). The RefSeq product names ("V1 protein")
+# carry no function, so each ORF is pinned here to its class colour from the
+# default palette; "putative" roles take the lighter tint.
+#   V1      coat protein                        -> capsid
+#   C1, C2  Rep (C1 = RepA; C1:C2 spliced = Rep) -> replicase, C2 lighter
+#   V2, V3  proposed movement-associated roles  -> movement, lighter tint
+#   C3      no assigned function                -> unknown
 
 color_mapping:
-  V1 protein: '#fd7f6f'   # coat protein
-  V2 protein: '#ffb55a'
-  V3 protein: '#ffee65'
-  C1 protein: '#7eb0d5'   # replication-associated protein (Rep)
-  C2 protein: '#8bd3c7'
-  C3 protein: '#b2e061'
+  V1 protein: '#e75480'
+  C1 protein: '#f5b041'
+  C2 protein: '#f8ca80'
+  V2 protein: '#82c5cf'
+  V3 protein: '#82c5cf'
+  C3 protein: '#9f9f9f'
 
 annotation_fontsize: 9
-
 default_color: '#9f9f9f'
-
 shade_color: '#ca4f35'
-
 depth_line_color: '#0077cc'
-
-stacked_area_colors:
-  - '#f96666'
-  - '#82c4fa'
-  - '#f9da86'
-
+stacked_area_colors: ['#f96666', '#82c4fa', '#f9da86']
 legend_location: "upper left"
 
-title: "Grapevine red blotch virus (NC_022002.1), 3206 nt circular"
+# overlap_mode: auto   # auto = tier when ORFs sit on both strands (they do here)
+title: ""              # empty -> "NC_022002.1 (3,206 nts)" when --title is given

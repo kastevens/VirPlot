@@ -28,7 +28,7 @@ Both plots are **aligned on a shared x-axis** and exported as vector-format grap
 
 ---
 
-Annotation-track drawing conventions follow the ICTV 9th Report family figures; see [`docs/ictv_drawing_conventions.md`](docs/ictv_drawing_conventions.md) for the spec and the staged implementation plan.
+Annotation-track drawing conventions follow the ICTV 9th Report family figures: colour encodes function, one-strand genomes flip a box across the line only where ORFs overlap, two-strand genomes draw + above and − below as arrows, and circular genomes nest overlapping arcs inward. See [`docs/ictv_drawing_conventions.md`](docs/ictv_drawing_conventions.md) for the spec, the implementation status, and the spec changes it turned up.
 
 ---
 

@@ -19,12 +19,23 @@ import numpy as np
 
 @dataclass(frozen=True)
 class Feature:
-    """One annotated feature (currently always a CDS) in 1-based, inclusive bp."""
+    """One annotated feature (currently always a CDS) in 1-based, inclusive bp.
+
+    ``product`` is the name written inside the glyph (``RdRp``, ``CP``);
+    ``gene`` is the optional ORF name written outside it (``ORF1a``, ``AC1``),
+    following the ICTV figure convention.
+    """
 
     start: int
     end: int
     strand: str
     product: str
+    gene: str | None = None
+
+    @property
+    def forward(self) -> bool:
+        """True unless the feature is on the complementary strand."""
+        return self.strand != "-"
 
     @property
     def length(self) -> int:
@@ -78,6 +89,12 @@ class RNA:
         if not tracks:
             return np.zeros(self.length, dtype=int)
         return np.sum(tracks, axis=0) if len(tracks) > 1 else tracks[0]
+
+    @property
+    def two_strand(self) -> bool:
+        """True when ORFs sit on both strands (ambisense RNA, geminiviruses...)."""
+        return any(not f.forward for f in self.features) and any(
+            f.forward for f in self.features)
 
     # --- coordinates --------------------------------------------------------
 

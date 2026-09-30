@@ -15,10 +15,11 @@ import logging
 import os
 
 import numpy as np
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Ellipse, Polygon, Rectangle
 import matplotlib.pyplot as plt
 
 from virplot.analysis import smooth_depth
+from virplot.layout import ABOVE, Placement, place_features, resolve_mode
 from virplot.models import RNA
 from virplot.settings import Settings
 
@@ -28,6 +29,8 @@ log = logging.getLogger(__name__)
 
 ANNOTATION_Y_BASE = 0.5
 ANNOTATION_HEIGHT = 0.6
+ARROW_HEAD_FRACTION = 0.012     # of genome length; arrowhead length cap
+ORF_LABEL_FONTSIZE = 7          # ORF name written outside the glyph
 LABEL_PAD_FRACTION = 0.02
 SMALL_FEATURE_THRESHOLD = 500  # bp; features shorter than this get external labels
 SMOOTH_WINDOW = 15
@@ -41,8 +44,12 @@ HEIGHT_RATIO_DEPTH = 1
 # circular layout: radii as a fraction of the plotted radius, inside out
 CIRC_FIGSIZE = 8
 CIRC_R_DEPTH_BASE = 0.30        # depth baseline (zero coverage)
-CIRC_R_DEPTH_MAX = 0.72         # depth at the y-limit
-CIRC_R_ANN_LANES = (0.80, 0.895)  # bottom radius of the inner / outer feature lane
+CIRC_R_DEPTH_MAX = 0.66         # depth at the y-limit
+CIRC_R_BASELINE = 0.71          # the genome circle; ORF arcs sit just outside it
+CIRC_R_ANN_LANES = (0.80, 0.895)  # kept for reference; lanes now come from CIRC_LANE_STEP
+CIRC_R_LANE0 = 0.895            # bottom radius of the outermost arc lane (tier 0)
+CIRC_LANE_STEP = 0.095          # each nesting tier steps this far inward
+CIRC_MAX_TIERS = 3              # deeper nesting than this collides with the depth band
 CIRC_ANN_HEIGHT = 0.085
 CIRC_R_OUTSIDE_LABEL = 1.01     # labels for features too narrow to hold text
 CIRC_RMAX = 1.22                # leaves room for position ticks; rim is hidden
@@ -112,7 +119,16 @@ class Plotter:
         return FIGURE_WIDTH
 
     def _feature_color(self, product: str) -> str:
-        return self.settings.color_mapping.get(product, self.settings.default_color)
+        return self.settings.feature_color(product)
+
+    def _placements(self, rna: RNA, circular: bool) -> tuple[list[Placement], str]:
+        """Lay the features out; returns (placements, rule used)."""
+        mode = "nest" if circular else resolve_mode(self.settings.overlap_mode, rna.two_strand)
+        return place_features(rna.features, rna.feature_spans, mode), mode
+
+    @staticmethod
+    def _head_length(span_len: int, seq_len: int) -> float:
+        return min(span_len * 0.35, seq_len * ARROW_HEAD_FRACTION)
 
     def _add_legend(self, ax: plt.Axes, layers: list, labels: list[str]) -> None:
         legend = ax.legend(
@@ -128,12 +144,18 @@ class Plotter:
         )
         legend.get_frame().set_linewidth(0.5)
 
-    def _add_title(self, fig: plt.Figure):
-        """Draw the YAML title if --title was given; returns the artist or None."""
+    def _add_title(self, fig: plt.Figure, rna: RNA | None = None):
+        """Draw the title if --title was given; returns the artist or None.
+
+        With no title in the YAML, the ICTV form ``name (length nts)`` is used.
+        """
         if not self.args.title:
             return None
+        title = self.settings.title
+        if not title and rna is not None:
+            title = f"{rna.name} ({rna.length:,} nts)"
         return fig.text(
-            0.5, 0.95, self.settings.title,
+            0.5, 0.95, title,
             ha="center", va="bottom", fontsize=14, fontweight="bold",
         )
 
@@ -188,7 +210,7 @@ class LinearPlotter(Plotter):
 
         self._style_depth_axis(ax_depth, total)
 
-        extra_artists.append(self._add_title(fig))
+        extra_artists.append(self._add_title(fig, rna))
 
         self._save(fig, extra_artists, out_base)
         plt.close(fig)
@@ -196,58 +218,103 @@ class LinearPlotter(Plotter):
     # --- panels -------------------------------------------------------------
 
     def _draw_annotations(self, ax: plt.Axes, rna: RNA) -> list:
-        """Genome line, 5'/3' marks and feature rectangles.
+        """Genome line, end marks and feature glyphs.
 
-        Returns the end-mark artists so the saved bbox includes them.
+        Placement follows docs/ictv_drawing_conventions.md: one-strand genomes
+        flip a box across the line only when it overlaps its upstream
+        neighbour; two-strand genomes keep + above / − below with arrows and
+        tier same-side overlaps outward. Returns artists outside the axes so
+        the saved bbox includes them.
         """
-        args = self.args
+        args, settings = self.args, self.settings
         seq_len = rna.length
         pad = int(seq_len * LABEL_PAD_FRACTION)
-        y0 = ANNOTATION_Y_BASE
+        y0, H = ANNOTATION_Y_BASE, ANNOTATION_HEIGHT
+        ends = self._draw_backbone(ax, rna, pad)
 
+        placements, mode = self._placements(rna, circular=False)
+        arrows = mode == "tier"
+        tiers_up = max([p.tier for p in placements if p.side == ABOVE], default=0) + 1
+        tiers_dn = max([p.tier for p in placements if p.side != ABOVE], default=0) + 1
+
+        for pl in placements:
+            feat = pl.feature
+            yb = y0 + pl.tier * H if pl.side == ABOVE else y0 - (pl.tier + 1) * H
+            color = self._feature_color(feat.product)
+            edge = "none" if args.no_border else "black"
+            spans = rna.feature_spans(feat)
+            head_span = spans[-1] if feat.forward else spans[0]
+            for (s_, e_) in spans:
+                if arrows and (s_, e_) == head_span:
+                    ax.add_patch(Polygon(self._arrow_points(s_, e_, yb, H, feat.forward, seq_len),
+                                         closed=True, facecolor=color, edgecolor=edge,
+                                         linewidth=0.8))
+                else:
+                    ax.add_patch(Rectangle((s_, yb), e_ - s_, H,
+                                           facecolor=color, edgecolor=edge))
+
+            if args.no_label:
+                continue
+            covered = sum(e_ - s_ + 1 for s_, e_ in spans)
+            mid = ((spans[0][0] - 1 + covered / 2) % seq_len) + 1 if rna.circular else feat.midpoint
+            small = covered < SMALL_FEATURE_THRESHOLD
+            if small:
+                # outside the glyph, clear of every tier on this side
+                ly = (y0 + tiers_up * H + H / 2 if pl.side == ABOVE
+                      else y0 - tiers_dn * H - H / 2)
+            else:
+                ly = yb + H / 2
+            ax.text(mid, ly, feat.product, ha="center", va="center",
+                    fontsize=settings.annotation_fontsize, color="black")
+            if feat.gene and not small:
+                gy = yb + H + 0.12 if pl.side == ABOVE else yb - 0.12
+                ax.text(mid, gy, feat.gene, ha="center",
+                        va="bottom" if pl.side == ABOVE else "top",
+                        fontsize=ORF_LABEL_FONTSIZE, color="0.25")
+
+        ax.set_xlim(0, seq_len)
+        ax.set_ylim(min(-1.5, y0 - tiers_dn * H - 0.9), max(2.0, y0 + tiers_up * H + 0.9))
+        ax.axis("off")
+        return ends
+
+    def _draw_backbone(self, ax: plt.Axes, rna: RNA, pad: int) -> list:
+        """The genome line with its end marks (or continuation marks if circular)."""
+        settings = self.settings
+        seq_len, y0 = rna.length, ANNOTATION_Y_BASE
         if rna.circular:
-            # No 5'/3' ends on a circle: show the backbone continuing past both
-            # edges instead, so the join at the origin is visible.
             ax.plot([0, seq_len], [y0, y0], color="black", linewidth=1.2)
             for x0, x1 in ((-pad, 0), (seq_len, seq_len + pad)):
                 ax.plot([x0, x1], [y0, y0], color="black", linewidth=1.2,
                         linestyle=(0, (2, 2)), clip_on=False)
-            ends = [
+            return [
                 ax.text(-pad * 1.25, y0, "\u21ba", va="center", ha="right", fontsize=11),
                 ax.text(seq_len + pad * 1.25, y0, "\u21bb", va="center", ha="left", fontsize=11),
             ]
+
+        ax.plot([-pad, seq_len + pad], [y0, y0], color="black", linewidth=1.2)
+        ends = []
+        five = settings.end_5_label
+        if five.strip().lower() == "vpg":
+            # ICTV: a grey oval labelled VPg at the 5' end
+            oval = Ellipse((-pad * 0.9, y0), width=pad * 1.4, height=0.8,
+                           facecolor="0.75", edgecolor="black", linewidth=0.8, clip_on=False)
+            ax.add_patch(oval)
+            ends.append(ax.text(-pad * 0.9, y0, "VPg", ha="center", va="center",
+                                fontsize=7, clip_on=False))
         else:
-            ax.plot([-pad, seq_len + pad], [y0, y0], color="black", linewidth=1.2)
-            ends = [
-                ax.text(-pad * 0.4, y0, "5'", va="center", ha="right",
-                        fontsize=10, fontweight="bold"),
-                ax.text(seq_len + pad * 0.4, y0, "3'", va="center", ha="left",
-                        fontsize=10, fontweight="bold"),
-            ]
-
-        for i, feat in enumerate(rna.features):
-            upper = i % 2 == 0
-            y = ANNOTATION_Y_BASE if upper else ANNOTATION_Y_BASE - ANNOTATION_HEIGHT
-            rect = Rectangle(
-                (feat.start, y), feat.length, ANNOTATION_HEIGHT,
-                facecolor=self._feature_color(feat.product),
-                edgecolor="none" if args.no_border else "black",
-            )
-            ax.add_patch(rect)
-
-            if not args.no_label:
-                if feat.length < SMALL_FEATURE_THRESHOLD:
-                    ly = (y + ANNOTATION_HEIGHT * 1.5 if upper
-                          else y - ANNOTATION_HEIGHT * 0.5)
-                else:
-                    ly = y + ANNOTATION_HEIGHT / 2
-                ax.text(feat.midpoint, ly, feat.product, ha="center", va="center",
-                        fontsize=self.settings.annotation_fontsize, color="black")
-
-        ax.set_xlim(0, seq_len)
-        ax.set_ylim(-1.5, 2.0)
-        ax.axis("off")
+            ends.append(ax.text(-pad * 0.4, y0, five, va="center", ha="right",
+                                fontsize=10, fontweight="bold"))
+        ends.append(ax.text(seq_len + pad * 0.4, y0, settings.end_3_label,
+                            va="center", ha="left", fontsize=10, fontweight="bold"))
         return ends
+
+    def _arrow_points(self, s_: int, e_: int, yb: float, H: float,
+                      forward: bool, seq_len: int) -> list[tuple[float, float]]:
+        """A box with an arrowhead at its reading end."""
+        head = self._head_length(e_ - s_, seq_len)
+        if forward:
+            return [(s_, yb), (e_ - head, yb), (e_, yb + H / 2), (e_ - head, yb + H), (s_, yb + H)]
+        return [(e_, yb), (s_ + head, yb), (s_, yb + H / 2), (s_ + head, yb + H), (e_, yb + H)]
 
     def _draw_depth(self, ax: plt.Axes, rna: RNA,
                     tracks: list[np.ndarray], total: np.ndarray) -> list:
@@ -327,7 +394,7 @@ class CircularPlotter(Plotter):
         if self.args.legend:
             self._add_legend(ax, layers, rna.labels)
 
-        extra_artists.append(self._add_title(fig))
+        extra_artists.append(self._add_title(fig, rna))
 
         self._save(fig, extra_artists, out_base)
         plt.close(fig)
@@ -354,28 +421,89 @@ class CircularPlotter(Plotter):
     # --- panels -------------------------------------------------------------
 
     def _draw_annotations(self, ax, rna: RNA) -> list:
-        """Feature arcs in two lanes, plus the origin marker."""
+        """Genome circle, ORF arcs with arrowheads, origin stem-loop.
+
+        Modes C1/C2 of docs/ictv_drawing_conventions.md: arcs sit just outside
+        the circle, run clockwise for virion-sense ORFs and anticlockwise for
+        complementary-sense ones (so each half of a geminivirus circle carries
+        one strand), and an arc overlapping one already placed nests inward.
+        """
         args = self.args
         extra: list = []
+        L = rna.length
 
-        for i, feat in enumerate(rna.features):
-            lane = CIRC_R_ANN_LANES[i % 2]
+        # the genome circle
+        theta = np.linspace(0, 2 * np.pi, 361)
+        ax.plot(theta, np.full_like(theta, CIRC_R_BASELINE), color="black",
+                linewidth=1.0, zorder=2)
+
+        placements, _ = self._placements(rna, circular=True)
+        deepest = max((p.tier for p in placements), default=0)
+        if deepest >= CIRC_MAX_TIERS:
+            log.warning("%d nesting levels needed but only %d fit; deepest arcs are "
+                        "drawn on the innermost lane", deepest + 1, CIRC_MAX_TIERS)
+        deepest = min(deepest, CIRC_MAX_TIERS - 1)
+        # the innermost tier in use sits just outside the circle; tier 0 is the
+        # outermost, so "AC4 inside AC1" reads as the ICTV figures draw it
+        lane0 = CIRC_R_BASELINE + 0.02 + deepest * CIRC_LANE_STEP
+        self._ring_top = lane0 + CIRC_ANN_HEIGHT
+        self._outside_label_r = self._ring_top + 0.03
+
+        for pl in placements:
+            feat = pl.feature
+            tier = min(pl.tier, CIRC_MAX_TIERS - 1)
+            lane = lane0 - tier * CIRC_LANE_STEP
             color = self._feature_color(feat.product)
-            for start, end in rna.feature_spans(feat):
-                width = self._theta(end + 1, rna.length) - self._theta(start, rna.length)
-                centre = self._theta(start, rna.length) + width / 2
-                ax.bar(centre, CIRC_ANN_HEIGHT, width=width, bottom=lane,
-                       facecolor=color, edgecolor="none" if args.no_border else "black",
-                       linewidth=0.6, align="center", zorder=3)
+            edge = "none" if args.no_border else "black"
+            spans = rna.feature_spans(feat)
+            head_span = spans[-1] if feat.forward else spans[0]
+            for (s_, e_) in spans:
+                th0, th1 = self._theta(s_, L), self._theta(e_ + 1, L)
+                head = self._theta(1 + self._head_length(e_ - s_ + 1, L), L) if (s_, e_) == head_span else 0.0
+                body0, body1 = (th0, th1 - head) if feat.forward else (th0 + head, th1)
+                if body1 > body0:
+                    ax.bar((body0 + body1) / 2, CIRC_ANN_HEIGHT, width=body1 - body0,
+                           bottom=lane, facecolor=color, edgecolor=edge, linewidth=0.6,
+                           align="center", zorder=3)
+                if head:
+                    r_lo, r_hi = lane - CIRC_ANN_HEIGHT * 0.18, lane + CIRC_ANN_HEIGHT * 1.18
+                    r_mid = lane + CIRC_ANN_HEIGHT / 2
+                    if feat.forward:
+                        pts_t, pts_r = [body1, th1, body1], [r_lo, r_mid, r_hi]
+                    else:
+                        pts_t, pts_r = [body0, th0, body0], [r_lo, r_mid, r_hi]
+                    ax.fill(pts_t, pts_r, facecolor=color, edgecolor=edge,
+                            linewidth=0.6, zorder=3)
 
             if not args.no_label:
-                extra.append(self._label_feature(ax, rna, feat, lane,
-                                                 rna.feature_spans(feat)))
+                extra.append(self._label_feature(ax, rna, feat, lane, spans))
+                if feat.gene:
+                    extra.append(self._label_outside(ax, rna, feat.gene, spans,
+                                                     fontsize=ORF_LABEL_FONTSIZE))
 
-        # origin: a radial tick at position 1
-        ax.plot([0, 0], [CIRC_R_DEPTH_BASE, CIRC_R_ANN_LANES[1] + CIRC_ANN_HEIGHT],
-                color="black", linewidth=0.8, linestyle=(0, (3, 2)), zorder=4)
+        # origin at 12 o'clock: a dashed radius through the depth band and a
+        # stem-loop icon for the intergenic region / origin of replication
+        ax.plot([0, 0], [CIRC_R_DEPTH_BASE, CIRC_R_BASELINE], color="black",
+                linewidth=0.8, linestyle=(0, (3, 2)), zorder=4)
+        stem_top = self._ring_top + 0.03
+        ax.plot([0, 0], [stem_top, stem_top + 0.04], color="black", linewidth=1.0,
+                zorder=4, clip_on=False)
+        ax.plot([0], [stem_top + 0.055], marker="o", markersize=5, markerfacecolor="white",
+                markeredgecolor="black", markeredgewidth=1.0, zorder=4, clip_on=False)
         return [a for a in extra if a is not None]
+
+    def _label_outside(self, ax, rna: RNA, text: str, spans, fontsize: int):
+        """Radial text just outside the arc ring, reading outwards."""
+        covered = sum(e - s + 1 for s, e in spans)
+        mid = ((spans[0][0] - 1 + covered / 2) % rna.length) + 1
+        theta = float(self._theta(mid, rna.length))
+        deg = np.degrees(theta)
+        left = 90 < (deg % 360) < 270
+        return ax.text(theta, getattr(self, "_outside_label_r", CIRC_R_OUTSIDE_LABEL), text,
+                       ha="right" if left else "left", va="center",
+                       rotation=(-deg + 180) if left else -deg,
+                       rotation_mode="anchor", fontsize=fontsize, color="0.25",
+                       clip_on=False, zorder=5)
 
     def _label_feature(self, ax, rna: RNA, feat, lane: float,
                        spans: list[tuple[int, int]]):
@@ -398,7 +526,7 @@ class CircularPlotter(Plotter):
 
         # narrow feature: read outwards from the rim
         left = 90 < (deg % 360) < 270
-        return ax.text(theta, CIRC_R_OUTSIDE_LABEL, feat.product,
+        return ax.text(theta, getattr(self, "_outside_label_r", CIRC_R_OUTSIDE_LABEL), feat.product,
                        ha="right" if left else "left", va="center",
                        rotation=(-deg + 180) if left else -deg,
                        rotation_mode="anchor", fontsize=fontsize,
@@ -472,7 +600,7 @@ class CircularPlotter(Plotter):
                     fontsize=7, color="0.35", zorder=5)
 
         # the hub is empty: name the molecule there rather than over the trace
-        ax.text(0, 0, f"{rna.name}\n{rna.length:,} nt", ha="center", va="center",
+        ax.text(0, 0, f"{rna.name}\n{rna.length:,} nts", ha="center", va="center",
                 fontsize=9, color="0.35", linespacing=1.5, zorder=5)
 
 
