@@ -14,6 +14,7 @@ authors:
   - family-names: Stevens
     given-names: Kristian
     affiliation: "Department of Computer Science, Department of Evolution and Ecology, and Foundation Plant Services, University of California, Davis"
+    orcid: "https://orcid.org/0009-0006-8779-1774"
     email: kastevens@ucdavis.edu
 contact:
   - family-names: Stevens
@@ -34,6 +35,7 @@ preferred-citation:
     - family-names: Stevens
       given-names: Kristian
       affiliation: "Department of Computer Science, Department of Evolution and Ecology, and Foundation Plant Services, University of California, Davis"
+      orcid: "https://orcid.org/0009-0006-8779-1774"
       email: kastevens@ucdavis.edu
   title: "VirPlot"
   version: 2.0.0
