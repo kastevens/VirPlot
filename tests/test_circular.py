@@ -45,10 +45,9 @@ def test_grbv_example_is_circular():
     assert rna.circular is True
     assert rna.length == 3206
     assert rna.seqid == "NC_022002.1"
-    assert [f.product for f in rna.features] == [
-        "V2 protein", "V1 protein", "V3 protein",
-        "C2 protein", "C1 protein", "C3 protein",
-    ]
+    # curated per the ICTV convention: ORF name in gene=, function in product=
+    assert [f.gene for f in rna.features] == ["V2", "V1", "V3", "C2", "C1", "C3"]
+    assert [f.product for f in rna.features] == ["putative MP", "CP", "V3", "Rep", "RepA", "C3"]
     assert [f.strand for f in rna.features] == ["+", "+", "+", "-", "-", "-"]
 
 

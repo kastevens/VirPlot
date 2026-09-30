@@ -172,9 +172,11 @@ rewording C2 to: direction by strand; nesting by overlap; halves follow.
 outside / product inside needs two names per feature. The code uses
 `product=` inside and `gene=` outside when present. NCBI RefSeq GFF3 for GRBV
 carries neither an ORF name nor a function — only `locus_tag=N761_gp1` and
-`product=V1 protein` — so the outside label is empty and function colouring
-needs a per-product `color_mapping` (as `examples/grbv.yml` does). Worth
-deciding whether `locus_tag` or `Name` should be accepted as the outside label.
+`product=V1 protein`. The shipped `examples/grbv.gff3` is therefore curated
+(`gene=V1;product=CP`, RefSeq name kept in `Note=`), which is what users are
+expected to do; docs/GFF_GUIDE.md §5 says so. Worth deciding whether
+`locus_tag` or `Name` should be accepted as the outside label for uncurated
+files.
 
 **E. §1 Palette — RefSeq product names are often function-free.** The keyword
 classifier covers RdRp/Rep/CP/MP/HSP70/p2x-style names; anything else falls to
@@ -293,5 +295,6 @@ compared too, and a real fixture added.
   (`test_byv_fixture_layout_versus_ictv_figure`).
 * `examples/grbv.gff3` is a Grablovirus, not in the 9th Report; its nearest
   figure is Begomovirus DNA-A. The C2 conventions (V clockwise right, C
-  anticlockwise left, nesting) hold; RefSeq names `V1 protein` etc. carry no
-  function, which is why `grbv.yml` maps colours by hand.
+  anticlockwise left, nesting) hold. RefSeq's `V1 protein` etc. carry no
+  function, so the shipped GFF is curated to `gene=V1;product=CP` and the
+  default palette colours it; the RefSeq names are kept in `Note=`.

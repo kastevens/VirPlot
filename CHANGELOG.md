@@ -10,6 +10,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- `examples/grbv.gff3` labels curated to the ICTV convention (`gene=V1;
+  product=CP`, `gene=C1;product=RepA`, …; RefSeq's `Vn protein` names kept in
+  `Note=`), with a header comment recording the curation. `grbv.yml` no longer
+  needs a `color_mapping`; the default palette colours the curated products.
 - **ICTV-style circular options.** `circular_labels: horizontal` writes every
   arc label level, outside the ring, as `ORF (product)`; a nested arc's label
   steps one line away from the equator per tier so it does not overprint.

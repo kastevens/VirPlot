@@ -6,7 +6,7 @@ few conventions of its own for things GFF3 does not standardise (circularity,
 frameshifts, function colours). This guide says exactly what it reads, what it
 ignores, and how to write each situation so the figure comes out as intended.
 Examples of every case are in [`examples/`](../examples/): `byv.gff3` (linear,
-one strand, with a `Note=+1 frameshift`), `grbv.gff3` (circular, both strands),
+one strand, with a `Note=+1 frameshift`), `grbv.gff3` (circular, both strands, RefSeq labels curated),
 `sample_multi.gff3` (two segments).
 
 ## 1. The minimum
@@ -92,8 +92,8 @@ So for a geminivirus, write the virion-sense ORFs with `+` and the
 complementary-sense ones with `-`, exactly as RefSeq does:
 
 ```gff3
-NC_022002.1	RefSeq	CDS	292	807	.	+	0	ID=v2;product=V2 protein
-NC_022002.1	RefSeq	CDS	2250	3044	.	-	0	ID=c1;product=C1 protein
+NC_022002.1	RefSeq	CDS	292	807	.	+	0	ID=v2;gene=V2;product=putative MP
+NC_022002.1	RefSeq	CDS	2250	3044	.	-	0	ID=c1;gene=C1;product=RepA
 ```
 
 Coordinates of a `-` strand feature are still written `start < end` in
@@ -132,8 +132,12 @@ Two consequences worth knowing:
   (BYV's `p6` is a membrane protein; its `p21` is a silencing suppressor —
   the name alone cannot tell). Either name the function in `product`
   (`p21 silencing suppressor`) or pin the colour in `color_mapping`.
-  `examples/grbv.yml` does the latter for GRBV, whose RefSeq products are all
-  `Vn protein` / `Cn protein`.
+  `examples/grbv.gff3` shows the former: RefSeq calls its products
+  `V1 protein` … `C3 protein`, and the shipped file rewrites them to
+  `gene=V1;product=CP`, `gene=C1;product=RepA` and so on, keeping the RefSeq
+  name in `Note=`. **Expect to do this curation for your own genomes** — a
+  header comment in the GFF recording what was changed and on what authority
+  is the right place to say so.
 * **"Putative" lightens the colour.** If `product` also contains `putative`,
   `probable`, `possible`, `hypothetical`, `predicted`, `proposed` or `-like`,
   the class colour is tinted 35 % towards white — the ICTV figures' convention

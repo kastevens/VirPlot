@@ -1,13 +1,6 @@
 # examples/grbv.yml restyled the way the ICTV 9th Report draws circular
-# genomes: level labels outside the ring and the innermost arcs sitting on
-# the genome circle. Everything else is identical to grbv.yml.
-color_mapping:
-  V1 protein: '#e75480'
-  C1 protein: '#f5b041'
-  C2 protein: '#f8ca80'
-  V2 protein: '#82c5cf'
-  V3 protein: '#82c5cf'
-  C3 protein: '#9f9f9f'
+# genomes: level "ORF (product)" labels outside the ring and the innermost
+# arcs sitting on the genome circle. Everything else is as in grbv.yml.
 annotation_fontsize: 9
 default_color: '#9f9f9f'
 shade_color: '#ca4f35'

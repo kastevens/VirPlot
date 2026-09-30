@@ -1,21 +1,28 @@
 ##gff-version 3
 #!gff-spec-version 1.21
 ##sequence-region NC_022002.1 1 3206
-# Grapevine red blotch virus (GRBV), isolate CF214-1, RefSeq NC_022002.1
-# Annotation taken verbatim from the NCBI RefSeq record (3206 bp, circular ssDNA,
-# family Geminiviridae, genus Grablovirus; host Vitis vinifera).
-# Virion-sense ORFs V1-V3; complementary-sense ORFs C1-C3. The large intergenic
-# region (3045..3206 + 1..291) spans the origin.
+#
+# Grapevine red blotch virus (GRBV), isolate CF214-1, RefSeq NC_022002.1:
+# 3206 nt circular ssDNA, family Geminiviridae, genus Grablovirus, host
+# Vitis vinifera. Coordinates, strands and Is_circular are the RefSeq
+# record's, unchanged.
+#
+# CURATED LABELS. RefSeq names the products only "V1 protein" ... "C3
+# protein", which carry no function, so VirPlot would draw them grey and
+# label them with those strings. As we expect users to do for their own
+# genomes, the labels below were rewritten to the ICTV figure convention
+# (ORF name in gene=, function in product=; see docs/GFF_GUIDE.md sections 3
+# and 5). The RefSeq product is kept in Note=. Functions follow the
+# grablovirus literature: V1 coat protein; V2 and V3 implicated in movement
+# (V2 the stronger candidate, hence "putative MP" and the lighter tint);
+# C1 RepA, and C1:C2 spliced giving Rep; C3 of unknown function.
+#
+# Virion-sense ORFs V1-V3 are on +, complementary-sense C1-C3 on -. The large
+# intergenic region (3045..3206 + 1..291) spans the origin.
 NC_022002.1	RefSeq	region	1	3206	.	+	.	ID=NC_022002.1:1..3206;Dbxref=taxon:1381007;Is_circular=true;isolate=CF214-1;mol_type=genomic DNA;nat-host=Vitis vinifera
-NC_022002.1	RefSeq	gene	292	807	.	+	.	ID=gene-N761_gp1;Name=N761_gp1;gene_biotype=protein_coding;locus_tag=N761_gp1
-NC_022002.1	RefSeq	CDS	292	807	.	+	0	ID=cds-YP_008400113.1;Parent=gene-N761_gp1;locus_tag=N761_gp1;product=V2 protein;protein_id=YP_008400113.1
-NC_022002.1	RefSeq	gene	710	1384	.	+	.	ID=gene-N761_gp2;Name=N761_gp2;gene_biotype=protein_coding;locus_tag=N761_gp2
-NC_022002.1	RefSeq	CDS	710	1384	.	+	0	ID=cds-YP_008400114.1;Parent=gene-N761_gp2;locus_tag=N761_gp2;product=V1 protein;protein_id=YP_008400114.1
-NC_022002.1	RefSeq	gene	1365	1736	.	+	.	ID=gene-N761_gp3;Name=N761_gp3;gene_biotype=protein_coding;locus_tag=N761_gp3
-NC_022002.1	RefSeq	CDS	1365	1736	.	+	0	ID=cds-YP_008400115.1;Parent=gene-N761_gp3;locus_tag=N761_gp3;product=V3 protein;protein_id=YP_008400115.1
-NC_022002.1	RefSeq	gene	1898	2332	.	-	.	ID=gene-N761_gp4;Name=N761_gp4;gene_biotype=protein_coding;locus_tag=N761_gp4
-NC_022002.1	RefSeq	CDS	1898	2332	.	-	0	ID=cds-YP_008400116.1;Parent=gene-N761_gp4;locus_tag=N761_gp4;product=C2 protein;protein_id=YP_008400116.1
-NC_022002.1	RefSeq	gene	2250	3044	.	-	.	ID=gene-N761_gp5;Name=N761_gp5;gene_biotype=protein_coding;locus_tag=N761_gp5
-NC_022002.1	RefSeq	CDS	2250	3044	.	-	0	ID=cds-YP_008400117.1;Parent=gene-N761_gp5;locus_tag=N761_gp5;product=C1 protein;protein_id=YP_008400117.1
-NC_022002.1	RefSeq	gene	2408	2890	.	-	.	ID=gene-N761_gp6;Name=N761_gp6;gene_biotype=protein_coding;locus_tag=N761_gp6
-NC_022002.1	RefSeq	CDS	2408	2890	.	-	0	ID=cds-YP_008400118.1;Parent=gene-N761_gp6;locus_tag=N761_gp6;product=C3 protein;protein_id=YP_008400118.1
+NC_022002.1	RefSeq	CDS	292	807	.	+	0	ID=cds-YP_008400113.1;locus_tag=N761_gp1;gene=V2;product=putative MP;Note=RefSeq product V2 protein; movement-associated
+NC_022002.1	RefSeq	CDS	710	1384	.	+	0	ID=cds-YP_008400114.1;locus_tag=N761_gp2;gene=V1;product=CP;Note=RefSeq product V1 protein; coat protein
+NC_022002.1	RefSeq	CDS	1365	1736	.	+	0	ID=cds-YP_008400115.1;locus_tag=N761_gp3;gene=V3;product=V3;Note=RefSeq product V3 protein; function not assigned, movement-associated in some reports
+NC_022002.1	RefSeq	CDS	1898	2332	.	-	0	ID=cds-YP_008400116.1;locus_tag=N761_gp4;gene=C2;product=Rep;Note=RefSeq product C2 protein; C1:C2 spliced transcript encodes Rep
+NC_022002.1	RefSeq	CDS	2250	3044	.	-	0	ID=cds-YP_008400117.1;locus_tag=N761_gp5;gene=C1;product=RepA;Note=RefSeq product C1 protein
+NC_022002.1	RefSeq	CDS	2408	2890	.	-	0	ID=cds-YP_008400118.1;locus_tag=N761_gp6;gene=C3;product=C3;Note=RefSeq product C3 protein; function not assigned
