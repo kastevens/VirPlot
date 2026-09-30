@@ -47,6 +47,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rnas", nargs="+", metavar="SEQID",
                    help="Plot only these GFF sequence ids, in this order "
                         "(default: every 'region' in the GFF)")
+    p.add_argument("--topology", choices=["auto", "circular", "linear"], default="auto",
+                   help="Treat the genome(s) as circular or linear; 'auto' follows the "
+                        "GFF region line's Is_circular attribute [%(default)s]")
     p.add_argument("--free-y", action="store_true",
                    help="With several RNAs, let each figure pick its own depth y-limit "
                         "instead of sharing one")
@@ -129,12 +132,19 @@ def main(argv: list[str] | None = None) -> None:
         log.error("--ref applies to a single RNA; use --rnas to select one, "
                   "or drop --ref so each RNA is matched by its GFF sequence id")
         sys.exit(1)
+    if args.topology != "auto":
+        for rna in rnas:
+            rna.circular = args.topology == "circular"
+
     multi = len(rnas) > 1
     for rna in rnas:
+        shape = "circular" if rna.circular else "linear"
         if multi:
-            log.info("%s: %d bp, %d features", rna.seqid, rna.length, len(rna.features))
+            log.info("%s: %d bp, %d features, %s", rna.seqid, rna.length,
+                     len(rna.features), shape)
         else:
-            log.info("Parsed %d features from GFF", len(rna.features))
+            log.info("Parsed %d features from GFF (%d bp, %s)",
+                     len(rna.features), rna.length, shape)
 
     # --- depth tracks ---
     labels = args.labels or [default_label(f) for f in args.depth]
@@ -143,7 +153,8 @@ def main(argv: list[str] | None = None) -> None:
         for label, df in zip(labels, args.depth):
             try:
                 y, n, kind = load_depth(df, rna.length, seqid=rna.seqid,
-                                        ref=args.ref, min_mapq=args.min_mapq)
+                                        ref=args.ref, min_mapq=args.min_mapq,
+                                        circular=rna.circular)
             except AlignmentError as exc:
                 log.error("%s", exc)
                 sys.exit(1)

@@ -1,0 +1,28 @@
+# Style for the grapevine red blotch virus example (examples/grbv.gff3).
+# Virion-sense ORFs (V1-V3) warm, complementary-sense ORFs (C1-C3) cool, so the
+# two transcriptional units read apart at a glance.
+
+color_mapping:
+  V1 protein: '#fd7f6f'   # coat protein
+  V2 protein: '#ffb55a'
+  V3 protein: '#ffee65'
+  C1 protein: '#7eb0d5'   # replication-associated protein (Rep)
+  C2 protein: '#8bd3c7'
+  C3 protein: '#b2e061'
+
+annotation_fontsize: 9
+
+default_color: '#9f9f9f'
+
+shade_color: '#ca4f35'
+
+depth_line_color: '#0077cc'
+
+stacked_area_colors:
+  - '#f96666'
+  - '#82c4fa'
+  - '#f9da86'
+
+legend_location: "upper left"
+
+title: "Grapevine red blotch virus (NC_022002.1), 3206 nt circular"

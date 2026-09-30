@@ -29,6 +29,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - `examples/sample.sam` (synthetic, two references; regenerate with
   `examples/make_sample_sam.py`) and `examples/sample_multi.gff3`.
 
+- **Circular genomes.** `Is_circular=true` on a GFF `region` line (as NCBI
+  RefSeq writes) marks an RNA circular; `--topology circular|linear` overrides
+  it. For a circular genome, alignments that run off the end of the reference
+  wrap round to position 1 and positions past the end are taken modulo the
+  length, so depth is continuous across the origin for a BAM produced by
+  padding the reference and wrapping coordinates back. The annotation track
+  drops the 5'/3' marks and shows the backbone continuing past both edges.
+- `examples/grbv.gff3`, `examples/grbv.sam`, `examples/grbv.yml` — grapevine
+  red blotch virus (RefSeq NC_022002.1, 3206 nt circular): real RefSeq
+  annotation with simulated, origin-spanning reads
+  (`examples/make_grbv_sam.py`).
+
 ### Fixed
 
 - `--report` no longer fails when the output directory does not exist yet.

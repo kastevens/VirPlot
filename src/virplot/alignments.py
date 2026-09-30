@@ -96,11 +96,18 @@ def depth_from_alignments(
     seqid: str | None = None,
     ref: str | None = None,
     min_mapq: int = 0,
+    circular: bool = False,
 ) -> tuple[np.ndarray, int]:
     """Compute per-base depth for one reference from a SAM/BAM file.
 
     ``seqid`` is the GFF sequence id used to choose among ``@SQ`` entries when
     the file has several; ``ref`` overrides that choice explicitly.
+
+    With ``circular``, alignments that run off the end of the reference wrap
+    round to position 1 instead of being clipped, and positions past the end
+    are taken modulo the length. Aligners have no notion of a circular
+    reference, so this is what makes depth continuous across the origin for a
+    BAM produced by padding the reference and wrapping the coordinates back.
 
     Returns ``(depth_array of length seq_len, n_reads_counted)``.
     """
@@ -108,7 +115,7 @@ def depth_from_alignments(
     target = resolve_reference(af.references, seqid=seqid, ref=ref, path=path)
 
     ref_len = af.references.get(target)
-    if ref_len is not None and ref_len != seq_len:
+    if ref_len is not None and ref_len != seq_len and not (circular and ref_len > seq_len):
         log.warning(
             "Reference %s is %d bp in %s but %d bp in the GFF; positions beyond "
             "the GFF length are ignored", target, ref_len, os.path.basename(path), seq_len,
@@ -124,15 +131,43 @@ def depth_from_alignments(
         pos = aln.pos - 1                  # 0-based
         for length, op in aln.cigar:
             if op in _DEPTH_OPS:
-                s, e = pos, pos + length
-                if s < seq_len and e > 0:
-                    diff[max(s, 0)] += 1
-                    diff[min(e, seq_len)] -= 1
+                if circular:
+                    _add_wrapped(diff, pos, length, seq_len)
+                else:
+                    s, e = pos, pos + length
+                    if s < seq_len and e > 0:
+                        diff[max(s, 0)] += 1
+                        diff[min(e, seq_len)] -= 1
             if op in _REF_CONSUMING:
                 pos += length
 
     depth = np.cumsum(diff[:-1]).astype(int)
     return depth, counted
+
+
+def _add_wrapped(diff: np.ndarray, start: int, length: int, seq_len: int) -> None:
+    """Mark ``length`` covered bases from ``start`` on a circular reference.
+
+    ``start`` is 0-based and may sit past the end (an unwrapped padded
+    alignment); the block may also run off the end, in which case it
+    continues from position 1.
+    """
+    if length <= 0 or seq_len <= 0:
+        return
+    if length >= seq_len:                  # covers the whole circle
+        diff[0] += 1
+        diff[seq_len] -= 1
+        return
+    s = start % seq_len
+    e = s + length
+    if e <= seq_len:
+        diff[s] += 1
+        diff[e] -= 1
+    else:                                  # split across the origin
+        diff[s] += 1
+        diff[seq_len] -= 1
+        diff[0] += 1
+        diff[e - seq_len] -= 1
 
 
 # --------------------------------------------------------------------------

@@ -43,7 +43,12 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
 
             if feature_type == "region":
                 if seqid not in rnas:
-                    rnas[seqid] = RNA(name=seqid, seqid=seqid, length=int(end))
+                    attrs = dict(
+                        kv.split("=", 1) for kv in attributes.split(";") if "=" in kv
+                    )
+                    circular = attrs.get("Is_circular", "").lower() == "true"
+                    rnas[seqid] = RNA(name=seqid, seqid=seqid, length=int(end),
+                                      circular=circular)
                 continue
 
             if feature_type != "CDS":
@@ -96,12 +101,14 @@ def gff_seqid(gff_path: str) -> str | None:
 # --------------------------------------------------------------------------
 
 def parse_depth(depth_path: str, seq_len: int, *, seqid: str | None = None,
-                ref: str | None = None) -> tuple[np.ndarray, int]:
+                ref: str | None = None, circular: bool = False) -> tuple[np.ndarray, int]:
     """Parse a samtools depth file directly into a numpy array.
 
     With ``seqid``/``ref`` the file may hold several sequences and the
     matching one is selected (see ``resolve_reference``); without either,
-    every line is used, as before. Returns (depth_array, n_entries).
+    every line is used, as before. With ``circular``, positions past the end
+    (as a padded reference produces) wrap round instead of being dropped.
+    Returns (depth_array, n_entries).
     """
     by_seq: dict[str, list[tuple[int, int]]] = {}
     with open(depth_path) as fp:
@@ -128,7 +135,9 @@ def parse_depth(depth_path: str, seq_len: int, *, seqid: str | None = None,
 
     y = np.zeros(seq_len, dtype=int)
     for pos, cov in rows:
-        if 1 <= pos <= seq_len:
+        if circular and pos >= 1:
+            y[(pos - 1) % seq_len] += cov
+        elif 1 <= pos <= seq_len:
             y[pos - 1] = cov
     return y, len(rows)
 
@@ -144,6 +153,7 @@ def load_depth(
     seqid: str | None = None,
     ref: str | None = None,
     min_mapq: int = 0,
+    circular: bool = False,
 ) -> tuple[np.ndarray, int, str]:
     """Load one depth track from a depth file or a SAM/BAM file.
 
@@ -152,9 +162,10 @@ def load_depth(
     ``"depth"`` or ``"alignments"``.
     """
     if is_alignment_file(path):
-        y, n = depth_from_alignments(path, seq_len, seqid=seqid, ref=ref, min_mapq=min_mapq)
+        y, n = depth_from_alignments(path, seq_len, seqid=seqid, ref=ref,
+                                     min_mapq=min_mapq, circular=circular)
         return y, n, "alignments"
-    y, n = parse_depth(path, seq_len, seqid=seqid, ref=ref)
+    y, n = parse_depth(path, seq_len, seqid=seqid, ref=ref, circular=circular)
     return y, n, "depth"
 
 

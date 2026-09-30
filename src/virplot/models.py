@@ -5,9 +5,9 @@ These are deliberately thin. ``Feature`` is an immutable record for one CDS,
 features, and one depth track per sample) so the rest of the code passes a
 single object around instead of parallel lists.
 
-``RNA.circular`` is a data-only flag for now: no behaviour hangs off it yet.
-It marks where topology-dependent logic (coordinate wrapping, origin-spanning
-features, circular plotting) will attach later.
+``RNA.circular`` comes from the GFF3 ``Is_circular=true`` attribute on the
+region line. It currently drives depth wrapping at the origin; origin-spanning
+features and circular plotting will hang off it too.
 """
 
 from __future__ import annotations

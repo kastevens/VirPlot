@@ -193,13 +193,27 @@ class LinearPlotter(Plotter):
         args = self.args
         seq_len = rna.length
         pad = int(seq_len * LABEL_PAD_FRACTION)
+        y0 = ANNOTATION_Y_BASE
 
-        ax.plot([-pad, seq_len + pad], [ANNOTATION_Y_BASE, ANNOTATION_Y_BASE],
-                color="black", linewidth=1.2)
-        p5 = ax.text(-pad * 0.4, ANNOTATION_Y_BASE, "5'", va="center", ha="right",
-                     fontsize=10, fontweight="bold")
-        p3 = ax.text(seq_len + pad * 0.4, ANNOTATION_Y_BASE, "3'", va="center", ha="left",
-                     fontsize=10, fontweight="bold")
+        if rna.circular:
+            # No 5'/3' ends on a circle: show the backbone continuing past both
+            # edges instead, so the join at the origin is visible.
+            ax.plot([0, seq_len], [y0, y0], color="black", linewidth=1.2)
+            for x0, x1 in ((-pad, 0), (seq_len, seq_len + pad)):
+                ax.plot([x0, x1], [y0, y0], color="black", linewidth=1.2,
+                        linestyle=(0, (2, 2)), clip_on=False)
+            ends = [
+                ax.text(-pad * 1.25, y0, "\u21ba", va="center", ha="right", fontsize=11),
+                ax.text(seq_len + pad * 1.25, y0, "\u21bb", va="center", ha="left", fontsize=11),
+            ]
+        else:
+            ax.plot([-pad, seq_len + pad], [y0, y0], color="black", linewidth=1.2)
+            ends = [
+                ax.text(-pad * 0.4, y0, "5'", va="center", ha="right",
+                        fontsize=10, fontweight="bold"),
+                ax.text(seq_len + pad * 0.4, y0, "3'", va="center", ha="left",
+                        fontsize=10, fontweight="bold"),
+            ]
 
         for i, feat in enumerate(rna.features):
             upper = i % 2 == 0
@@ -223,7 +237,7 @@ class LinearPlotter(Plotter):
         ax.set_xlim(0, seq_len)
         ax.set_ylim(-1.5, 2.0)
         ax.axis("off")
-        return [p5, p3]
+        return ends
 
     def _draw_depth(self, ax: plt.Axes, rna: RNA,
                     tracks: list[np.ndarray], total: np.ndarray) -> list:

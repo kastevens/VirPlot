@@ -40,7 +40,7 @@ pip install .
 
 ## Quick Start
 
-A sample GFF3, depth file, SAM file, and YAML configuration are included in `examples/`:
+Example data in `examples/`: a synthetic two-segment genome (`sample.gff3`, `sample_multi.gff3`, `sample.dep`, `sample.sam`, `spec.yml`) and a circular one — grapevine red blotch virus, real RefSeq NC_022002.1 annotation with simulated reads (`grbv.gff3`, `grbv.sam`, `grbv.yml`).
 
 ```bash
 # Basic plot
@@ -90,6 +90,22 @@ virplot -g examples/sample_multi.gff3 -d examples/sample.sam -y examples/spec.ym
 
 So the separate figures can be laid side by side without misleading the reader, they share one depth y-limit and their widths are proportional to RNA length. `--free-y` and `--equal-width` switch either behaviour off; `--rnas SEQID [SEQID ...]` selects and orders a subset. With `--normalize`, depth is scaled by the maximum across all plotted RNAs.
 
+### Circular genomes
+
+A genome is treated as circular when its GFF `region` line carries the GFF3 attribute `Is_circular=true` (as NCBI RefSeq records do); `--topology circular|linear` overrides that.
+
+Aligners have no notion of a circular reference — bowtie2, BWA and minimap2 all treat the reference as a linear string — so a read spanning the origin is soft-clipped or lost, leaving a false coverage dip about one read length wide at position 1. The usual fix is to pad the reference by a read length, align, then wrap the coordinates back. VirPlot completes that: for a circular genome, alignments running off the end continue from position 1, and positions past the end are taken modulo the genome length.
+
+```bash
+# grapevine red blotch virus, 3206 nt circular (RefSeq NC_022002.1)
+virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml --legend --title
+
+# same reads, origin ignored — note the ramp over the first 150 bp
+virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml --topology linear
+```
+
+On a circular genome the annotation track drops the 5′/3′ marks and shows the backbone continuing past both edges instead.
+
 ### Depth from SAM/BAM
 
 ```bash
@@ -110,7 +126,8 @@ The reference to plot is taken from the GFF `region` line's sequence id. If the 
 
 ```txt
 virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
-        [--ref REF] [--rnas SEQID [SEQID ...]] [--free-y] [--equal-width]
+        [--ref REF] [--rnas SEQID [SEQID ...]] [--topology {auto,circular,linear}]
+        [--free-y] [--equal-width]
         [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
         [--yscale {linear,symlog}] [--linthresh LINTHRESH]
         [--name NAME] [--no-label] [--no-border]
@@ -130,6 +147,7 @@ virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
 | `--free-y`           | With several RNAs, let each figure pick its own y-limit          |
 | `--equal-width`      | With several RNAs, draw every figure at full width               |
 | `--min-mapq`         | Skip SAM/BAM reads with MAPQ below this (default: 0)           |
+| `--topology`         | `auto` (from the GFF `Is_circular` attribute), `circular` or `linear` |
 | `-y`, `--yaml`       | YAML file for color mapping and other specs                    |
 | `-o`, `--outdir`     | Output directory (default: `.`)                                |
 | `-f`, `--format`     | Output format: `svg`, `pdf`, or `png` (default: `svg`)         |
