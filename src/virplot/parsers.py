@@ -4,20 +4,30 @@ source (samtools depth text, SAM, BAM) into a per-base array."""
 from __future__ import annotations
 
 import logging
+import os
 import sys
 
 import numpy as np
 
-from virplot.alignments import depth_from_alignments, is_alignment_file
-from virplot.models import Feature
+from virplot.alignments import depth_from_alignments, is_alignment_file, resolve_reference
+from virplot.models import RNA, Feature
 
 log = logging.getLogger(__name__)
 
 
-def parse_gff(gff_path: str) -> tuple[int, list[Feature]]:
-    """Parse a GFF3 file, returning (sequence_length, features)."""
-    features: list[Feature] = []
-    sequence_length: int | None = None
+# --------------------------------------------------------------------------
+# GFF3
+# --------------------------------------------------------------------------
+
+def parse_gff_rnas(gff_path: str) -> list[RNA]:
+    """Parse a GFF3 file into one ``RNA`` per ``region`` line.
+
+    RNAs are returned in the order their ``region`` lines appear. CDS features
+    are attached to the RNA whose sequence id (column 1) they carry; a CDS on
+    a sequence id with no ``region`` line is skipped with a warning.
+    """
+    rnas: dict[str, RNA] = {}
+    orphans: set[str] = set()
 
     with open(gff_path) as fp:
         for line in fp:
@@ -29,10 +39,11 @@ def parse_gff(gff_path: str) -> tuple[int, list[Feature]]:
             if len(parts) != 9:
                 continue
 
-            _, _, feature_type, start, end, _, strand, _, attributes = parts
+            seqid, _, feature_type, start, end, _, strand, _, attributes = parts
 
-            if feature_type == "region" and sequence_length is None:
-                sequence_length = int(end)
+            if feature_type == "region":
+                if seqid not in rnas:
+                    rnas[seqid] = RNA(name=seqid, seqid=seqid, length=int(end))
                 continue
 
             if feature_type != "CDS":
@@ -41,23 +52,35 @@ def parse_gff(gff_path: str) -> tuple[int, list[Feature]]:
             info = dict(
                 kv.split("=", 1) for kv in attributes.split(";") if "=" in kv
             )
-
-            features.append(Feature(
+            feat = Feature(
                 start=int(start),
                 end=int(end),
                 strand=strand,
                 product=info.get("product", "unknown"),
-            ))
+            )
+            if seqid in rnas:
+                rnas[seqid].features.append(feat)
+            else:
+                orphans.add(seqid)
 
-    if sequence_length is None:
+    if not rnas:
         log.error("No 'region' feature found in GFF: %s", gff_path)
         sys.exit(1)
 
-    return sequence_length, features
+    for seqid in sorted(orphans):
+        log.warning("CDS features on %r ignored: no 'region' line for that sequence", seqid)
+
+    return list(rnas.values())
+
+
+def parse_gff(gff_path: str) -> tuple[int, list[Feature]]:
+    """Parse a GFF3 file, returning (sequence_length, features) of its first RNA."""
+    first = parse_gff_rnas(gff_path)[0]
+    return first.length, first.features
 
 
 def gff_seqid(gff_path: str) -> str | None:
-    """Return the sequence id (column 1) of the GFF's ``region`` line, if any."""
+    """Return the sequence id (column 1) of the GFF's first ``region`` line, if any."""
     with open(gff_path) as fp:
         for line in fp:
             if line.startswith("#") or not line.strip():
@@ -68,13 +91,19 @@ def gff_seqid(gff_path: str) -> str | None:
     return None
 
 
-def parse_depth(depth_path: str, seq_len: int) -> tuple[np.ndarray, int]:
+# --------------------------------------------------------------------------
+# samtools depth text
+# --------------------------------------------------------------------------
+
+def parse_depth(depth_path: str, seq_len: int, *, seqid: str | None = None,
+                ref: str | None = None) -> tuple[np.ndarray, int]:
     """Parse a samtools depth file directly into a numpy array.
 
-    Returns (depth_array, n_entries).
+    With ``seqid``/``ref`` the file may hold several sequences and the
+    matching one is selected (see ``resolve_reference``); without either,
+    every line is used, as before. Returns (depth_array, n_entries).
     """
-    y = np.zeros(seq_len, dtype=int)
-    n = 0
+    by_seq: dict[str, list[tuple[int, int]]] = {}
     with open(depth_path) as fp:
         for lineno, line in enumerate(fp, 1):
             fields = line.rstrip("\n").split("\t")
@@ -87,11 +116,26 @@ def parse_depth(depth_path: str, seq_len: int) -> tuple[np.ndarray, int]:
             except ValueError:
                 log.error("Non-integer value in %s:%d — %r", depth_path, lineno, line.rstrip())
                 sys.exit(1)
-            if 1 <= pos <= seq_len:
-                y[pos - 1] = cov
-            n += 1
-    return y, n
+            by_seq.setdefault(fields[0], []).append((pos, cov))
 
+    if seqid is None and ref is None:
+        rows = [r for rows in by_seq.values() for r in rows]
+    elif not by_seq:
+        rows = []
+    else:
+        target = resolve_reference(by_seq, seqid=seqid, ref=ref, path=depth_path)
+        rows = by_seq.get(target, [])
+
+    y = np.zeros(seq_len, dtype=int)
+    for pos, cov in rows:
+        if 1 <= pos <= seq_len:
+            y[pos - 1] = cov
+    return y, len(rows)
+
+
+# --------------------------------------------------------------------------
+# dispatcher
+# --------------------------------------------------------------------------
 
 def load_depth(
     path: str,
@@ -110,5 +154,10 @@ def load_depth(
     if is_alignment_file(path):
         y, n = depth_from_alignments(path, seq_len, seqid=seqid, ref=ref, min_mapq=min_mapq)
         return y, n, "alignments"
-    y, n = parse_depth(path, seq_len)
+    y, n = parse_depth(path, seq_len, seqid=seqid, ref=ref)
     return y, n, "depth"
+
+
+def default_label(path: str) -> str:
+    """Label for a depth source: its basename without extension."""
+    return os.path.splitext(os.path.basename(path))[0]

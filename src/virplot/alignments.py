@@ -105,7 +105,7 @@ def depth_from_alignments(
     Returns ``(depth_array of length seq_len, n_reads_counted)``.
     """
     af = open_alignments(path)
-    target = _resolve_reference(af.references, seqid=seqid, ref=ref, path=path)
+    target = resolve_reference(af.references, seqid=seqid, ref=ref, path=path)
 
     ref_len = af.references.get(target)
     if ref_len is not None and ref_len != seq_len:
@@ -139,8 +139,15 @@ def depth_from_alignments(
 # reference selection
 # --------------------------------------------------------------------------
 
-def _resolve_reference(references: dict[str, int], *, seqid: str | None,
-                       ref: str | None, path: str) -> str:
+def resolve_reference(references: dict, *, seqid: str | None,
+                      ref: str | None, path: str) -> str:
+    """Pick which sequence to use from a file's reference names.
+
+    Priority: explicit ``ref``; the GFF ``seqid`` when present in the file (or
+    when the file lists no references at all); the only reference if there is
+    exactly one. Anything else is ambiguous and raises ``AlignmentError``.
+    ``references`` may be any mapping or set of names.
+    """
     if ref is not None:
         if references and ref not in references:
             raise AlignmentError(

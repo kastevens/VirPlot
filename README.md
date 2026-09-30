@@ -71,13 +71,24 @@ cp examples/spec.yml my_project.yml
 
 Three input files are required:
 
-1. **GFF3 file** — genome annotations containing CDS features and a `region` entry for sequence length
+1. **GFF3 file** — genome annotations containing CDS features and a `region` entry per RNA giving its length
 2. **Depth source** — either
    - tab-delimited output from `samtools depth -a`, **or**
    - a **SAM or BAM** file; VirPlot computes per-base depth from the alignments itself (no `samtools`/`pysam` needed)
 3. **YAML file** — color mapping and style settings (see [Customization](#customization))
 
 If multiple depth sources are given, VirPlot combines them into a *stacked area chart* showing each sample's depth contribution under a combined depth line. Depth files and SAM/BAM files can be mixed.
+
+### Multiple RNAs (segmented genomes)
+
+If the GFF contains several `region` lines — one per genome segment, satellite or subgenomic RNA — VirPlot plots each one, writing `<name>.<seqid>.<format>` (and per-RNA CSV reports). Depth is matched to each RNA by sequence id, so a single SAM/BAM (or a multi-sequence `samtools depth` file) covers all of them:
+
+```bash
+virplot -g examples/sample_multi.gff3 -d examples/sample.sam -y examples/spec.yml --smooth --shade-breaks
+# -> virplot.SyntheticVirus1.svg, virplot.SyntheticVirus2.svg
+```
+
+So the separate figures can be laid side by side without misleading the reader, they share one depth y-limit and their widths are proportional to RNA length. `--free-y` and `--equal-width` switch either behaviour off; `--rnas SEQID [SEQID ...]` selects and orders a subset. With `--normalize`, depth is scaled by the maximum across all plotted RNAs.
 
 ### Depth from SAM/BAM
 
@@ -99,7 +110,8 @@ The reference to plot is taken from the GFF `region` line's sequence id. If the 
 
 ```txt
 virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
-        [--ref REF] [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
+        [--ref REF] [--rnas SEQID [SEQID ...]] [--free-y] [--equal-width]
+        [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
         [--yscale {linear,symlog}] [--linthresh LINTHRESH]
         [--name NAME] [--no-label] [--no-border]
         [-t THRESHOLDS [THRESHOLDS ...]] [-r] [--shade-breaks]
@@ -113,7 +125,10 @@ virplot [-h] [-V] -g GFF -d DEPTH [DEPTH ...] [-l LABELS [LABELS ...]]
 | `-g`, `--gff`        | Path to GFF3 annotation file                                   |
 | `-d`, `--depth`      | One or more depth sources — `samtools depth` files or SAM/BAM (stacked if multiple) |
 | `-l`, `--labels`     | Label(s) for each depth source (same order as `--depth`)       |
-| `--ref`              | Reference name to use from SAM/BAM headers (default: GFF sequence id, or the only reference) |
+| `--ref`              | Reference name to use from SAM/BAM/depth files when it differs from the GFF sequence id (single-RNA GFF only) |
+| `--rnas`             | Plot only these GFF sequence ids, in this order (default: every `region`) |
+| `--free-y`           | With several RNAs, let each figure pick its own y-limit          |
+| `--equal-width`      | With several RNAs, draw every figure at full width               |
 | `--min-mapq`         | Skip SAM/BAM reads with MAPQ below this (default: 0)           |
 | `-y`, `--yaml`       | YAML file for color mapping and other specs                    |
 | `-o`, `--outdir`     | Output directory (default: `.`)                                |

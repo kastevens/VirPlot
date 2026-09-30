@@ -19,14 +19,26 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - `--ref NAME` to choose the reference from a multi-reference SAM/BAM header
   (default: the GFF sequence id, or the only `@SQ` entry).
 - `--min-mapq N` to drop low mapping-quality reads.
-- `examples/sample.sam` (synthetic; regenerate with `examples/make_sample_sam.py`).
+- **Multiple RNAs.** A GFF with several `region` lines (segmented genomes,
+  satellites, subgenomic RNAs) now produces one figure per RNA, named
+  `<name>.<seqid>.<format>`, with per-RNA CSV reports. Depth sources are
+  matched to each RNA by sequence id, so one SAM/BAM or multi-sequence depth
+  file serves all of them. Figures share a depth y-limit and have widths
+  proportional to RNA length so they compare honestly side by side;
+  `--free-y` / `--equal-width` opt out, `--rnas` selects a subset.
+- `examples/sample.sam` (synthetic, two references; regenerate with
+  `examples/make_sample_sam.py`) and `examples/sample_multi.gff3`.
+
+### Fixed
+
+- `--report` no longer fails when the output directory does not exist yet.
 
 ### Changed
 
 - Internal refactor toward an object model (no user-facing changes; output is
   pixel-identical):
   - New `virplot.models` module with `Feature`, `DepthTrack` and `RNA`
-    dataclasses. `RNA.circular` is a placeholder flag for future circular-RNA
+    dataclasses; `parse_gff_rnas()` returns one `RNA` per GFF region. `RNA.circular` is a placeholder flag for future circular-RNA
     support.
   - `parse_gff` now returns `Feature` objects instead of dicts.
   - `plotting.plot()` replaced by a `Plotter` base class and `LinearPlotter`;

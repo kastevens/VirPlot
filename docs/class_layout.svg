@@ -19,10 +19,10 @@
   <rect width="1040" height="650" fill="#fff"/>
 
   <!-- title + legend -->
-  <text x="40" y="32" font-size="15" font-weight="700" fill="currentColor">VirPlot — proposed class layout</text>
+  <text x="40" y="32" font-size="15" font-weight="700" fill="currentColor">VirPlot — class layout</text>
   <g font-size="11" fill="currentColor">
     <rect x="720" y="20" width="26" height="14" fill="none" stroke="currentColor" stroke-width="1.2"/>
-    <text x="752" y="31">exists after minimal refactor</text>
+    <text x="752" y="31">implemented</text>
     <rect x="900" y="20" width="26" height="14" fill="none" stroke="#1f6fb2" stroke-width="1.2" stroke-dasharray="4 3"/>
     <text x="932" y="31" fill="#1f6fb2">planned</text>
   </g>
@@ -37,7 +37,7 @@
   </g>
   <g fill="currentColor" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="11">
     <text x="95" y="106">genome.gff</text>
-    <text x="95" y="166">sample*.depth</text>
+    <text x="95" y="166" font-size="10">dep · sam · bam</text>
     <text x="95" y="586">spec.yaml</text>
   </g>
 
@@ -48,8 +48,8 @@
     <rect x="210" y="560" width="130" height="44" rx="4"/>
   </g>
   <g fill="currentColor" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="11">
-    <text x="275" y="106">parse_gff()</text>
-    <text x="275" y="166">parse_depth()</text>
+    <text x="275" y="106">parse_gff_rnas()</text>
+    <text x="275" y="166">load_depth()</text>
     <text x="275" y="586">load_settings()</text>
   </g>
   <g stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)">
@@ -60,8 +60,8 @@
 
   <!-- ===== column 3: model ===== -->
   <!-- list[RNA] shadow card (planned) -->
-  <rect x="424" y="46" width="220" height="190" fill="none" stroke="#1f6fb2" stroke-width="1.2" stroke-dasharray="4 3"/>
-  <text x="650" y="56" font-size="11" fill="#1f6fb2">list[RNA] — one per segment</text>
+  <rect x="424" y="46" width="220" height="190" fill="none" stroke="currentColor" stroke-width="1.2"/>
+  <text x="650" y="56" font-size="11" fill="currentColor">list[RNA] — one per GFF region</text>
 
   <!-- RNA -->
   <rect x="410" y="60" width="220" height="190" fill="#fff" stroke="currentColor" stroke-width="1.4"/>
@@ -69,9 +69,9 @@
   <text x="520" y="77" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">RNA</text>
   <g font-family="ui-monospace, Menlo, monospace" font-size="11" fill="currentColor">
     <text x="420" y="102">name: str</text>
-    <text x="420" y="118">length: int</text>
+    <text x="420" y="118">seqid, length</text>
     <text x="420" y="134">features: list[Feature]</text>
-    <text x="420" y="150">depth: {label: ndarray}</text>
+    <text x="420" y="150">depth: list[DepthTrack]</text>
     <text x="420" y="166" fill="#1f6fb2">topology: Topology</text>
   </g>
   <line x1="410" y1="176" x2="630" y2="176" stroke="currentColor" stroke-width="0.8"/>
@@ -88,8 +88,7 @@
     <line x1="340" y1="162" x2="409" y2="162"/>
   </g>
   <g font-size="10" fill="currentColor" text-anchor="middle">
-    <text x="375" y="96">length +</text>
-    <text x="375" y="115">[Feature]</text>
+    <text x="375" y="96">list[RNA]</text>
     <text x="375" y="156">add_depth</text>
   </g>
 
@@ -137,8 +136,8 @@
   <text x="840" y="77" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">Plotter <tspan font-weight="400" font-size="11">(base)</tspan></text>
   <g font-family="ui-monospace, Menlo, monospace" font-size="11" fill="currentColor">
     <text x="730" y="102">settings: Settings</text>
-    <text x="730" y="118">options: PlotOptions</text>
-    <text x="730" y="142">render(rna, thresholds)</text>
+    <text x="730" y="118">shared_ymax · max_length</text>
+    <text x="730" y="142">prepare(rnas) · render(rna, …)</text>
     <text x="730" y="158">_prepared_tracks() · _save()</text>
   </g>
   <line x1="720" y1="126" x2="960" y2="126" stroke="currentColor" stroke-width="0.8"/>
@@ -186,7 +185,7 @@
   <!-- cli -->
   <rect x="720" y="560" width="240" height="44" fill="#fff" stroke="currentColor" stroke-width="1.4"/>
   <text x="840" y="578" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">cli.main()</text>
-  <text x="840" y="595" text-anchor="middle" font-size="10" fill="currentColor">builds RNA · call_blocks · picks Plotter</text>
+  <text x="840" y="595" text-anchor="middle" font-size="10" fill="currentColor">for rna in rnas: call_blocks · render</text>
   <!-- Settings -> cli -->
   <line x1="630" y1="592" x2="719" y2="592" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
   <!-- cli -> analysis -->
@@ -194,8 +193,8 @@
   <text x="846" y="534" font-size="10" fill="currentColor">call_blocks</text>
   <!-- cli -> Plotter (chooses subclass), routed up the left edge -->
   <polyline points="720,572 690,572 690,110 719,110" fill="none" stroke="#1f6fb2" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrowp)"/>
-  <text x="706" y="445" font-size="10" fill="#1f6fb2" text-anchor="middle" transform="rotate(-90 706 445)">chooses Plotter by rna.topology</text>
+  <text x="706" y="445" font-size="10" fill="#1f6fb2" text-anchor="middle" transform="rotate(-90 706 445)">prepare(rnas)</text>
 
   <!-- footnote -->
-  <text x="40" y="636" font-size="11" fill="currentColor">Solid: after the minimal refactor (Feature, RNA, LinearPlotter). Dashed blue: seams left open for circular RNAs and segmented genomes — no behaviour yet, only a place to put it.</text>
+  <text x="40" y="636" font-size="11" fill="currentColor">Solid: implemented. Multiple RNAs → one figure each, shared y-limit, length-proportional width. Dashed blue: seams left open for circular RNAs.</text>
 </svg>

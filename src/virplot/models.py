@@ -47,10 +47,11 @@ class DepthTrack:
 class RNA:
     """A single RNA molecule with its annotation and per-sample depth tracks."""
 
-    name: str
+    name: str                       # display / output name
     length: int
     features: list[Feature] = field(default_factory=list)
     depth: list[DepthTrack] = field(default_factory=list)
+    seqid: str | None = None        # sequence id in GFF / SAM / depth files
     circular: bool = False
 
     # --- depth tracks -------------------------------------------------------
