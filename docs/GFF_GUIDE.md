@@ -233,9 +233,17 @@ NC_001598.1	RefSeq	CDS	108	7997	.	+	0	ID=orf1a;gene=ORF1a;product=L-Pro/Mtr/Hel
 NC_001598.1	RefSeq	CDS	7999	9393	.	+	0	ID=orf1b;gene=ORF1b;product=RdRp;Note=+1 frameshift from ORF1a
 ```
 
-Any `Note` containing `frameshift` marks the row; `+1` or `-1` in the note
-gives the sign, otherwise it is inferred from the gap to the nearest upstream
-ORF on the same strand. `examples/byv.gff3` is written this way.
+Any `Note` containing the word `frameshift` marks the row. **Write the sign
+(`+1` or `-1`) in the note.** Without it VirPlot infers the sign from the gap
+between this row and the nearest upstream ORF on the same strand, which is
+only right when the two coordinates meet at the slippage site as they do in a
+RefSeq join; if ORF1b is written from its first full codon, or with any other
+convenient boundary, the inferred sign will be wrong or missing (a bare `FS`).
+An explicit sign in the note always wins. `examples/byv.gff3` is written this
+way.
+
+On the `-` strand write the coordinates as usual (`start < end`); VirPlot
+orders the segments in translation direction itself.
 
 A frameshift continuation **always** flips across the line, whether or not it
 overlaps — that step is how every ICTV figure shows the event — so the
@@ -266,12 +274,30 @@ A	.	CDS	100	1000	.	+	0	ID=orf3;gene=ORF3;product=CP
 A	.	CDS	1001	1800	.	+	0	ID=orf5;gene=ORF5;product=readthrough domain;Note=readthrough of ORF3 stop
 ```
 
-The extension takes the side of the ORF whose end it abuts (not merely the
-previous ORF by coordinate — a nested ORF4 can sit between ORF3 and ORF5, as
-in luteovirids), and never flips.
+Any `Note` containing `readthrough` or `read-through` marks the row. **Make
+the extension start exactly one base after its partner's end** (`1000` →
+`1001`; on the `-` strand, end exactly one base before the partner's start).
+That abutment is how VirPlot finds the partner: the extension takes the side
+of the ORF it abuts — not merely the previous ORF by coordinate, since a nested
+ORF4 can sit between ORF3 and ORF5, as in luteovirids — and never flips. If
+nothing abuts, it falls back to the side of the previous ORF, which may be the
+wrong one. If instead you give the extension the *full* span of the readthrough
+product (starting where the partner starts), that is the RefSeq form above
+and is trimmed automatically, provided the `Note` or a `transl_except=` is
+present.
 
-Both marks are drawn in the linear layout only for now; the circular layout
-places the ORFs correctly but omits the `FS`/`RT` text.
+### What VirPlot needs, in one table
+
+| To draw | Write | VirPlot then |
+|---|---|---|
+| a frameshift, from RefSeq | leave the multi-row CDS with `exception=ribosomal slippage` as is | one box per segment, continuation flipped, sign from the coordinates, product labelled once |
+| a frameshift, by hand | two CDS rows; on the downstream one `Note=+1 frameshift …` or `Note=-1 frameshift …` | continuation flipped and labelled with the sign you wrote |
+| a readthrough, from RefSeq | leave the full-span CDS with `transl_except=` as is | trimmed to the extension, same side as its partner, bar + `RT` |
+| a readthrough, by hand | extension row starting at partner end + 1, `Note=readthrough …` | same side as the ORF it abuts, bar + `RT` |
+
+**Layout limit.** The `FS`/`RT` marks are drawn in the linear layout only.
+`--layout circular` places these ORFs correctly (a frameshift or readthrough
+arc nests like any other) but writes no mark yet.
 
 ### Not yet drawn
 
@@ -291,8 +317,9 @@ encodings. The `noncoding` colour class exists for the day they are read.
       `gene=` for the ORF name; long descriptions in `Note=`.
 - [ ] Strand `+`/`-` correct — it chooses the layout and the arrow direction.
 - [ ] Frameshifts: either leave RefSeq's `exception=ribosomal slippage` rows as
-      they are, or split into named ORFs with `Note=+1 frameshift`; readthrough
-      via `transl_except=` or `Note=readthrough`.
+      they are, or split into named ORFs with `Note=+1 frameshift` / `-1` —
+      **with the sign written**. Readthrough via `transl_except=`, or an
+      extension row that starts at partner end + 1 with `Note=readthrough`.
 - [ ] Origin-crossing features only on `Is_circular=true` molecules.
 - [ ] Products with no function word either renamed or pinned in
       `color_mapping`.
