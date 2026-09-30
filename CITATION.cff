@@ -9,6 +9,13 @@ authors:
     affiliation: University of California, Davis
     email: lhrli@ucdavis.edu
     orcid: "https://orcid.org/0009-0003-6643-9788"
+  - family-names: Yuan
+    given-names: Ruihan
+    affiliation: University of California, Davis
+  - family-names: Stevens
+    given-names: Kristian
+    affiliation: University of California, Davis
+    email: kastevens@ucdavis.edu
 repository-code: "https://github.com/ucdavis/VirPlot"
 url: "https://github.com/ucdavis/VirPlot"
 preferred-citation:
@@ -18,6 +25,12 @@ preferred-citation:
       given-names: Haoran
       affiliation: University of California, Davis
       orcid: "https://orcid.org/0009-0003-6643-9788"
+    - family-names: Yuan
+      given-names: Ruihan
+      affiliation: University of California, Davis
+    - family-names: Stevens
+      given-names: Kristian
+      affiliation: University of California, Davis
   title: "VirPlot"
   version: 2.0.0
   date-released: 2026-05-03
