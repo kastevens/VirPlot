@@ -24,6 +24,12 @@ class Feature:
     ``product`` is the name written inside the glyph (``RdRp``, ``CP``);
     ``gene`` is the optional ORF name written outside it (``ORF1a``, ``AC1``),
     following the ICTV figure convention.
+
+    ``mechanism`` says the ORF is translated by continuing from its upstream
+    neighbour — ``"frameshift"`` (drawn flipped across the line, labelled
+    ``+1 FS``/``−1 FS``) or ``"readthrough"`` (kept on the same side behind a
+    bar labelled ``RT``). The parser sets it from RefSeq's
+    ``exception=ribosomal slippage`` / ``transl_except=`` or from a ``Note=``.
     """
 
     start: int
@@ -31,6 +37,9 @@ class Feature:
     strand: str
     product: str
     gene: str | None = None
+    mechanism: str | None = None    # "frameshift" | "readthrough": how this ORF is reached
+    shift: int | None = None        # +1 / -1 for a frameshift, when known
+    show_label: bool = True         # False for a RefSeq join segment that repeats its product
 
     @property
     def forward(self) -> bool:

@@ -11,7 +11,8 @@ Implements the placement rules in docs/ictv_drawing_conventions.md:
   chosen side is already taken where it would land — a long upstream ORF can
   do this — the other side is tried, and failing that the glyph tiers
   outward.  The document's rule never leaves two boxes on top of each other
-  this way.
+  this way.  An ORF reached by a frameshift always flips (the step across the
+  line is how the figures draw it); a readthrough extension never does.
 * ``tier`` (mode L2, both strands): side is fixed by strand (+ above, − below)
   and same-side overlap is resolved by tiering further from the line.
 * ``nest`` (modes C1/C2, circular): arcs are placed largest first on the
@@ -105,8 +106,15 @@ def _place_flip(ordered: list[Feature], spans: SpanFn,
     prev: Feature | None = None
     for feat in ordered:
         wanted = current
-        if prev is not None and (spans_overlap(spans(prev), spans(feat))
-                                 or (flip_if is not None and flip_if(prev, feat))):
+        if feat.mechanism == "frameshift" and prev is not None:
+            wanted = -current                     # the step across the line IS the frameshift
+        elif feat.mechanism == "readthrough" and placed:
+            # continues the box it abuts (not necessarily the previous by start:
+            # a nested ORF4 can sit between ORF3 and its readthrough ORF5)
+            partner = next((p for p in placed if _abuts(p.feature, feat)), None)
+            wanted = partner.side if partner else current
+        elif prev is not None and (spans_overlap(spans(prev), spans(feat))
+                                   or (flip_if is not None and flip_if(prev, feat))):
             wanted = -current
         # the document's rule, with a safety net for a long upstream ORF
         if _free_tier(placed, spans, feat, wanted) == 0:
@@ -118,3 +126,12 @@ def _place_flip(ordered: list[Feature], spans: SpanFn,
         placed.append(Placement(feat, side, tier))
         current, prev = side, feat
     return placed
+
+
+def _abuts(upstream: Feature, feat: Feature) -> bool:
+    """True when ``feat`` starts right where ``upstream`` stops, in reading order."""
+    if upstream.strand != feat.strand:
+        return False
+    if feat.forward:
+        return upstream.end + 1 == feat.start
+    return upstream.start - 1 == feat.end

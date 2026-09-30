@@ -131,7 +131,7 @@ showed the spec itself needs a change. Rule numbers refer to the sections above.
 | 1 | Done. Flip-on-overlap with a collision fallback (see A below). | `layout.py` |
 | 2 | Done. Keyword classifier → ICTV palette; `color_mapping` still wins; "putative" → lighter tint. | `settings.py` |
 | 3 | Done. `Feature.strand`/`gene` carried; + above →, − below ←; same-side overlap tiers outward; `auto` picks flip/tier from `two_strand`. | `layout.py`, `plotting.py` |
-| 4 | **Partly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from the GFF `gene=` attribute; default title `name (length nts)`. RT bar, FS step, polyprotein dividers, sgRNA rows: **not done** (see F). | `plotting.py`, `parsers.py` |
+| 4 | **Partly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=`; default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=` (linear layout). Polyprotein dividers, sgRNA rows: **not done** (see F). | `plotting.py`, `parsers.py`, `layout.py` |
 | 5 | **Done differently.** One figure per RNA with a shared y-limit and length-proportional width, not stacked rows (see G). | `cli.py`, `plotting.py` |
 | 6 | Done. `CircularPlotter`: origin at 12 o'clock with stem-loop icon, arcs just outside the circle with arrowheads, clockwise for + and anticlockwise for −, overlap nests inward; depth as an inner ring. `--layout circular|auto`. | `plotting.py` |
 
@@ -181,12 +181,15 @@ classifier covers RdRp/Rep/CP/MP/HSP70/p2x-style names; anything else falls to
 grey unless mapped. That is the right failure mode, but the document's "map
 product names by default" will silently leave many RefSeq genomes grey.
 
-**F. §1 Expression features are unimplementable until encoded.** RT, FS,
-polyprotein domains and sgRNAs need a data source. GFF3 has no standard
-attribute for these; the document should choose one (e.g.
-`ribosomal_slippage`/`Note=` on the CDS, `sequence_feature` rows for sgRNAs)
-before stage 4 continues. The parser also reads only `CDS` rows, so IR/UTR/
-stem-loop arcs (§3 baseline) need `parse_gff_rnas` to accept other types.
+**F. §1 Expression features need an encoding — two now have one.** Frameshift
+and readthrough are read from what RefSeq already writes (`exception=ribosomal
+slippage` on the rows of a joined CDS; `transl_except=` on a readthrough
+product) and from VirPlot's `Note=+1 frameshift` / `Note=readthrough`
+convention (docs/GFF_GUIDE.md §8). The frameshift sign is derived from the
+join geometry (skip one base = +1, re-read one = −1). Polyprotein domains
+(`mat_peptide` rows) and sgRNAs still need an encoding decision, and the
+parser still reads only `CDS` rows, so IR/UTR/stem-loop arcs (§3 baseline)
+need `parse_gff_rnas` to accept other types.
 
 **G. §1 Segmented genomes — stacked vs separate.** The document specifies
 stacked rows, largest first. The branch delivers separate files with a shared
@@ -227,8 +230,8 @@ compared too, and a real fixture added.
 |---|---|---|
 | L1 flip only on overlap (§2) | BYV: RdRp→p6 (50 nt gap) stay together below; every overlapping pair flips. CTV likewise. | BYV: CP is flipped below CPm despite a 70 nt gap (same colour, close — flipped for legibility; now a rule, see A′). LIYV RNA-1: p31 is above though RdRp below and no overlap. |
 | First (5′-most) ORF above (§2) | BYV, LIYV, BYDV | **CTV: ORF1a is below, RdRp above.** Starting side is arbitrary; alternation is what matters. |
-| Frameshift = step + `+1 FS` label (§1) | CTV (label present). | BYV shows the same step with no label. The step is simply the flip; the flip happens although the two boxes abut (7997/7999) rather than overlap — so **frameshift continuation flips even without overlap**. |
-| Readthrough = one box + bar (§1) | — | BYDV-PAV: ORF3→ORF5 readthrough is two abutting boxes on the **same** side, no bar. And ORF5 stays above although the rule would put it below with ORF4. So **readthrough continuation does not flip, frameshift does** — opposite behaviours the coordinates alone cannot distinguish. |
+| Frameshift = step + `+1 FS` label (§1) | CTV (label present). | BYV shows the same step with no label. The step is simply the flip; the flip happens although the two boxes abut (7997/7999) rather than overlap — so **frameshift continuation flips even without overlap**. *Implemented: a frameshift ORF always flips; label at the junction on the partner's side.* |
+| Readthrough = one box + bar (§1) | — | BYDV-PAV: ORF3→ORF5 readthrough is two abutting boxes on the **same** side, no bar. And ORF5 stays above although the rule would put it below with ORF4. So **readthrough continuation does not flip, frameshift does** — opposite behaviours the coordinates alone cannot distinguish. *Implemented: a readthrough extension takes the side of the ORF it abuts and gets a thin bar + `RT`; the bar is VirPlot's addition, the figure has none.* |
 | ORF number outside, product inside (§1) | Closteroviridae: `ORF1a`/`ORF1b`/`66K 63K 100K` outside, `L-Pro Mtr Hel RdRp` inside. | **Luteoviridae: ORF numbers are inside the boxes** (`ORF1`…`ORF6`), sizes inside the product boxes beneath. Not universal. |
 | Palette (§1) | Closteroviridae only. | **Geminiviridae uses a different palette**: CP green, MP yellow, Rep teal, TrAP pink, REn blue. Luteoviridae: CP pink, MP blue, RTD green, P0 (suppressor) green. Colour is consistent *within a family figure*, not across the Report. "Small 3′ ORFs purple" is BYV p21 only; BYV p6 is grey. |
 | Circular: arcs "just outside the circle", nest inward (§3) | Mastrevirus: the arcs *are* the circle — thick coloured arcs replace the line where ORFs lie, the thin black line shows only in the LIR/SIR gaps. | Begomovirus: base arcs sit **on** the circle line; AC2/AC3/AC4 nest **inside** the circle. Nothing is drawn outside the ring except labels and the stem-loop. |
@@ -249,11 +252,10 @@ compared too, and a real fixture added.
 * **No outlines** — glyphs are flat colour, as in the figures and the original
   VirPlot output; there is no option to add an outline. Separation between
   neighbours comes from colour and from the flip rule above.
-* **Frameshift / readthrough** — must come from data. Proposed encoding for
-  stage 4: `Note=+1 frameshift` (or a `frameshift=+1` attribute) on the
-  downstream CDS ⇒ flip and label; `Note=readthrough` ⇒ stay on the same
-  side, no bar. `examples/byv.gff3` already carries `Note=+1 frameshift`
-  on ORF1b.
+* **Frameshift / readthrough** — read from RefSeq's own attributes and from
+  `Note=`; see F above and docs/GFF_GUIDE.md §8. With this, BYV matches
+  Closteroviridae Fig 2 on eight ORFs from overlap and mechanism alone, and on
+  all nine with the figure's palette (the CPm/CP legibility flip).
 * **Palette** — the keyword classifier now colours only names that state a
   function (`RdRp`, `coat protein`, `movement`, `HSP70`, `silencing
   suppressor`); a bare `p6`/`p20` stays `default_color` until mapped. Colour

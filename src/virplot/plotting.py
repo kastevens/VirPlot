@@ -276,7 +276,9 @@ class LinearPlotter(Plotter):
                     ax.add_patch(Rectangle((s_, yb), e_ - s_, H,
                                            facecolor=color, edgecolor="none"))
 
-            if args.no_label:
+            self._draw_mechanism(ax, feat, spans, yb, H, pl.side == ABOVE)
+
+            if args.no_label or not feat.show_label:
                 continue
             covered = sum(e_ - s_ + 1 for s_, e_ in spans)
             mid = ((spans[0][0] - 1 + covered / 2) % seq_len) + 1 if rna.circular else feat.midpoint
@@ -299,6 +301,33 @@ class LinearPlotter(Plotter):
         ax.set_ylim(min(-1.5, y0 - tiers_dn * H - 0.9), max(2.0, y0 + tiers_up * H + 0.9))
         ax.axis("off")
         return ends
+
+    def _draw_mechanism(self, ax: plt.Axes, feat, spans, yb: float, H: float, above: bool) -> None:
+        """Mark how a continuation ORF is reached, as the ICTV figures do.
+
+        Frameshift: the box has already flipped across the line; write ``+1 FS``
+        / ``−1 FS`` at the junction, outside the box on its far side.
+        Readthrough: the extension sits on its partner's side; draw a thin bar
+        at the read-through stop and write ``RT`` beside it.
+        """
+        if feat.mechanism not in ("frameshift", "readthrough"):
+            return
+        junction = spans[0][0] if feat.forward else spans[-1][1]
+        far_y = yb + H + 0.08 if above else yb - 0.08
+        va = "bottom" if above else "top"
+        if feat.mechanism == "frameshift":
+            # the continuation has flipped, so its partner ends at the junction on
+            # the other side; write the label there, outside the partner's box,
+            # ending at the junction (CTV: "+1FS" under the 3' end of ORF1a)
+            sign = {1: "+1 ", -1: "\u22121 "}.get(feat.shift, "")
+            partner_y = (ANNOTATION_Y_BASE - 0.08) if above else (ANNOTATION_Y_BASE + H + 0.08)
+            ax.text(junction, partner_y, f"{sign}FS", ha="right" if feat.forward else "left",
+                    va="top" if above else "bottom", fontsize=ORF_LABEL_FONTSIZE, color="black")
+        else:
+            ax.plot([junction, junction], [yb - 0.06, yb + H + 0.06], color="black",
+                    linewidth=1.0, solid_capstyle="butt", zorder=4)
+            ax.text(junction, far_y, "RT", ha="center", va=va,
+                    fontsize=ORF_LABEL_FONTSIZE, color="black")
 
     def _draw_backbone(self, ax: plt.Axes, rna: RNA, pad: int) -> list:
         """The genome line with its end marks (or continuation marks if circular)."""

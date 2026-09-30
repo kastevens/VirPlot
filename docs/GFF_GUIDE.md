@@ -6,7 +6,7 @@ few conventions of its own for things GFF3 does not standardise (circularity,
 frameshifts, function colours). This guide says exactly what it reads, what it
 ignores, and how to write each situation so the figure comes out as intended.
 Examples of every case are in [`examples/`](../examples/): `byv.gff3` (linear,
-one strand, with a frameshift), `grbv.gff3` (circular, both strands),
+one strand, with a `Note=+1 frameshift`), `grbv.gff3` (circular, both strands),
 `sample_multi.gff3` (two segments).
 
 ## 1. The minimum
@@ -197,42 +197,89 @@ candidates, and `--ref NAME` picks one. Using the RefSeq accession *with its
 version* (`NC_022002.1`) everywhere is the least error-prone choice, since that
 is what the RefSeq FASTA header and therefore the aligner's `@SQ` will carry.
 
-## 8. Frameshifts, readthrough and other expression features
+## 8. Frameshifts and readthrough
 
-GFF3 has no standard way to say "this ORF is translated from that one by a
-+1 frameshift", and RefSeq encodes a frameshifted polyprotein as **one CDS with
-two rows** sharing an `ID`:
+GFF3 has no field for "this ORF is reached from that one by a frameshift" or
+"by reading through a stop codon". VirPlot recognises the two ways such ORFs
+are actually written and draws them as the ICTV figures do.
+
+### Frameshift
+
+**RefSeq form — nothing to change.** RefSeq encodes a frameshifted
+polyprotein as one CDS in several rows sharing an `ID`, each carrying
+`exception=ribosomal slippage`:
 
 ```gff3
-# RefSeq NC_001598.1 as downloaded: one CDS, two rows, same ID and product
-NC_001598.1	RefSeq	CDS	108	7997	.	+	0	ID=cds-NP_041872.1;product=fusion protein of papain-like protease, methyltransferase, RNA helicase and RNA-dependent RNA polymerase
-NC_001598.1	RefSeq	CDS	7999	9393	.	+	0	ID=cds-NP_041872.1;product=fusion protein of papain-like protease, methyltransferase, RNA helicase and RNA-dependent RNA polymerase
+NC_001598.1	RefSeq	CDS	108	7997	.	+	0	ID=cds-NP_041872.1;exception=ribosomal slippage;product=fusion protein of ...
+NC_001598.1	RefSeq	CDS	7999	9393	.	+	0	ID=cds-NP_041872.1;exception=ribosomal slippage;product=fusion protein of ...
 ```
 
-VirPlot does **not** merge rows by `ID`; each row is a glyph, so left alone
-this draws two boxes with the same very long label. The convention is to
-rewrite it as the two ORFs the ICTV figures draw, and record the mechanism in
-`Note=`:
+VirPlot groups the rows by `ID`, orders them in translation direction, draws
+each segment as its own box, flips every segment after the first across the
+line, and writes the shift at the junction. The sign comes from the
+coordinates: a junction that skips one base (`…7997`, `7999…`) is `+1 FS`; one
+that re-reads a base (`…13468`, `13468…`, as in coronaviruses) is `−1 FS`.
+Because RefSeq gives every row the same long product, only the first segment
+is labelled with it; the continuation shows the `FS` mark instead. Rows that
+share an `ID` *without* a slippage note (a spliced CDS) are left as separate,
+unmarked boxes.
+
+**Hand-written form — name the two ORFs.** To get the figure's `L-Pro/Mtr/Hel`
+and `RdRp` labels, write the segments as two CDS rows and put the mechanism in
+`Note=` on the downstream one:
 
 ```gff3
-NC_001598.1	RefSeq	CDS	108	7997	.	+	0	ID=orf1a;gene=ORF1a;product=L-Pro/Mtr/Hel;Note=papain-like protease, methyltransferase, RNA helicase
+NC_001598.1	RefSeq	CDS	108	7997	.	+	0	ID=orf1a;gene=ORF1a;product=L-Pro/Mtr/Hel
 NC_001598.1	RefSeq	CDS	7999	9393	.	+	0	ID=orf1b;gene=ORF1b;product=RdRp;Note=+1 frameshift from ORF1a
 ```
 
-Both products fall in the replicase class, so they share a colour and abut
-within 1 % of the genome — which makes VirPlot flip ORF1b to the other side of
-the line, the step the figures use to show a frameshift. Today that is a
-consequence of the colour rule, not of the `Note`: **VirPlot does not read
-`Note=+1 frameshift` yet.** Writing it now costs nothing and means the file
-will be right when a labelled step is implemented.
+Any `Note` containing `frameshift` marks the row; `+1` or `-1` in the note
+gives the sign, otherwise it is inferred from the gap to the nearest upstream
+ORF on the same strand. `examples/byv.gff3` is written this way.
 
-Readthrough (one box continuing on the same side past a bar), polyprotein
-domain dividers, subgenomic RNAs and `mat_peptide` rows are likewise not drawn
-yet; see §6 F and §7.2 of
+A frameshift continuation **always** flips across the line, whether or not it
+overlaps — that step is how every ICTV figure shows the event — so the
+same-colour rule of §5 no longer has to do this job.
+
+### Readthrough
+
+**RefSeq form.** A readthrough product is annotated as a CDS that starts
+where the shorter ORF starts and runs past its stop, with a `transl_except=`
+attribute recording the read-through codon (TMV's 183K beside its 126K, for
+instance):
+
+```gff3
+NC_001367.1	RefSeq	CDS	69	3419	.	+	0	ID=p126;product=126 kDa replicase
+NC_001367.1	RefSeq	CDS	69	4919	.	+	0	ID=p183;product=183 kDa replicase;transl_except=(pos:3417..3419%2Caa:OTHER)
+```
+
+VirPlot trims the readthrough CDS to the part beyond the shorter ORF
+(3420–4919 here) and draws it as a second box **on the same side**, abutting
+the first, with a thin bar at the read-through stop labelled `RT` — the
+BYDV ORF3/ORF5 picture.
+
+**Hand-written form.** Give the extension its own coordinates and
+`Note=readthrough`:
+
+```gff3
+A	.	CDS	100	1000	.	+	0	ID=orf3;gene=ORF3;product=CP
+A	.	CDS	1001	1800	.	+	0	ID=orf5;gene=ORF5;product=readthrough domain;Note=readthrough of ORF3 stop
+```
+
+The extension takes the side of the ORF whose end it abuts (not merely the
+previous ORF by coordinate — a nested ORF4 can sit between ORF3 and ORF5, as
+in luteovirids), and never flips.
+
+Both marks are drawn in the linear layout only for now; the circular layout
+places the ORFs correctly but omits the `FS`/`RT` text.
+
+### Not yet drawn
+
+Polyprotein domain dividers (`mat_peptide` rows), subgenomic RNAs and
+non-coding features (`misc_feature`, `regulatory`, `stem_loop`) are ignored by
+the parser; see §6 F and §7.2 of
 [`ictv_drawing_conventions.md`](ictv_drawing_conventions.md) for the intended
-encodings. Non-coding features (`misc_feature`, `regulatory`, `stem_loop`)
-are ignored by the parser — the `noncoding` colour class exists for the day
-they are read.
+encodings. The `noncoding` colour class exists for the day they are read.
 
 ## 9. Checklist
 
@@ -243,8 +290,9 @@ they are read.
 - [ ] One `CDS` row per ORF; `product=` short and naming the **function**;
       `gene=` for the ORF name; long descriptions in `Note=`.
 - [ ] Strand `+`/`-` correct — it chooses the layout and the arrow direction.
-- [ ] Frameshifted polyproteins split into their two ORFs; RefSeq's duplicate
-      `join` rows renamed.
+- [ ] Frameshifts: either leave RefSeq's `exception=ribosomal slippage` rows as
+      they are, or split into named ORFs with `Note=+1 frameshift`; readthrough
+      via `transl_except=` or `Note=readthrough`.
 - [ ] Origin-crossing features only on `Is_circular=true` molecules.
 - [ ] Products with no function word either renamed or pinned in
       `color_mapping`.

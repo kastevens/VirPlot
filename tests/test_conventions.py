@@ -241,11 +241,9 @@ def test_byv_fixture_layout_versus_ictv_figure():
     """Real BYV coordinates under the L1 rule, compared with the published panel.
 
     The figure draws: ORF1a above, RdRp below, p6 below, Hsp70h above, p64
-    below, CPm above, CP below, p20 above, p21 below. The flip rule reproduces
-    every overlap-driven flip. It diverges exactly where the figure's choice is
-    not overlap-driven: RdRp (a +1 frameshift that abuts ORF1a at 7997/7999
-    without overlapping) and CP (70 nt clear of CPm, flipped for legibility).
-    Those two need expression semantics / a judgement the data does not carry.
+    below, CPm above, CP below, p20 above, p21 below. Overlap flips and the
+    frameshift flip reproduce eight of nine; CP (70 nt clear of CPm, flipped
+    for legibility) is the one that needs the same-colour rule.
     """
     ex = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples")
     (rna,) = parse_gff_rnas(os.path.join(ex, "byv.gff3"))
@@ -260,10 +258,11 @@ def test_byv_fixture_layout_versus_ictv_figure():
     assert side["CPm"] == -side["p64"]
     assert side["p20"] == -side["CP"]
     assert side["p21"] == -side["p20"]
-    # non-overlap: rule keeps the side; figure agrees for RdRp/p6...
+    # non-overlap: rule keeps the side; figure agrees for RdRp/p6
     assert side["p6"] == side["RdRp"]
-    # ...and disagrees for the two documented cases
-    assert side["RdRp"] == side["L-Pro/Mtr/Hel"]         # figure: flipped (+1 FS)
+    # the frameshift (Note=+1 frameshift on ORF1b) flips although the boxes only abut
+    assert side["RdRp"] == -side["L-Pro/Mtr/Hel"]
+    # the one remaining divergence needs the colour rule (see the byv.yml test)
     assert side["CP"] == side["CPm"]                     # figure: flipped (no overlap)
 
 

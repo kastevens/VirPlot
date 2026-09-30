@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 
 import numpy as np
@@ -28,6 +29,7 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
     """
     rnas: dict[str, RNA] = {}
     orphans: set[str] = set()
+    rows: dict[str, list[tuple[int, int, str, dict]]] = {}
 
     with open(gff_path) as fp:
         for line in fp:
@@ -57,15 +59,8 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
             info = dict(
                 kv.split("=", 1) for kv in attributes.split(";") if "=" in kv
             )
-            feat = Feature(
-                start=int(start),
-                end=int(end),
-                strand=strand,
-                product=info.get("product", "unknown"),
-                gene=info.get("gene") or None,
-            )
             if seqid in rnas:
-                rnas[seqid].features.append(feat)
+                rows.setdefault(seqid, []).append((int(start), int(end), strand, info))
             else:
                 orphans.add(seqid)
 
@@ -73,10 +68,142 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
         log.error("No 'region' feature found in GFF: %s", gff_path)
         sys.exit(1)
 
+    for seqid, rna in rnas.items():
+        rna.features.extend(_features_from_rows(rows.get(seqid, [])))
+
     for seqid in sorted(orphans):
         log.warning("CDS features on %r ignored: no 'region' line for that sequence", seqid)
 
     return list(rnas.values())
+
+
+# --- expression mechanisms ---------------------------------------------------
+#
+# GFF3 has no field for "this ORF is reached by a frameshift / by reading
+# through a stop". RefSeq encodes a slipped CDS as several rows sharing one ID
+# with ``exception=ribosomal slippage``, and a readthrough product as a CDS
+# carrying ``transl_except=``. VirPlot reads both, plus its own ``Note=``
+# convention (``Note=+1 frameshift``, ``Note=readthrough``) for hand-written
+# files. See docs/GFF_GUIDE.md section 8.
+
+_SHIFT_IN_NOTE = re.compile(r"([+-])\s*([12])\s*(?:ribosomal\s+)?frameshift", re.I)
+
+
+def _features_from_rows(rows: list[tuple[int, int, str, dict]]) -> list[Feature]:
+    """Turn one molecule's CDS rows into Features, resolving joins and mechanisms."""
+    # 1. group rows that share an ID (a RefSeq join); keep first-seen order
+    groups: dict[str, list[tuple[int, int, str, dict]]] = {}
+    order: list[str] = []
+    for i, row in enumerate(rows):
+        key = row[3].get("ID") or f"__row{i}"
+        if key not in groups:
+            groups[key] = []; order.append(key)
+        groups[key].append(row)
+
+    feats: list[Feature] = []
+    for key in order:
+        segs = groups[key]
+        if len(segs) == 1:
+            feats.append(_feature(*segs[0]))
+            continue
+        info = segs[0][3]
+        slipped = ("slippage" in info.get("exception", "").lower()
+                   or "frameshift" in info.get("Note", "").lower())
+        if not slipped:
+            log.info("CDS %s has %d rows without a ribosomal-slippage note; drawn as %d boxes",
+                     key, len(segs), len(segs))
+            feats.extend(_feature(*seg) for seg in segs)
+            continue
+        # translation order: ascending on +, descending on -
+        forward = segs[0][2] != "-"
+        segs = sorted(segs, key=lambda r: r[0], reverse=not forward)
+        first = _feature(*segs[0])
+        feats.append(first)
+        prev = first
+        for seg in segs[1:]:
+            shift = _shift_between(prev, seg[0], seg[1], forward)
+            cont = _feature(*seg, mechanism="frameshift", shift=shift,
+                            show_label=seg[3].get("product") != segs[0][3].get("product"))
+            feats.append(cont)
+            prev = cont
+
+    # 2. single rows that declare a mechanism in their own attributes
+    resolved: list[Feature] = []
+    for f in feats:
+        if f.mechanism is not None:
+            resolved.append(f); continue
+        info = f._attrs                                    # stashed by _feature
+        note = info.get("Note", "").lower()
+        if "readthrough" in note or "read-through" in note or "transl_except" in info:
+            resolved.append(_as_readthrough(f, feats))
+        elif "frameshift" in note:
+            m = _SHIFT_IN_NOTE.search(info.get("Note", ""))
+            shift = int(m.group(1) + m.group(2)) if m else _shift_from_neighbour(f, feats)
+            resolved.append(_with(f, mechanism="frameshift", shift=shift))
+        else:
+            resolved.append(f)
+    return [_strip_attrs(f) for f in resolved]
+
+
+def _feature(start: int, end: int, strand: str, info: dict, **extra) -> Feature:
+    f = Feature(start=start, end=end, strand=strand,
+                product=info.get("product", "unknown"),
+                gene=info.get("gene") or None, **extra)
+    object.__setattr__(f, "_attrs", info)                # frozen dataclass: side channel
+    return f
+
+
+def _with(f: Feature, **changes) -> Feature:
+    g = Feature(**{**{k: getattr(f, k) for k in Feature.__dataclass_fields__}, **changes})
+    object.__setattr__(g, "_attrs", getattr(f, "_attrs", {}))
+    return g
+
+
+def _strip_attrs(f: Feature) -> Feature:
+    if hasattr(f, "_attrs"):
+        object.__delattr__(f, "_attrs")
+    return f
+
+
+def _shift_between(prev: Feature, start: int, end: int, forward: bool) -> int:
+    """Frameshift sign from the join geometry: skipping 1 nt is +1, re-reading 1 nt is -1."""
+    gap = (start - prev.end - 1) if forward else (prev.start - end - 1)
+    return {1: 1, 2: -1}.get(gap % 3, 0)
+
+
+def _shift_from_neighbour(f: Feature, feats: list[Feature]) -> int | None:
+    """For a Note=frameshift row with no sign given: infer it from the nearest upstream ORF."""
+    same = [g for g in feats if g is not f and g.strand == f.strand]
+    if f.forward:
+        ups = [g for g in same if g.end <= f.start + 2]
+        if not ups:
+            return None
+        prev = max(ups, key=lambda g: g.end)
+        gap = f.start - prev.end - 1
+    else:
+        ups = [g for g in same if g.start >= f.end - 2]
+        if not ups:
+            return None
+        prev = min(ups, key=lambda g: g.start)
+        gap = prev.start - f.end - 1
+    return {1: 1, 2: -1}.get(gap % 3, None)
+
+
+def _as_readthrough(f: Feature, feats: list[Feature]) -> Feature:
+    """A readthrough product spans the ORF it extends; draw only the extension.
+
+    RefSeq annotates e.g. TMV 183K as 69..4919 beside 126K at 69..3419. The
+    ICTV figures show the readthrough as a second box abutting the first, so
+    the shared part is trimmed off and the bar marks the read-through stop.
+    """
+    for g in feats:
+        if g is f or g.strand != f.strand or g.mechanism is not None:
+            continue
+        if f.forward and g.start == f.start and g.end < f.end:
+            return _with(f, start=g.end + 1, mechanism="readthrough")
+        if not f.forward and g.end == f.end and g.start > f.start:
+            return _with(f, end=g.start - 1, mechanism="readthrough")
+    return _with(f, mechanism="readthrough")
 
 
 def parse_gff(gff_path: str) -> tuple[int, list[Feature]]:

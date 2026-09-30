@@ -10,6 +10,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Frameshift and readthrough.** A RefSeq CDS split over several rows with
+  `exception=ribosomal slippage` is drawn as one box per segment, each
+  continuation flipped across the line and labelled `+1 FS` / `−1 FS` (sign
+  from the join geometry); a CDS with `transl_except=` is trimmed to its
+  extension and drawn abutting the ORF it reads through, behind a bar
+  labelled `RT`. Hand-written files can say the same with `Note=+1
+  frameshift` / `Note=readthrough`. A frameshift ORF always flips and a
+  readthrough extension never does, whatever the overlap and colour rules
+  would say. Linear layout only; docs/GFF_GUIDE.md §8.
 - **Map reads with bowtie2.** `-x FASTA` plus `-U` (unpaired) or `-1`/`-2`
   (paired) per sample, `-p` threads and `--bowtie2-args`, mirroring bowtie2's
   own options. VirPlot builds and caches the index under `--outdir` (or uses

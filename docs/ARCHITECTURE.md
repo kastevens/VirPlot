@@ -63,6 +63,8 @@ classDiagram
         +str strand
         +str product
         +str gene
+        +str mechanism
+        +int shift
         +forward() bool
         +length() int
         +midpoint() float
@@ -232,7 +234,11 @@ accident:
    (`-d` sources plus one per `-U` / `-1`+`-2` sample).
 2. **Parse annotation** — `parse_gff_rnas` returns one `RNA` per GFF
    `region` line, in file order, with `circular` set from the
-   `Is_circular=true` attribute. `--rnas` selects and orders a subset;
+   `Is_circular=true` attribute. CDS rows sharing an `ID` with
+   `exception=ribosomal slippage` become one box per segment with the
+   continuation marked `mechanism="frameshift"` (sign from the join
+   geometry); a CDS with `transl_except=` is trimmed to its extension and
+   marked `"readthrough"`; `Note=` can state either for hand-written files. `--rnas` selects and orders a subset;
    `--topology` overrides circularity for all of them.
 3. **Map reads** — if `-U`/`-1`/`-2` were given, `_map_read_sets` checks
    bowtie2 is on `PATH`, warns where the reference FASTA's lengths disagree
@@ -283,9 +289,11 @@ raw `start`/`end`.
 **Layout rules (see the conventions doc for the source figures).**
 `resolve_mode("auto", two_strand)` picks `flip` for one-strand genomes and
 `tier` for two-strand ones; circular renderers always use `nest`.
-- `flip`: 5′-most feature above; flip across the line when overlapping the
-  upstream neighbour, or when that neighbour is the same colour and closer
-  than `NEAR_GAP_FRACTION` (1 %) of the genome — glyphs have no outline, so
+- `flip`: 5′-most feature above; a frameshift continuation always flips and
+  a readthrough extension always stays with the box it abuts; otherwise flip
+  across the line when overlapping the upstream neighbour, or when that
+  neighbour is the same colour and closer than `NEAR_GAP_FRACTION` (1 %) of
+  the genome — glyphs have no outline, so
   two adjacent same-colour boxes would otherwise merge (the plotter passes
   this test in as `flip_if`, keeping `layout.py` colour-blind); if the
   wanted side is already occupied there, try the other side, then tier
@@ -358,6 +366,7 @@ Suites and what they pin down:
 | `test_multi_rna.py` | Multi-region GFF, per-seqid depth, shared scaling, CLI writes one file per RNA |
 | `test_circular.py` | `Is_circular` detection, wrapping at the origin, GRBV example end to end |
 | `test_circular_plot.py` | Polar geometry, origin-crossing arcs, pinned radial range, `--layout` selection |
+| `test_mechanisms.py` | RefSeq joins (+1, −1, minus strand, spliced-not-slipped), `Note=` forms, `transl_except` trimming, the always-flip / never-flip rules, and the `FS` / `RT` marks |
 | `test_conventions.py` | Flip / tier / nest rules, palette precedence, settings keys, arrows, VPg, and the BYV fixture against ICTV Closteroviridae Fig 2 |
 | `test_settings.py`, `test_cli.py` | YAML loading, log formatting |
 
