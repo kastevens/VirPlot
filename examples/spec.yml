@@ -33,3 +33,25 @@ stacked_area_colors:
 legend_location: "upper left"
 
 title: ""
+
+# --- ICTV drawing conventions (docs/ictv_drawing_conventions.md) -------------
+# Products not listed in color_mapping are coloured by function class, guessed
+# from their name (RdRp/Rep -> replicase, CP -> capsid, MP -> movement, HSP70h,
+# 'silencing suppressor'). A bare pNN name stays default_color: map it here.
+# Override a class colour if you wish:
+# function_palette:
+#   replicase: '#f5b041'
+#   capsid: '#e75480'
+#   movement: '#3ea6b5'
+#   hsp70: '#7dbb4f'
+#   suppressor: '#9b6fc4'
+#   unknown: '#9f9f9f'
+
+# How overlapping ORFs are placed on the linear track:
+#   auto  flip across the line for one-strand genomes, tier by strand otherwise
+#   flip  always flip (mode L1)      tier  always + above / - below (mode L2)
+overlap_mode: auto
+
+# End marks on a linear genome, e.g. "5' m7G" / "A(n)", or "VPg" for the oval
+end_5_label: "5'"
+end_3_label: "3'"

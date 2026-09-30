@@ -1,0 +1,21 @@
+##gff-version 3
+#!gff-spec-version 1.21
+##sequence-region NC_022002.1 1 3206
+# Grapevine red blotch virus (GRBV), isolate CF214-1, RefSeq NC_022002.1
+# Annotation taken verbatim from the NCBI RefSeq record (3206 bp, circular ssDNA,
+# family Geminiviridae, genus Grablovirus; host Vitis vinifera).
+# Virion-sense ORFs V1-V3; complementary-sense ORFs C1-C3. The large intergenic
+# region (3045..3206 + 1..291) spans the origin.
+NC_022002.1	RefSeq	region	1	3206	.	+	.	ID=NC_022002.1:1..3206;Dbxref=taxon:1381007;Is_circular=true;isolate=CF214-1;mol_type=genomic DNA;nat-host=Vitis vinifera
+NC_022002.1	RefSeq	gene	292	807	.	+	.	ID=gene-N761_gp1;Name=N761_gp1;gene_biotype=protein_coding;locus_tag=N761_gp1
+NC_022002.1	RefSeq	CDS	292	807	.	+	0	ID=cds-YP_008400113.1;Parent=gene-N761_gp1;locus_tag=N761_gp1;product=V2 protein;protein_id=YP_008400113.1
+NC_022002.1	RefSeq	gene	710	1384	.	+	.	ID=gene-N761_gp2;Name=N761_gp2;gene_biotype=protein_coding;locus_tag=N761_gp2
+NC_022002.1	RefSeq	CDS	710	1384	.	+	0	ID=cds-YP_008400114.1;Parent=gene-N761_gp2;locus_tag=N761_gp2;product=V1 protein;protein_id=YP_008400114.1
+NC_022002.1	RefSeq	gene	1365	1736	.	+	.	ID=gene-N761_gp3;Name=N761_gp3;gene_biotype=protein_coding;locus_tag=N761_gp3
+NC_022002.1	RefSeq	CDS	1365	1736	.	+	0	ID=cds-YP_008400115.1;Parent=gene-N761_gp3;locus_tag=N761_gp3;product=V3 protein;protein_id=YP_008400115.1
+NC_022002.1	RefSeq	gene	1898	2332	.	-	.	ID=gene-N761_gp4;Name=N761_gp4;gene_biotype=protein_coding;locus_tag=N761_gp4
+NC_022002.1	RefSeq	CDS	1898	2332	.	-	0	ID=cds-YP_008400116.1;Parent=gene-N761_gp4;locus_tag=N761_gp4;product=C2 protein;protein_id=YP_008400116.1
+NC_022002.1	RefSeq	gene	2250	3044	.	-	.	ID=gene-N761_gp5;Name=N761_gp5;gene_biotype=protein_coding;locus_tag=N761_gp5
+NC_022002.1	RefSeq	CDS	2250	3044	.	-	0	ID=cds-YP_008400117.1;Parent=gene-N761_gp5;locus_tag=N761_gp5;product=C1 protein;protein_id=YP_008400117.1
+NC_022002.1	RefSeq	gene	2408	2890	.	-	.	ID=gene-N761_gp6;Name=N761_gp6;gene_biotype=protein_coding;locus_tag=N761_gp6
+NC_022002.1	RefSeq	CDS	2408	2890	.	-	0	ID=cds-YP_008400118.1;Parent=gene-N761_gp6;locus_tag=N761_gp6;product=C3 protein;protein_id=YP_008400118.1

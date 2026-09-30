@@ -1,0 +1,18 @@
+##gff-version 3
+##sequence-region NC_001598.1 1 15480
+# Beet yellows virus (BYV), RefSeq NC_001598.1, 15,480 nt linear +ssRNA
+# (Closteroviridae). CDS coordinates are those of the RefSeq record; ORF
+# names and short products follow the ICTV 9th Report Closteroviridae Fig. 2
+# (which shows isolate length 15,468). ORF1a/ORF1b are one RefSeq CDS
+# joined across a +1 ribosomal frameshift at 7997/7999; they are given here
+# as the two boxes the figure draws. Note= keeps the RefSeq product text.
+NC_001598.1	RefSeq	region	1	15480	.	+	.	ID=NC_001598.1:1..15480;Is_circular=false
+NC_001598.1	RefSeq	CDS	108	7997	.	+	0	ID=orf1a;gene=ORF1a;product=L-Pro/Mtr/Hel;Note=papain-like protease, methyltransferase, RNA helicase
+NC_001598.1	RefSeq	CDS	7999	9393	.	+	0	ID=orf1b;gene=ORF1b;product=RdRp;Note=+1 frameshift from ORF1a
+NC_001598.1	RefSeq	CDS	9444	9608	.	+	0	ID=orf2;gene=ORF2;product=p6;Note=putative membrane-binding protein
+NC_001598.1	RefSeq	CDS	9608	11404	.	+	0	ID=orf3;gene=ORF3;product=Hsp70h;Note=heat shock 70-related protein
+NC_001598.1	RefSeq	CDS	11310	12971	.	+	0	ID=orf4;gene=ORF4;product=p64;Note=putative heat shock 90-related protein
+NC_001598.1	RefSeq	CDS	12919	13569	.	+	0	ID=orf5;gene=ORF5;product=CPm;Note=coat protein homolog (minor coat protein)
+NC_001598.1	RefSeq	CDS	13640	14254	.	+	0	ID=orf6;gene=ORF6;product=CP;Note=coat protein
+NC_001598.1	RefSeq	CDS	14251	14793	.	+	0	ID=orf7;gene=ORF7;product=p20;Note=long-distance transport factor
+NC_001598.1	RefSeq	CDS	14768	15301	.	+	0	ID=orf8;gene=ORF8;product=p21;Note=RNA silencing suppressor

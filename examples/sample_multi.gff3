@@ -1,0 +1,14 @@
+##gff-version 3
+SyntheticVirus1	.	region	1	8000	.	+	.	ID=SyntheticVirus1
+SyntheticVirus1	.	CDS	1	2400	.	+	0	ID=cds1;product=Methyltransferase/helicase
+SyntheticVirus1	.	CDS	2500	3800	.	+	0	ID=cds2;product=RdRp
+SyntheticVirus1	.	CDS	3900	4300	.	+	0	ID=cds3;product=p22
+SyntheticVirus1	.	CDS	4400	5600	.	+	0	ID=cds4;product=HSP70h
+SyntheticVirus1	.	CDS	5700	6100	.	+	0	ID=cds5;product=CP
+SyntheticVirus1	.	CDS	6200	6500	.	+	0	ID=cds6;product=MP
+SyntheticVirus1	.	CDS	6600	7200	.	+	0	ID=cds7;product=CPm
+SyntheticVirus1	.	CDS	7300	7600	.	+	0	ID=cds8;product=p20
+SyntheticVirus1	.	CDS	7700	7900	.	+	0	ID=cds9;product=p7
+SyntheticVirus2	.	region	1	3000	.	+	.	ID=SyntheticVirus2
+SyntheticVirus2	.	CDS	100	1900	.	+	0	ID=cds10;product=CP
+SyntheticVirus2	.	CDS	2000	2800	.	+	0	ID=cds11;product=MP

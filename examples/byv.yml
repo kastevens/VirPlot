@@ -1,0 +1,26 @@
+# Style for the beet yellows virus example (examples/byv.gff3), following the
+# palette of ICTV 9th Report Closteroviridae Fig. 2: replication yellow,
+# Hsp70h green, p64 teal, CPm and CP the same magenta, p20 orange, p21
+# purple, p6 grey. Because CPm and CP share a colour and sit 70 nt apart,
+# VirPlot flips CP to the other side of the line — as the figure does.
+
+color_mapping:
+  L-Pro/Mtr/Hel: '#f5e663'
+  RdRp: '#f5e663'
+  p6: '#9f9f9f'
+  Hsp70h: '#7dbb4f'
+  p64: '#3ea6b5'
+  CPm: '#e75480'
+  CP: '#e75480'
+  p20: '#f28e2b'
+  p21: '#7b5ea7'
+
+annotation_fontsize: 9
+default_color: '#9f9f9f'
+shade_color: '#ca4f35'
+depth_line_color: '#0077cc'
+stacked_area_colors: ['#f96666', '#82c4fa', '#f9da86']
+legend_location: "upper left"
+end_5_label: "5' m7G"
+end_3_label: "3' OH"
+title: "Beet yellows virus, BYV (15,480 nts)"
