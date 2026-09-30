@@ -332,10 +332,11 @@ Suites and what they pin down:
 | `test_settings.py`, `test_cli.py` | YAML loading, log formatting |
 
 Rendering changes are additionally checked by re-plotting `examples/sample.*`
-and comparing PNGs pixel-for-pixel with the pre-refactor output; the linear
-depth panel has stayed byte-identical through every change on the
-`refactor/oo-models` branch, and the annotation track changed exactly once,
-when the ICTV placement rules replaced index alternation.
+and comparing PNGs pixel-for-pixel with the previous output. Through the
+`refactor/oo-models` branch the linear depth panel stayed byte-identical; it
+then changed deliberately twice — the annotation track when the ICTV
+placement rules replaced index alternation, and the depth trace when it went
+back to the original figure's thin black outline over a solid fill.
 
 ## 8. Example data
 

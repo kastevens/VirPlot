@@ -82,6 +82,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   figure's palette) BYV now matches Closteroviridae Fig 2 on every ORF.
 - Circular arcs and their arrowheads are one path each, removing the
   hairline seam between body and head.
+- Depth trace restyled to match the original figure: a thin black outline
+  (0.35 pt) over a solid fill in `depth_line_color`, in both layouts, instead
+  of a heavier coloured line over a pale fill; the legend swatch now shows
+  the fill colour.
 
 - Linear annotation track: boxes no longer alternate above/below by index;
   they follow the ICTV flip/tier rules. Genomes without overlapping ORFs now

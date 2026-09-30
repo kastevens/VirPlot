@@ -35,6 +35,8 @@ ORF_LABEL_FONTSIZE = 7          # ORF name written outside the glyph
 LABEL_PAD_FRACTION = 0.02
 SMALL_FEATURE_THRESHOLD = 500  # bp; features shorter than this get external labels
 SMOOTH_WINDOW = 15
+DEPTH_OUTLINE = dict(color="black", linewidth=0.35, alpha=0.85)  # thin black trace, as the original figure
+DEPTH_FILL_ALPHA = 0.55
 Y_HEADROOM = 1.05
 PNG_DPI = 400
 FIGURE_WIDTH = 12
@@ -338,14 +340,14 @@ class LinearPlotter(Plotter):
         x = rna.positions
 
         if len(tracks) == 1:
-            layers = ax.plot(x, total, color=s.depth_line_color, linewidth=0.8, alpha=0.9)
-            ax.fill_between(x, total, color=s.depth_line_color, alpha=0.3)
+            layers = [ax.fill_between(x, total, color=s.depth_line_color,
+                                      alpha=DEPTH_FILL_ALPHA, linewidth=0)]
         else:
             k = len(tracks)
             colors = (s.stacked_area_colors[:k]
                       + [s.default_color] * max(0, k - len(s.stacked_area_colors)))
             layers = ax.stackplot(x, *reversed(tracks), colors=colors, alpha=0.9, step="pre")
-            ax.plot(x, total, color="black", linewidth=0.3, alpha=0.8, label="Combined depth")
+        ax.plot(x, total, **DEPTH_OUTLINE)
 
         ax.set_xlim(x[0], x[-1])
         return layers
@@ -573,9 +575,9 @@ class CircularPlotter(Plotter):
         if len(tracks) == 1:
             r = self._depth_radius(total, ymax)
             th, rc = self._close(theta, r)
-            ax.fill_between(th, base, rc, color=s.depth_line_color, alpha=0.3, zorder=2)
-            layers = ax.plot(th, rc, color=s.depth_line_color, linewidth=0.8,
-                             alpha=0.9, zorder=2)
+            layers = [ax.fill_between(th, base, rc, color=s.depth_line_color,
+                                      alpha=DEPTH_FILL_ALPHA, linewidth=0, zorder=2)]
+            ax.plot(th, rc, zorder=3, **DEPTH_OUTLINE)
         else:
             k = len(tracks)
             colors = (s.stacked_area_colors[:k]
@@ -590,8 +592,7 @@ class CircularPlotter(Plotter):
                 layers.append(ax.fill_between(th, rl, ru, color=color, alpha=0.9, zorder=2))
                 lower = upper
             th, rc = self._close(theta, self._depth_radius(total, ymax))
-            ax.plot(th, rc, color="black", linewidth=0.3, alpha=0.8, zorder=3,
-                    label="Combined depth")
+            ax.plot(th, rc, zorder=3, **DEPTH_OUTLINE)
 
         self._depth_ymax = ymax
         return layers
