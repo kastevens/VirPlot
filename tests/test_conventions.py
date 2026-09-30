@@ -185,7 +185,7 @@ def test_gene_attribute_parsed(tmp_path):
 def make_args(**over):
     base = dict(smooth=False, normalize=False, free_y=False, equal_width=False,
                 legend=False, shade_breaks=False, title=True, grid=False,
-                no_label=False, no_border=False, yscale="linear", linthresh=10.0,
+                no_label=False, no_border=False, border=False, yscale="linear", linthresh=10.0,
                 format="png", outdir=".", name="x", layout="linear")
     base.update(over)
     return argparse.Namespace(**base)
@@ -265,3 +265,14 @@ def test_byv_fixture_layout_versus_ictv_figure():
     # ...and disagrees for the two documented cases
     assert side["RdRp"] == side["L-Pro/Mtr/Hel"]         # figure: flipped (+1 FS)
     assert side["CP"] == side["CPm"]                     # figure: flipped (no overlap)
+
+
+def test_glyph_outline_off_by_default_on_with_border():
+    from matplotlib.colors import to_rgba
+    fig, ax, _ = draw_linear(rna_with(F(1, 1000)))
+    assert to_rgba(ax.patches[0].get_edgecolor())[3] == 0          # transparent
+    plt.close(fig)
+    fig, ax = plt.subplots()
+    LinearPlotter(Settings(), make_args(border=True))._draw_annotations(ax, rna_with(F(1, 1000)))
+    assert to_rgba(ax.patches[0].get_edgecolor()) == to_rgba("black")
+    plt.close(fig)

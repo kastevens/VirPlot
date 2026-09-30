@@ -73,6 +73,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed (output)
 
+- Feature glyphs are drawn without a black outline by default, as in the
+  original VirPlot figure and the ICTV maps; `--border` restores the outline.
+  `--no-border` is still accepted and now a no-op.
+
 - Linear annotation track: boxes no longer alternate above/below by index;
   they follow the ICTV flip/tier rules. Genomes without overlapping ORFs now
   draw every box above the line. Products with no explicit colour that match

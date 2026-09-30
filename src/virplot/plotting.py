@@ -121,6 +121,10 @@ class Plotter:
     def _feature_color(self, product: str) -> str:
         return self.settings.feature_color(product)
 
+    def _edge_color(self) -> str:
+        """ORF glyph outline: none by default (as the ICTV figures), black with --border."""
+        return "black" if getattr(self.args, "border", False) else "none"
+
     def _placements(self, rna: RNA, circular: bool) -> tuple[list[Placement], str]:
         """Lay the features out; returns (placements, rule used)."""
         mode = "nest" if circular else resolve_mode(self.settings.overlap_mode, rna.two_strand)
@@ -241,7 +245,7 @@ class LinearPlotter(Plotter):
             feat = pl.feature
             yb = y0 + pl.tier * H if pl.side == ABOVE else y0 - (pl.tier + 1) * H
             color = self._feature_color(feat.product)
-            edge = "none" if args.no_border else "black"
+            edge = self._edge_color()
             spans = rna.feature_spans(feat)
             head_span = spans[-1] if feat.forward else spans[0]
             for (s_, e_) in spans:
@@ -454,7 +458,7 @@ class CircularPlotter(Plotter):
             tier = min(pl.tier, CIRC_MAX_TIERS - 1)
             lane = lane0 - tier * CIRC_LANE_STEP
             color = self._feature_color(feat.product)
-            edge = "none" if args.no_border else "black"
+            edge = self._edge_color()
             spans = rna.feature_spans(feat)
             head_span = spans[-1] if feat.forward else spans[0]
             for (s_, e_) in spans:

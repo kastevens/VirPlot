@@ -26,7 +26,7 @@ from virplot.settings import Settings
 def make_args(**over):
     base = dict(smooth=False, normalize=False, free_y=False, equal_width=False,
                 legend=False, shade_breaks=False, title=False, grid=False,
-                no_label=False, no_border=False, yscale="linear", linthresh=10.0,
+                no_label=False, no_border=False, border=False, yscale="linear", linthresh=10.0,
                 format="png", outdir=".", name="x", layout="circular")
     base.update(over)
     return argparse.Namespace(**base)
