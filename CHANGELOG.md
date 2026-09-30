@@ -74,6 +74,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   `name (length nts)`. Section 6 of the document records what changed and
   what the spec still needs.
 
+- `docs/GFF_GUIDE.md`: how to write a GFF3 for VirPlot — what is read, `product`/`gene`
+  naming, strand, `Is_circular` and origin-crossing features, frameshift convention,
+  and the function words behind the default colours.
 - `docs/ARCHITECTURE.md`: module map, pipeline and class diagrams (Mermaid,
   rendered by GitHub), a step-by-step run, the behaviours that are easy to
   get wrong, extension points and the test suites. `docs/figures/`: example
