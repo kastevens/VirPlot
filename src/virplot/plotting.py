@@ -186,6 +186,12 @@ class Plotter:
         ext = args.format
         if ext == "png":
             save_kwargs["dpi"] = PNG_DPI
+        else:
+            # reproducible vector output: no timestamp, and element ids hashed
+            # from the file name rather than a random salt, so regenerating an
+            # unchanged figure yields a byte-identical file
+            save_kwargs["metadata"] = {"Date": None} if ext == "svg" else {"CreationDate": None}
+            plt.rcParams["svg.hashsalt"] = out_base
 
         output_path = os.path.join(args.outdir, f"{out_base}.{ext}")
 

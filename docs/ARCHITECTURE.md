@@ -331,7 +331,7 @@ Suites and what they pin down:
 | `test_conventions.py` | Flip / tier / nest rules, palette precedence, settings keys, arrows, VPg, and the BYV fixture against ICTV Closteroviridae Fig 2 |
 | `test_settings.py`, `test_cli.py` | YAML loading, log formatting |
 
-Rendering changes are additionally checked by re-plotting `examples/sample.*`
+Vector output is deterministic (no timestamp, ids hashed from the file name), so `sh docs/make_figures.sh` followed by `git diff` shows exactly what a change did to the documentation figures. Rendering changes are additionally checked by re-plotting `examples/sample.*`
 and comparing PNGs pixel-for-pixel with the previous output. Through the
 `refactor/oo-models` branch the linear depth panel stayed byte-identical; it
 then changed deliberately twice — the annotation track when the ICTV

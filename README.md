@@ -8,7 +8,7 @@ This tool generates **SVG, PDF, or PNG plots** that combine viral genome feature
 |---|---|
 | ![BYV](docs/figures/byv_linear.svg) | ![GRBV circular](docs/figures/grbv_circular.svg) |
 
-Reads in the examples are simulated; the annotations are real RefSeq records. More renders in [`docs/figures/`](docs/figures/).
+Reads in the examples are simulated; the annotations are real RefSeq records. More renders in [`docs/figures/`](docs/figures/); `sh docs/make_figures.sh` regenerates them.
 
 Developed and maintained by Haoran (Henry) Li for [Foundation Plant Services](https://fps.ucdavis.edu/index.cfm) at [UC Davis](https://www.ucdavis.edu/).
 

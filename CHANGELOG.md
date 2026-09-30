@@ -86,6 +86,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   (0.35 pt) over a solid fill in `depth_line_color`, in both layouts, instead
   of a heavier coloured line over a pale fill; the legend swatch now shows
   the fill colour.
+- SVG and PDF output is reproducible: no embedded timestamp, and element
+  ids are hashed from the output name, so regenerating an unchanged figure
+  gives a byte-identical file. `docs/make_figures.sh` regenerates the
+  documentation figures.
 
 - Linear annotation track: boxes no longer alternate above/below by index;
   they follow the ICTV flip/tier rules. Genomes without overlapping ORFs now
