@@ -1,0 +1,21 @@
+##gff-version 3
+##sequence-region NC_001747.1 1 5987
+# Potato leafroll virus (PLRV), RefSeq NC_001747.1, 5,987 nt linear +ssRNA
+# with a 5' VPg (genus Polerovirus). CDS coordinates are those of the RefSeq
+# record; labels and colours follow ICTV 9th Report Luteoviridae Fig. 2 (which
+# draws a 5,882-nt isolate; NC_076505.1 is that length but carries no CDS
+# annotation). Curation:
+#  - RefSeq gives ORF1+2 as one CDS in two rows (308..1774, 1774..3495) marked
+#    "artificial frameshift"; here ORF1 is the P1 CDS and ORF2 the -1
+#    frameshift continuation, written with Note=.
+#  - RefSeq gives ORF3+5 as one CDS with transl_except at 4317..4319; here ORF5
+#    is the extension beyond the ORF3 stop, Note=readthrough.
+#  - Omitted, not in the figure: Rap1 (1632..1757, added by NCBI later) and
+#    ORF3a (3575..3712, non-AUG, described 2015).
+NC_001747.1	RefSeq	region	1	5987	.	+	.	ID=NC_001747.1;Name=PLRV;Is_circular=false
+NC_001747.1	RefSeq	CDS	175	918	.	+	0	ID=orf0;product=ORF0;Note=28K (P0) suppressor of RNA silencing
+NC_001747.1	RefSeq	CDS	308	2227	.	+	0	ID=orf1;product=ORF1;Note=70K (P1) protease and VPg
+NC_001747.1	RefSeq	CDS	1774	3495	.	+	0	ID=orf2;product=ORF2;Note=-1 frameshift from ORF1 (ORF1+2 is the 118K RdRp)
+NC_001747.1	RefSeq	CDS	3693	4319	.	+	0	ID=orf3;product=ORF3;Note=23K major coat protein
+NC_001747.1	RefSeq	CDS	3718	4188	.	+	0	ID=orf4;product=ORF4;Note=17K probable movement protein
+NC_001747.1	RefSeq	CDS	4320	5846	.	+	0	ID=orf5;product=ORF5;Note=readthrough of the ORF3 stop (ORF3+5 is the 76K minor coat protein)

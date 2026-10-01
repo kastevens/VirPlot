@@ -10,6 +10,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **ICTV reference examples.** Seven curated RefSeq genomes, each labelled
+  and coloured as in its ICTV 9th Report family figure, with a style file and
+  simulated reads: BYDV-PAV and PLRV (−1 frameshift, readthrough, VPg), LIYV
+  (two RNAs, BAM input), TSWV (three ambisense segments), TGMV (bipartite
+  begomovirus), FBNYV (eight-component nanovirus) and PVX (triple gene
+  block). Each GFF header lists its accessions and every change from RefSeq.
+  `examples/make_example_sam.py` simulates reads for every molecule in a GFF.
 - `examples/grbv.gff3` labels curated to the ICTV convention (`gene=V1;
   product=CP`, `gene=C1;product=RepA`, …; RefSeq's `Vn protein` names kept in
   `Note=`), with a header comment recording the curation. `grbv.yml` no longer

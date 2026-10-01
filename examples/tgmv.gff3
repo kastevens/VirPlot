@@ -1,0 +1,23 @@
+##gff-version 3
+##sequence-region NC_001507.1 1 2588
+##sequence-region NC_001508.1 1 2508
+# Tomato golden mosaic virus (TGMV), bipartite circular ssDNA (genus
+# Begomovirus): DNA-A RefSeq NC_001507.1 (2,588 nt), DNA-B NC_001508.1
+# (2,508 nt). Coordinates are those of the RefSeq records; ORF names,
+# products and colours follow ICTV 9th Report Geminiviridae Fig. 5
+# ("AV1 (CP)" style: ORF name outside, function inside). Notes:
+#  - RefSeq uses the older names cp/ac1-ac4 and BR-1/BL-1; here AV1, AC1-AC4,
+#    BV1 (NSP) and BC1 (MP), as in the figure.
+#  - TGMV is a New World begomovirus and has no AV2; the figure draws an Old
+#    World DNA-A with AV2.
+#  - Both records start about 130 nt before the TAATATT|AC nick site (at
+#    132..140), so the common region sits just clockwise of 12 o'clock.
+NC_001507.1	RefSeq	region	1	2588	.	+	.	ID=NC_001507.1;Name=DNA-A;Is_circular=true
+NC_001507.1	RefSeq	CDS	327	1070	.	+	0	ID=av1;gene=AV1;product=CP;Note=coat protein
+NC_001507.1	RefSeq	CDS	1067	1465	.	-	0	ID=ac3;gene=AC3;product=REn;Note=replication enhancer
+NC_001507.1	RefSeq	CDS	1212	1601	.	-	0	ID=ac2;gene=AC2;product=TrAP;Note=transcriptional activator
+NC_001507.1	RefSeq	CDS	1543	2601	.	-	0	ID=ac1;gene=AC1;product=Rep;Note=replication-associated protein
+NC_001507.1	RefSeq	CDS	2184	2447	.	-	0	ID=ac4;product=AC4;Note=AC4 protein
+NC_001508.1	RefSeq	region	1	2508	.	+	.	ID=NC_001508.1;Name=DNA-B;Is_circular=true
+NC_001508.1	RefSeq	CDS	461	1231	.	+	0	ID=bv1;gene=BV1;product=NSP;Note=nuclear shuttle protein
+NC_001508.1	RefSeq	CDS	1638	2192	.	-	0	ID=bc1;gene=BC1;product=MP;Note=cell-to-cell movement protein

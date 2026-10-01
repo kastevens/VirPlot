@@ -1,0 +1,34 @@
+##gff-version 3
+##sequence-region NC_003617.1 1 8118
+##sequence-region NC_003618.1 1 7193
+# Lettuce infectious yellows virus (LIYV), bipartite linear +ssRNA (genus
+# Crinivirus): RNA-1 RefSeq NC_003617.1 (8,118 nt), RNA-2 RefSeq NC_003618.1
+# (7,193 nt). CDS coordinates are those of the RefSeq records unless noted;
+# ORF names, products and colours follow ICTV 9th Report Closteroviridae
+# Fig. 5. Curation:
+#  - RNA-1: RefSeq gives ORF1a+1b as one polyprotein CDS in two rows
+#    (98..5692, 5694..7238) marked "artificial frameshift"; here they are
+#    ORF1a and ORF1b, the latter with Note=+1 frameshift.
+#  - RNA-1: the RefSeq "hypothetical protein" at 7075..7899 (275 aa) is the
+#    figure's p31.
+#  - RNA-2: p5 (327..446, 39 aa) and p9 (3975..4217, 80 aa) are in the figure
+#    but not in RefSeq; their coordinates are the ATG..stop ORFs found in the
+#    NC_003618.1 sequence at those positions.
+# Placement differs from the figure where neighbouring ORFs do not overlap
+# (HSP70h, and CP onwards on RNA-2): VirPlot keeps such a box on its
+# neighbour's side; the figure alternates. See docs/ictv_drawing_conventions.md
+# section 7.1.
+# Reads: liyv.bam, simulated with make_example_sam.py and converted with
+# samtools view -b; kept as BAM so the examples exercise BAM input.
+NC_003617.1	RefSeq	region	1	8118	.	+	.	ID=NC_003617.1;Name=RNA-1;Is_circular=false
+NC_003617.1	RefSeq	CDS	98	5692	.	+	0	ID=orf1a;gene=ORF1a;product=P-Pro/Mtr/Hel;Note=papain-like protease and replicase (RefSeq polyprotein)
+NC_003617.1	RefSeq	CDS	5694	7238	.	+	0	ID=orf1b;gene=ORF1b;product=RdRp;Note=+1 frameshift from ORF1a
+NC_003617.1	RefSeq	CDS	7075	7899	.	+	0	ID=p31;product=p31;Note=RefSeq hypothetical protein
+NC_003618.1	RefSeq	region	1	7193	.	+	.	ID=NC_003618.1;Name=RNA-2;Is_circular=false
+NC_003618.1	VirPlot	CDS	327	446	.	+	0	ID=p5;product=p5;Note=ORF from the sequence (not in RefSeq) as drawn in the ICTV figure
+NC_003618.1	RefSeq	CDS	693	2357	.	+	0	ID=hsp70h;product=HSP70h;Note=heat shock protein 70 homolog
+NC_003618.1	RefSeq	CDS	2449	3993	.	+	0	ID=p59;product=p59;Note=RefSeq hypothetical protein
+NC_003618.1	VirPlot	CDS	3975	4217	.	+	0	ID=p9;product=p9;Note=ORF from the sequence (not in RefSeq) as drawn in the ICTV figure
+NC_003618.1	RefSeq	CDS	4221	4970	.	+	0	ID=cp;product=CP;Note=coat protein
+NC_003618.1	RefSeq	CDS	4964	6322	.	+	0	ID=cpm;product=CPm;Note=minor coat protein (RefSeq duplicated coat protein)
+NC_003618.1	RefSeq	CDS	6319	7002	.	+	0	ID=p26;product=p26;Note=RefSeq hypothetical protein

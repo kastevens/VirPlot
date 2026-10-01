@@ -1,0 +1,21 @@
+# Style for the faba bean necrotic yellows virus example (examples/fbnyv.gff3),
+# following ICTV 9th Report Nanoviridae Fig. 2, which gives each component's
+# ORF its own colour. Colours were sampled from the figure.
+
+color_mapping:
+  M-Rep: '#bc2c2c'
+  CP: '#94bc4c'
+  Clink: '#04a4d4'
+  MP: '#bc1c7c'
+  NSP: '#d48c3c'
+  U1: '#2c3474'
+  U2: '#4c2c74'
+  U4: '#34643c'
+
+annotation_fontsize: 9
+default_color: '#9f9f9f'
+shade_color: '#ca4f35'
+depth_line_color: '#85dbec'
+stacked_area_colors: ['#567eb0', '#55b9d9', '#85dbec']
+legend_location: "upper left"
+title: ""   # empty -> "<seqid> (length nts)" per component

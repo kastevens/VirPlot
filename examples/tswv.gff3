@@ -1,0 +1,25 @@
+##gff-version 3
+##sequence-region NC_002052.1 1 8897
+##sequence-region NC_002050.1 1 4821
+##sequence-region NC_002051.1 1 2916
+# Tomato spotted wilt virus (TSWV), tripartite -ssRNA/ambisense (genus
+# Tospovirus in the ICTV 9th Report; now Orthotospovirus): L RefSeq
+# NC_002052.1 (8,897 nt), M NC_002050.1 (4,821 nt), S NC_002051.1 (2,916 nt).
+# Coordinates are those of the RefSeq records; protein names and colours
+# follow ICTV 9th Report Bunyaviridae Fig. 2 (Tospovirus row). Notes:
+#  - The figure draws each segment 3' to 5'; VirPlot draws 5' to 3', so the
+#    S and M maps are mirror images of the figure's.
+#  - The L record is the viral-complementary (mRNA-sense) strand, so L sits
+#    on the plus strand; M and S are given in genomic sense, ambisense, with
+#    NSm and NSs on the plus strand and Gn-Gc and N on the minus strand.
+#  - Gn and Gc are cleaved from one precursor; RefSeq has a single CDS
+#    (product G1), drawn as one box labelled Gn-Gc.
+#  - NSm is 5'-partial in RefSeq (no start codon in this record).
+NC_002052.1	RefSeq	region	1	8897	.	+	.	ID=NC_002052.1;Name=L;Is_circular=false
+NC_002052.1	RefSeq	CDS	34	8661	.	+	0	ID=l;product=L 332K;Note=RNA-dependent RNA polymerase
+NC_002050.1	RefSeq	region	1	4821	.	+	.	ID=NC_002050.1;Name=M;Is_circular=false
+NC_002050.1	RefSeq	CDS	242	1009	.	+	0	ID=nsm;product=NSm;Note=movement protein (34K) 5'-partial in RefSeq
+NC_002050.1	RefSeq	CDS	1330	4737	.	-	0	ID=gngc;product=Gn-Gc;Note=glycoprotein precursor (Gn 46K + Gc 75K)
+NC_002051.1	RefSeq	region	1	2916	.	+	.	ID=NC_002051.1;Name=S;Is_circular=false
+NC_002051.1	RefSeq	CDS	89	1483	.	+	0	ID=nss;product=NSs 52K;Note=non-structural protein (silencing suppressor)
+NC_002051.1	RefSeq	CDS	1987	2763	.	-	0	ID=n;product=N 29K;Note=nucleocapsid protein

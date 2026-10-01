@@ -1,0 +1,21 @@
+# Style for the tomato spotted wilt virus example (examples/tswv.gff3),
+# following ICTV 9th Report Bunyaviridae Fig. 2 (Tospovirus row). Colours were
+# sampled from the figure: L yellow, N pink, NSs blue, Gn purple (here the
+# whole Gn-Gc precursor), NSm green. One style serves all three segments.
+
+color_mapping:
+  L 332K: '#f4dc6c'
+  NSm: '#7cb47c'
+  Gn-Gc: '#9494bc'
+  NSs 52K: '#94c4e4'
+  N 29K: '#d494b4'
+
+annotation_fontsize: 9
+default_color: '#9f9f9f'
+shade_color: '#ca4f35'
+depth_line_color: '#85dbec'
+stacked_area_colors: ['#567eb0', '#55b9d9', '#85dbec']
+legend_location: "upper left"
+end_5_label: "5'"
+end_3_label: "3'"
+title: ""   # empty -> "<seqid> (length nts)" per segment

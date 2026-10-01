@@ -1,0 +1,21 @@
+# Style for the tomato golden mosaic virus example (examples/tgmv.gff3),
+# following ICTV 9th Report Geminiviridae Fig. 5, whose palette differs from
+# the Closteroviridae one: CP green, MP yellow, Rep teal, TrAP pink, REn blue,
+# AC4 purple, NSP magenta. Colours were sampled from the figure.
+
+color_mapping:
+  CP: '#84b474'
+  REn: '#5cb4dc'
+  TrAP: '#cc7ca4'
+  Rep: '#84bca4'
+  AC4: '#8b578f'
+  NSP: '#b42c7c'
+  MP: '#ecc464'
+
+annotation_fontsize: 9
+default_color: '#9f9f9f'
+shade_color: '#ca4f35'
+depth_line_color: '#85dbec'
+stacked_area_colors: ['#567eb0', '#55b9d9', '#85dbec']
+legend_location: "upper left"
+title: ""   # empty -> "<seqid> (length nts)" per component

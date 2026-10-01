@@ -1,0 +1,26 @@
+# Style for the lettuce infectious yellows virus example (examples/liyv.gff3),
+# following ICTV 9th Report Closteroviridae Fig. 5. Colours were sampled from
+# the figure: replication yellow, HSP70h green, p59 red, CP/CPm and p31
+# magenta, p26 purple, p5 blue, p9 grey. One style serves both RNAs.
+
+color_mapping:
+  P-Pro/Mtr/Hel: '#fcf46c'
+  RdRp: '#fcf46c'
+  p31: '#b42c7c'
+  p5: '#2ca4d4'
+  HSP70h: '#6cac5c'
+  p59: '#bc343c'
+  p9: '#949c9c'
+  CP: '#b42c7c'
+  CPm: '#b42c7c'
+  p26: '#54347c'
+
+annotation_fontsize: 9
+default_color: '#9f9f9f'
+shade_color: '#ca4f35'
+depth_line_color: '#85dbec'
+stacked_area_colors: ['#567eb0', '#55b9d9', '#85dbec']
+legend_location: "upper left"
+end_5_label: "5' m7G?"
+end_3_label: "3' OH"
+title: ""   # empty -> "<seqid> (length nts)" per RNA
