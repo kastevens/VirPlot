@@ -6,9 +6,20 @@ date-released: 2026-05-03
 authors:
   - family-names: Li
     given-names: Haoran
-    affiliation: University of California, Davis
-    email: lhrli@ucdavis.edu
+    affiliation: "Department of Computer Science and Foundation Plant Services, University of California, Davis"
     orcid: "https://orcid.org/0009-0003-6643-9788"
+  - family-names: Yuan
+    given-names: Ruihan
+    affiliation: "Department of Computer Science and Foundation Plant Services, University of California, Davis"
+  - family-names: Stevens
+    given-names: Kristian
+    affiliation: "Department of Computer Science, Department of Evolution and Ecology, and Foundation Plant Services, University of California, Davis"
+    orcid: "https://orcid.org/0009-0006-8779-1774"
+    email: kastevens@ucdavis.edu
+contact:
+  - family-names: Stevens
+    given-names: Kristian
+    email: kastevens@ucdavis.edu
 repository-code: "https://github.com/ucdavis/VirPlot"
 url: "https://github.com/ucdavis/VirPlot"
 preferred-citation:
@@ -16,8 +27,16 @@ preferred-citation:
   authors:
     - family-names: Li
       given-names: Haoran
-      affiliation: University of California, Davis
+      affiliation: "Department of Computer Science and Foundation Plant Services, University of California, Davis"
       orcid: "https://orcid.org/0009-0003-6643-9788"
+    - family-names: Yuan
+      given-names: Ruihan
+      affiliation: "Department of Computer Science and Foundation Plant Services, University of California, Davis"
+    - family-names: Stevens
+      given-names: Kristian
+      affiliation: "Department of Computer Science, Department of Evolution and Ecology, and Foundation Plant Services, University of California, Davis"
+      orcid: "https://orcid.org/0009-0006-8779-1774"
+      email: kastevens@ucdavis.edu
   title: "VirPlot"
   version: 2.0.0
   date-released: 2026-05-03
