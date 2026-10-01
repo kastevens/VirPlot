@@ -208,7 +208,30 @@ def test_circular_horizontal_mode_labels_region_level():
     plt.close(fig)
 
 
-def test_grbv_example_carries_its_intergenic_region():
+def test_grbv_example_carries_its_intergenic_region_and_hairpin():
     (rna,) = parse_gff_rnas("examples/grbv.gff3")
-    (ir,) = rna.noncoding
+    ir, sl = rna.noncoding
     assert ir.label == "IR" and rna.feature_spans(ir) == [(3045, 3206), (1, 291)]
+    assert sl.kind == "stem_loop" and rna.feature_spans(sl) == [(3189, 3206), (1, 11)]
+
+
+def test_refseq_stem_loop_row_with_a_gene_attribute_is_not_named_after_the_gene(tmp_path):
+    # FBNYV DNA-U4 (NC_024457.1) hangs gene=U4 on its stem_loop row
+    rna = gff(tmp_path, """\
+        A	RefSeq	stem_loop	1	33	.	+	.	ID=id-HZ18_sU4gp1;gbkey=stem_loop;gene=U4;locus_tag=HZ18_sU4gp1
+        A	RefSeq	stem_loop	500	530	.	+	.	ID=x;Name=nick;gene=U4
+    """)
+    assert [n.label for n in rna.noncoding] == ["", "nick"]
+
+
+def test_tgmv_example_common_regions_and_hairpins():
+    a, b = parse_gff_rnas("examples/tgmv.gff3")
+    assert [(n.kind, n.label) for n in a.noncoding] == [("region", "CRA"), ("stem_loop", "")]
+    assert [(n.kind, n.label) for n in b.noncoding] == [("region", "CRB"), ("stem_loop", "")]
+
+
+def test_fbnyv_example_every_component_has_its_stem_loop_at_the_origin():
+    rnas = parse_gff_rnas("examples/fbnyv.gff3")
+    assert len(rnas) == 8
+    assert all(len(r.noncoding) == 1 and r.noncoding[0].kind == "stem_loop"
+               and r.noncoding[0].start == 1 for r in rnas)

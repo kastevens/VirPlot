@@ -21,9 +21,11 @@
 # intergenic region (3045..3206 + 1..291) spans the origin; it is written
 # below as a misc_feature with end past the genome length (3497 = 3206 + 291),
 # the GFF3 way to cross the origin of a circle, and VirPlot draws it as the
-# grey arc astride the circle of the ICTV begomovirus figures. The record does
-# not place the stem-loop, so none is written; the hairpin icon stays at
-# position 1 (see docs/GFF_GUIDE.md section 10 for a stem_loop row).
+# grey arc astride the circle of the ICTV begomovirus figures. The record
+# annotates no stem-loop; the row below was located from the sequence: the
+# nonanucleotide TAATATTAC at 3200..3208 (crossing the origin), flanked by a
+# 9-bp stem GAAGTGCCA / TGGCACTTC, so the hairpin is 3189..11 and VirPlot
+# puts its icon there instead of at position 1.
 NC_022002.1	RefSeq	region	1	3206	.	+	.	ID=NC_022002.1:1..3206;Dbxref=taxon:1381007;Is_circular=true;isolate=CF214-1;mol_type=genomic DNA;nat-host=Vitis vinifera
 NC_022002.1	RefSeq	CDS	292	807	.	+	0	ID=cds-YP_008400113.1;locus_tag=N761_gp1;gene=V2;product=putative MP;Note=RefSeq product V2 protein; movement-associated
 NC_022002.1	RefSeq	CDS	710	1384	.	+	0	ID=cds-YP_008400114.1;locus_tag=N761_gp2;gene=V1;product=CP;Note=RefSeq product V1 protein; coat protein
@@ -32,3 +34,4 @@ NC_022002.1	RefSeq	CDS	1898	2332	.	-	0	ID=cds-YP_008400116.1;locus_tag=N761_gp4;
 NC_022002.1	RefSeq	CDS	2250	3044	.	-	0	ID=cds-YP_008400117.1;locus_tag=N761_gp5;gene=C1;product=RepA;Note=RefSeq product C1 protein
 NC_022002.1	RefSeq	CDS	2408	2890	.	-	0	ID=cds-YP_008400118.1;locus_tag=N761_gp6;gene=C3;product=C3;Note=RefSeq product C3 protein; function not assigned
 NC_022002.1	RefSeq	misc_feature	3045	3497	.	+	.	ID=ir;Name=IR;Note=large intergenic region, 3045..3206 + 1..291, spanning the origin
+NC_022002.1	VirPlot	stem_loop	3189	3217	.	+	.	ID=sl;Note=hairpin with the TAATATTAC nick site, 3189..3206 + 1..11, located from the sequence (not in the RefSeq annotation)

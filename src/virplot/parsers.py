@@ -321,8 +321,9 @@ def _noncoding(ftype: str, start: int, end: int, strand: str, info: dict) -> Non
     The label is the first of ``Name``, ``product``, ``gene``,
     ``standard_name``, ``regulatory_class``, then ``Note``; for the dedicated
     types a default (``5′ UTR``, ``IR``, ``ori``) stands in when none is
-    given, and a ``stem_loop`` row is labelled only when actually named. A
-    short region whose words say stem-loop / hairpin is drawn as one.
+    given; a ``stem_loop`` row is labelled only by its own ``Name`` /
+    ``standard_name`` (not a ``gene=`` RefSeq may attach to it). A short
+    region whose words say stem-loop / hairpin is drawn as one.
     """
     named = next((info[k] for k in ("Name", "product", "gene", "standard_name",
                                     "regulatory_class") if info.get(k)), "")
@@ -330,8 +331,13 @@ def _noncoding(ftype: str, start: int, end: int, strand: str, info: dict) -> Non
     text = named or note
     if ftype in _NONCODING_ALWAYS:
         kind, default = _NONCODING_ALWAYS[ftype]
-        # a stem-loop's Note is a description, not a name: label it only when named
-        label = (named if kind == "stem_loop" else text) or default
+        if kind == "stem_loop":
+            # a stem-loop's Note is a description, and RefSeq hangs the
+            # neighbouring ORF's gene= on it (FBNYV DNA-U4): only an explicit
+            # Name / standard_name is the hairpin's own name
+            label = next((info[k] for k in ("Name", "standard_name") if info.get(k)), "")
+        else:
+            label = text or default
     else:
         if classify_function(f"{text} {note}") != "noncoding":
             return None                      # a motif, promoter, repeat inside an ORF…

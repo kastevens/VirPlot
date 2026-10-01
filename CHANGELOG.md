@@ -22,8 +22,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   a circle replaces the default icon at position 1. A region holding an
   unnamed stem-loop is named once, over the hairpin. Labels: `Name=` first,
   then `product=`/`gene=`/`Note=`, with defaults for the dedicated types.
-  `examples/grbv.gff3` now carries its origin-spanning intergenic region;
-  docs/GFF_GUIDE.md §10.
+  `examples/grbv.gff3` now carries its origin-spanning intergenic region and
+  hairpin, `examples/tgmv.gff3` its common regions (`CRA`/`CRB`) and
+  hairpins — all located from the sequences, since RefSeq annotates none —
+  and `examples/fbnyv.gff3` RefSeq's own `stem_loop` rows on every
+  component; docs/GFF_GUIDE.md §10.
 - Inside labels switch to white on a really dark fill (`color_mapping`
   navy, the non-coding grey); every ICTV palette colour keeps black text.
 - **Polyprotein domain dividers.** RefSeq's `mature_protein_region_of_CDS`

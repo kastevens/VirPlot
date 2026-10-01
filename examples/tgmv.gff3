@@ -12,12 +12,23 @@
 #    World DNA-A with AV2.
 #  - Both records start about 130 nt before the TAATATT|AC nick site (at
 #    132..140), so the common region sits just clockwise of 12 o'clock.
+#  - RefSeq annotates neither the common region nor the stem-loop. Both were
+#    located from the sequences: the stretch shared by DNA-A and DNA-B is
+#    1..160 on A and 1..161 on B (identical from 61 to the end but for one
+#    extra T in B's loop), written as misc_feature CRA / CRB as the figure
+#    labels them; the hairpin is an 11-bp GCGGCCATCCG stem round the
+#    nonanucleotide, 119..151 on A and 119..152 on B, written as stem_loop so
+#    VirPlot puts the icon there. Rows carry source "VirPlot" to mark them.
 NC_001507.1	RefSeq	region	1	2588	.	+	.	ID=NC_001507.1;Name=DNA-A;Is_circular=true
+NC_001507.1	VirPlot	misc_feature	1	160	.	+	.	ID=cra;Name=CRA;Note=common region shared with DNA-B, located from the sequences
+NC_001507.1	VirPlot	stem_loop	119	151	.	+	.	ID=sla;Note=hairpin with the TAATATTAC nick site at 132..140, located from the sequence
 NC_001507.1	RefSeq	CDS	327	1070	.	+	0	ID=av1;gene=AV1;product=CP;Note=coat protein
 NC_001507.1	RefSeq	CDS	1067	1465	.	-	0	ID=ac3;gene=AC3;product=REn;Note=replication enhancer
 NC_001507.1	RefSeq	CDS	1212	1601	.	-	0	ID=ac2;gene=AC2;product=TrAP;Note=transcriptional activator
 NC_001507.1	RefSeq	CDS	1543	2601	.	-	0	ID=ac1;gene=AC1;product=Rep;Note=replication-associated protein
 NC_001507.1	RefSeq	CDS	2184	2447	.	-	0	ID=ac4;product=AC4;Note=AC4 protein
 NC_001508.1	RefSeq	region	1	2508	.	+	.	ID=NC_001508.1;Name=DNA-B;Is_circular=true
+NC_001508.1	VirPlot	misc_feature	1	161	.	+	.	ID=crb;Name=CRB;Note=common region shared with DNA-A, located from the sequences
+NC_001508.1	VirPlot	stem_loop	119	152	.	+	.	ID=slb;Note=hairpin with the TAATATTAC nick site at 133..141, located from the sequence
 NC_001508.1	RefSeq	CDS	461	1231	.	+	0	ID=bv1;gene=BV1;product=NSP;Note=nuclear shuttle protein
 NC_001508.1	RefSeq	CDS	1638	2192	.	-	0	ID=bc1;gene=BC1;product=MP;Note=cell-to-cell movement protein

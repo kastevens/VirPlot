@@ -295,7 +295,10 @@ compared too, and a real fixture added.
   as a grey arc astride the circle, under the ORF arcs, with the hairpin icon
   at the `stem_loop` row's position and the name written once over it, as
   Fig. 5 draws `CRA`; the Mastrevirus `LIR`/`SIR` are the same two rows.
-  `examples/grbv.gff3` carries its intergenic region this way. The depth
+  `examples/grbv.gff3` and `examples/tgmv.gff3` carry their intergenic /
+  common regions and hairpins this way (RefSeq annotates neither for those
+  records, so the rows were located from the sequences and say so);
+  `examples/fbnyv.gff3` keeps RefSeq's own `stem_loop 1..33` rows. The depth
   ceiling label, which stood against the circle at 12 o'clock, hangs inward
   when such an arc straddles the origin. `ORF (function)` labels come from
   `gene=` + `product=` with `circular_labels: horizontal`; see §6 D.

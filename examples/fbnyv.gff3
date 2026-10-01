@@ -5,23 +5,34 @@
 #   DNA-R NC_003560.1  DNA-S NC_003563.1  DNA-C NC_003559.1  DNA-M NC_003562.1
 #   DNA-N NC_003566.1  DNA-U1 NC_003561.1 DNA-U2 NC_003564.1 DNA-U4 NC_024457.1
 # Coordinates are those of the RefSeq records, each of which starts at the
-# common-region stem-loop, so it sits at 12 o'clock as in the figure. Products
+# common-region stem-loop (RefSeq's stem_loop 1..29 / 1..33 rows are kept,
+# so the hairpin icon sits on it), so it sits at 12 o'clock as in the figure.
+# RefSeq's TATA_box / polyA_signal_sequence rows are omitted (VirPlot would
+# ignore them anyway). Products
 # are the figure's names (M-Rep, CP, Clink, MP, NSP, U1, U2, U4). For DNA-U4,
 # RefSeq also gives a short variant (445..693) of the same ORF; only the full
 # ORF is kept.
 NC_003560.1	RefSeq	region	1	1003	.	+	.	ID=NC_003560.1;Name=DNA-R;Is_circular=true
+NC_003560.1	RefSeq	stem_loop	1	33	.	+	.	ID=sl-NC_003560.1;gbkey=stem_loop
 NC_003560.1	RefSeq	CDS	121	981	.	+	0	ID=r;product=M-Rep;Note=master replication-associated protein
 NC_003563.1	RefSeq	region	1	1006	.	+	.	ID=NC_003563.1;Name=DNA-S;Is_circular=true
+NC_003563.1	RefSeq	stem_loop	1	33	.	+	.	ID=sl-NC_003563.1;gbkey=stem_loop
 NC_003563.1	RefSeq	CDS	328	846	.	+	0	ID=s;product=CP;Note=capsid protein
 NC_003559.1	RefSeq	region	1	999	.	+	.	ID=NC_003559.1;Name=DNA-C;Is_circular=true
+NC_003559.1	RefSeq	stem_loop	1	29	.	+	.	ID=sl-NC_003559.1;gbkey=stem_loop
 NC_003559.1	RefSeq	CDS	314	823	.	+	0	ID=c;product=Clink;Note=cell-cycle link protein
 NC_003562.1	RefSeq	region	1	992	.	+	.	ID=NC_003562.1;Name=DNA-M;Is_circular=true
+NC_003562.1	RefSeq	stem_loop	1	33	.	+	.	ID=sl-NC_003562.1;gbkey=stem_loop
 NC_003562.1	RefSeq	CDS	342	686	.	+	0	ID=m;product=MP;Note=putative movement protein
 NC_003566.1	RefSeq	region	1	986	.	+	.	ID=NC_003566.1;Name=DNA-N;Is_circular=true
+NC_003566.1	RefSeq	stem_loop	1	33	.	+	.	ID=sl-NC_003566.1;gbkey=stem_loop
 NC_003566.1	RefSeq	CDS	365	826	.	+	0	ID=n;product=NSP;Note=nuclear shuttle protein
 NC_003561.1	RefSeq	region	1	996	.	+	.	ID=NC_003561.1;Name=DNA-U1;Is_circular=true
+NC_003561.1	RefSeq	stem_loop	1	29	.	+	.	ID=sl-NC_003561.1;gbkey=stem_loop
 NC_003561.1	RefSeq	CDS	372	839	.	+	0	ID=u1;product=U1;Note=unknown function
 NC_003564.1	RefSeq	region	1	1020	.	+	.	ID=NC_003564.1;Name=DNA-U2;Is_circular=true
+NC_003564.1	RefSeq	stem_loop	1	33	.	+	.	ID=sl-NC_003564.1;gbkey=stem_loop
 NC_003564.1	RefSeq	CDS	356	730	.	+	0	ID=u2;product=U2;Note=unknown function
 NC_024457.1	RefSeq	region	1	991	.	+	.	ID=NC_024457.1;Name=DNA-U4;Is_circular=true
+NC_024457.1	RefSeq	stem_loop	1	33	.	+	.	ID=sl-NC_024457.1;gbkey=stem_loop
 NC_024457.1	RefSeq	CDS	376	693	.	+	0	ID=u4;product=U4;Note=unknown function
