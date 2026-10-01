@@ -8,6 +8,10 @@ This tool generates **SVG, PDF, or PNG plots** that combine viral genome feature
 |---|---|
 | ![BYV](docs/figures/byv_linear.svg) | ![GRBV circular](docs/figures/grbv_circular.svg) |
 
+Polyprotein — PVY (`examples/pvy.gff3` + `pvy.yml`): RefSeq's mature-protein rows become the segments of one box.
+
+![PVY](docs/figures/pvy_linear.svg)
+
 Reads in the examples are simulated; the annotations are real RefSeq records. More renders in [`docs/figures/`](docs/figures/); `sh docs/make_figures.sh` regenerates them.
 
 Developed and maintained by Haoran (Henry) Li for [Foundation Plant Services](https://fps.ucdavis.edu/index.cfm) at [UC Davis](https://www.ucdavis.edu/).
@@ -50,7 +54,7 @@ pip install .
 
 ## Quick Start
 
-Example data in `examples/`: a synthetic two-segment genome (`sample.gff3`, `sample_multi.gff3`, `sample.dep`, `sample.sam`, `spec.yml`); beet yellows virus with its real RefSeq NC_001598.1 coordinates, ICTV ORF names and the ICTV figure palette (`byv.gff3`, `byv.sam`, `byv.yml`); and a circular one — grapevine red blotch virus, real RefSeq NC_022002.1 annotation (`grbv.gff3`, `grbv.sam`, `grbv.yml`). Reads in the `.sam` files are simulated (`make_reads.py`, `make_grbv_sam.py`).
+Example data in `examples/`: a synthetic two-segment genome (`sample.gff3`, `sample_multi.gff3`, `sample.dep`, `sample.sam`, `spec.yml`); beet yellows virus with its real RefSeq NC_001598.1 coordinates, ICTV ORF names and the ICTV figure palette (`byv.gff3`, `byv.sam`, `byv.yml`); a circular one — grapevine red blotch virus, real RefSeq NC_022002.1 annotation (`grbv.gff3`, `grbv.sam`, `grbv.yml`); and a polyprotein — potato virus Y, RefSeq NC_001616.1 with its `mature_protein_region_of_CDS` rows (`pvy.gff3`, `pvy.sam`, `pvy.yml`). Reads in the `.sam` files are simulated (`make_reads.py`, `make_grbv_sam.py`, `make_example_sam.py`).
 
 ```bash
 # Basic plot

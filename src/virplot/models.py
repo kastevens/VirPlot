@@ -1,6 +1,7 @@
-"""Core data model: Feature and RNA.
+"""Core data model: Feature, Domain and RNA.
 
-These are deliberately thin. ``Feature`` is an immutable record for one CDS,
+These are deliberately thin. ``Feature`` is an immutable record for one CDS
+(with its polyprotein ``Domain`` segments, if any),
 ``DepthTrack`` one sample's depth array; ``RNA`` bundles everything VirPlot knows about one molecule (its length, its
 features, and one depth track per sample) so the rest of the code passes a
 single object around instead of parallel lists.
@@ -18,6 +19,21 @@ import numpy as np
 
 
 @dataclass(frozen=True)
+class Domain:
+    """One mature protein cut from a polyprotein, in 1-based inclusive bp.
+
+    Comes from a RefSeq ``mature_protein_region_of_CDS`` (GenBank
+    ``mat_peptide``) row. Drawn as a segment of its parent CDS's box: its own
+    colour, its ``product`` inside, a thin divider at each boundary — the ICTV
+    "domains written inside one box, separated by thin vertical lines".
+    """
+
+    start: int
+    end: int
+    product: str
+
+
+@dataclass(frozen=True)
 class Feature:
     """One annotated feature (currently always a CDS) in 1-based, inclusive bp.
 
@@ -30,6 +46,10 @@ class Feature:
     ``+1 FS``/``−1 FS``) or ``"readthrough"`` (kept on the same side behind a
     bar labelled ``RT``). The parser sets it from RefSeq's
     ``exception=ribosomal slippage`` / ``transl_except=`` or from a ``Note=``.
+
+    ``domains`` are the mature proteins of a polyprotein. When present they
+    take over the inside of the box (segment colours and labels replace the
+    single ``product`` label); ``gene`` is still written outside.
     """
 
     start: int
@@ -40,6 +60,7 @@ class Feature:
     mechanism: str | None = None    # "frameshift" | "readthrough": how this ORF is reached
     shift: int | None = None        # +1 / -1 for a frameshift, when known
     show_label: bool = True         # False for a RefSeq join segment that repeats its product
+    domains: tuple[Domain, ...] = ()  # mature proteins of a polyprotein, genome order
 
     @property
     def forward(self) -> bool:
@@ -53,6 +74,41 @@ class Feature:
     @property
     def midpoint(self) -> float:
         return (self.start + self.end) / 2
+
+    # --- polyprotein domains ------------------------------------------------
+
+    def domains_within(self, start: int, end: int) -> list[Domain]:
+        """Domains clipped to the drawable span ``[start, end]``, in genome order.
+
+        A span is one piece of the feature as drawn (a readthrough extension
+        is trimmed, an origin-crossing feature is split), so a domain may be
+        cut or fall outside it entirely. A domain edge within one codon of the
+        span's end is snapped to it: RefSeq's last mature protein stops short
+        of the stop codon, and those three bases are not a segment.
+        """
+        out = []
+        for d in self.domains:
+            s, e = max(d.start, start), min(d.end, end)
+            if s <= e:
+                s = start if s - start <= 3 else s
+                e = end if end - e <= 3 else e
+                out.append(Domain(s, e, d.product))
+        return sorted(out, key=lambda d: d.start)
+
+    def dividers_within(self, start: int, end: int) -> list[float]:
+        """Positions of the thin lines between domains inside ``[start, end]``.
+
+        One line wherever a domain begins or ends strictly inside the span —
+        so a line also separates a domain from an unannotated stretch — placed
+        between bases (``x.5``) and deduplicated.
+        """
+        cuts: set[float] = set()
+        for d in self.domains_within(start, end):
+            if d.start > start:
+                cuts.add(d.start - 0.5)
+            if d.end < end:
+                cuts.add(d.end + 0.5)
+        return sorted(cuts)
 
 
 @dataclass

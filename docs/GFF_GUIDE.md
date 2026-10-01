@@ -1,13 +1,14 @@
 # Writing a GFF3 file for VirPlot
 
 VirPlot draws the annotation track from a GFF3 file. It reads a deliberately
-small subset of GFF3 — two feature types and four attributes — and applies a
-few conventions of its own for things GFF3 does not standardise (circularity,
-frameshifts, function colours). This guide says exactly what it reads, what it
-ignores, and how to write each situation so the figure comes out as intended.
-Examples of every case are in [`examples/`](../examples/): `byv.gff3` (linear,
-one strand, with a `Note=+1 frameshift`), `grbv.gff3` (circular, both strands, RefSeq labels curated),
-`sample_multi.gff3` (two segments).
+small subset of GFF3 — three feature types and a handful of attributes — and
+applies a few conventions of its own for things GFF3 does not standardise
+(circularity, frameshifts, function colours). This guide says exactly what it
+reads, what it ignores, and how to write each situation so the figure comes
+out as intended. Examples of every case are in [`examples/`](../examples/):
+`byv.gff3` (linear, one strand, with a `Note=+1 frameshift`), `grbv.gff3`
+(circular, both strands, RefSeq labels curated), `pvy.gff3` (a polyprotein
+with its mature-protein rows), `sample_multi.gff3` (two segments).
 
 ## 1. The minimum
 
@@ -68,8 +69,10 @@ This is the ICTV figure convention: ORF number outside, product inside. Keep
 in `Note=`, which VirPlot ignores (and so never draws).
 
 Other attributes (`ID`, `Parent`, `locus_tag`, `Dbxref`, `protein_id`, …) are
-accepted and ignored. `gene` rows, `mRNA` rows, `mat_peptide` rows are ignored
-too, so a RefSeq GFF3 can be used as is — with two caveats in §8.
+accepted and ignored. `gene` rows and `mRNA` rows are ignored too, so a RefSeq
+GFF3 can be used as is — with two caveats in §8. Mature-protein rows
+(`mature_protein_region_of_CDS` / `mat_peptide`) are read: they split a
+polyprotein's box into domains (§9).
 
 ## 4. Strand
 
@@ -305,13 +308,68 @@ arc nests like any other) but writes no mark yet.
 
 ### Not yet drawn
 
-Polyprotein domain dividers (`mat_peptide` rows), subgenomic RNAs and
-non-coding features (`misc_feature`, `regulatory`, `stem_loop`) are ignored by
-the parser; see §6 F and §7.2 of
+Subgenomic RNAs and non-coding features (`misc_feature`, `regulatory`,
+`stem_loop`) are ignored by the parser; see §6 F and §7.2 of
 [`ictv_drawing_conventions.md`](ictv_drawing_conventions.md) for the intended
 encodings. The `noncoding` colour class exists for the day they are read.
 
-## 9. Checklist
+## 9. Polyproteins: domains inside one box
+
+Potyviruses, picornaviruses, comoviruses, flaviviruses, coronaviruses — many
+genomes translate one long ORF into a polyprotein that is cut into mature
+proteins. The ICTV figures draw this as **one box split by thin vertical
+lines**, each segment named (Potyviridae Fig. 2: `P1-Pro | HC-Pro | P3 | 6K1 |
+CI | …`). VirPlot draws it the same way from the rows RefSeq already provides.
+
+**RefSeq form — nothing to change.** RefSeq lists the mature proteins under
+the CDS as `mature_protein_region_of_CDS` rows (the GFF3 spelling of GenBank's
+`mat_peptide`), each with `Parent=` naming the CDS and its own `product=`:
+
+```
+NC_001616.1	RefSeq	CDS	185	9376	.	+	0	ID=cds-NP_056759.1;product=polyprotein
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	185	1036	.	+	.	Parent=cds-NP_056759.1;product=P1 protein
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	1037	2404	.	+	.	Parent=cds-NP_056759.1;product=HC-Pro protein
+…
+```
+
+What VirPlot does with them:
+
+- The CDS is still one feature — one box, one position in the flip/tier
+  layout, labelled outside by its `gene=` if it has one. Its own `product=`
+  (`polyprotein`) is **not** written: the domains label the box instead.
+- Each domain is a segment of the box in its own colour, chosen by the same
+  rule as any product (§5: `color_mapping`, then function words, then grey),
+  with a thin line at every boundary. Any stretch of the CDS with no domain
+  keeps the polyprotein's colour.
+- A domain's `product=` is written inside its segment when it fits at the
+  figure's size, otherwise just outside the box — the figure's `6K1`, `6K2`.
+  Outside labels that would overprint step out onto a second row.
+- The last domain usually stops three bases short of the CDS (RefSeq leaves
+  the stop codon out); that is not a boundary and no line is drawn there.
+
+**Hand-written form.** Use the `mat_peptide` type if you prefer; `Parent=` is
+optional — a row without one is attached to the smallest CDS on its strand
+that contains it. Rows that match no CDS are dropped with a warning.
+
+```
+A	.	CDS	100	5000	.	+	0	ID=pp;gene=ORF1;product=polyprotein
+A	.	mat_peptide	100	2000	.	+	.	product=Pro
+A	.	mat_peptide	2001	4997	.	+	.	product=RdRp
+```
+
+**Curate the names.** RefSeq's `P1 protein`, `coat protein`, `NIa-VPg
+protein` are long for a segment and function-free for the colour rule;
+`examples/pvy.gff3` shortens them to the figure's `P1-Pro`, `CP`, `VPg` and
+keeps the RefSeq names in `Note=`, and `examples/pvy.yml` pins the figure's
+per-domain colours. Do the same for your own genomes.
+
+**Limits.** A domain that straddles a frameshift junction (coronavirus
+`nsp12`, which starts in ORF1a and ends in ORF1b) is attached to the segment
+holding most of it and drawn clipped to that segment. Domains are drawn in
+both layouts; in the circular layout each domain is labelled by the same
+rule as an arc (along it, or radially outside when narrow).
+
+## 10. Checklist
 
 - [ ] `##gff-version 3` first line; nine tab-separated columns.
 - [ ] One `region` row per molecule, `end` = genome length,
@@ -325,5 +383,8 @@ encodings. The `noncoding` colour class exists for the day they are read.
       **with the sign written**. Readthrough via `transl_except=`, or an
       extension row that starts at partner end + 1 with `Note=readthrough`.
 - [ ] Origin-crossing features only on `Is_circular=true` molecules.
+- [ ] Polyproteins: keep RefSeq's `mature_protein_region_of_CDS` rows (or
+      write `mat_peptide` rows) and shorten their `product=` to the names you
+      want inside the segments.
 - [ ] Products with no function word either renamed or pinned in
       `color_mapping`.

@@ -11,7 +11,7 @@ import sys
 import numpy as np
 
 from virplot.alignments import depth_from_alignments, is_alignment_file, resolve_reference
-from virplot.models import RNA, Feature
+from virplot.models import RNA, Domain, Feature
 
 log = logging.getLogger(__name__)
 
@@ -20,16 +20,24 @@ log = logging.getLogger(__name__)
 # GFF3
 # --------------------------------------------------------------------------
 
+# Row types read as polyprotein domains: NCBI's GFF3 spelling of GenBank's
+# mat_peptide, plus the GenBank name itself and the SO synonym, which other
+# converters write.
+_DOMAIN_TYPES = {"mature_protein_region_of_CDS", "mat_peptide", "mature_protein_region"}
+
+
 def parse_gff_rnas(gff_path: str) -> list[RNA]:
     """Parse a GFF3 file into one ``RNA`` per ``region`` line.
 
     RNAs are returned in the order their ``region`` lines appear. CDS features
     are attached to the RNA whose sequence id (column 1) they carry; a CDS on
-    a sequence id with no ``region`` line is skipped with a warning.
+    a sequence id with no ``region`` line is skipped with a warning. Mature
+    protein rows become ``Domain`` segments of the CDS they belong to.
     """
     rnas: dict[str, RNA] = {}
     orphans: set[str] = set()
     rows: dict[str, list[tuple[int, int, str, dict]]] = {}
+    domain_rows: dict[str, list[tuple[int, int, str, dict]]] = {}
 
     with open(gff_path) as fp:
         for line in fp:
@@ -53,23 +61,25 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
                                       circular=circular)
                 continue
 
-            if feature_type != "CDS":
+            if feature_type != "CDS" and feature_type not in _DOMAIN_TYPES:
                 continue
 
             info = dict(
                 kv.split("=", 1) for kv in attributes.split(";") if "=" in kv
             )
-            if seqid in rnas:
-                rows.setdefault(seqid, []).append((int(start), int(end), strand, info))
-            else:
+            if seqid not in rnas:
                 orphans.add(seqid)
+                continue
+            target = rows if feature_type == "CDS" else domain_rows
+            target.setdefault(seqid, []).append((int(start), int(end), strand, info))
 
     if not rnas:
         log.error("No 'region' feature found in GFF: %s", gff_path)
         sys.exit(1)
 
     for seqid, rna in rnas.items():
-        rna.features.extend(_features_from_rows(rows.get(seqid, [])))
+        rna.features.extend(_features_from_rows(rows.get(seqid, []),
+                                                domain_rows.get(seqid, [])))
 
     for seqid in sorted(orphans):
         log.warning("CDS features on %r ignored: no 'region' line for that sequence", seqid)
@@ -89,8 +99,10 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
 _SHIFT_IN_NOTE = re.compile(r"([+-])\s*([12])\s*(?:ribosomal\s+)?frameshift", re.I)
 
 
-def _features_from_rows(rows: list[tuple[int, int, str, dict]]) -> list[Feature]:
-    """Turn one molecule's CDS rows into Features, resolving joins and mechanisms."""
+def _features_from_rows(rows: list[tuple[int, int, str, dict]],
+                        domain_rows: list[tuple[int, int, str, dict]] = ()) -> list[Feature]:
+    """Turn one molecule's CDS rows into Features, resolving joins and mechanisms,
+    then hang any mature-protein rows off the CDS they belong to."""
     # 1. group rows that share an ID (a RefSeq join); keep first-seen order
     groups: dict[str, list[tuple[int, int, str, dict]]] = {}
     order: list[str] = []
@@ -142,7 +154,62 @@ def _features_from_rows(rows: list[tuple[int, int, str, dict]]) -> list[Feature]
             resolved.append(_with(f, mechanism="frameshift", shift=shift))
         else:
             resolved.append(f)
+
+    # 3. polyprotein domains
+    resolved = _attach_domains(resolved, domain_rows)
     return [_strip_attrs(f) for f in resolved]
+
+
+# --- polyprotein domains -------------------------------------------------------
+#
+# RefSeq writes the mature proteins of a polyprotein as
+# ``mature_protein_region_of_CDS`` rows (GenBank ``mat_peptide``) with
+# ``Parent=cds-…`` naming the CDS and ``product=`` naming the protein. The ICTV
+# figures draw them as one box split by thin lines, so they become ``Domain``
+# segments of the CDS's Feature rather than Features of their own.
+
+def _attach_domains(feats: list[Feature],
+                    domain_rows: list[tuple[int, int, str, dict]]) -> list[Feature]:
+    """Give each Feature the domains that belong to it; warn about any that fit nowhere.
+
+    Matching: ``Parent=`` against the CDS ``ID`` first; failing that, the
+    smallest CDS on the same strand that contains the domain (for files
+    written without ``Parent``). A joined CDS is several Features sharing
+    one ID; the domain goes to the segment it overlaps most.
+
+    LIMIT: a domain that straddles a frameshift junction (coronavirus nsp12
+    begins in ORF1a and ends in ORF1b) is attached to one segment only and
+    drawn clipped to it, so its far end carries no divider.
+    """
+    if not domain_rows:
+        return feats
+    by_id: dict[str, list[int]] = {}
+    for i, f in enumerate(feats):
+        fid = f._attrs.get("ID")
+        if fid:
+            by_id.setdefault(fid, []).append(i)
+
+    attached: dict[int, list[Domain]] = {}
+    for start, end, strand, info in domain_rows:
+        product = info.get("product", "unknown")
+        candidates: list[int] = []
+        for parent in info.get("Parent", "").split(","):
+            candidates.extend(by_id.get(parent.strip(), []))
+        if not candidates:
+            mid = (start + end) / 2
+            candidates = [i for i, f in enumerate(feats)
+                          if f.strand == strand and f.start <= mid <= f.end]
+            candidates.sort(key=lambda i: feats[i].length)       # smallest container
+            candidates = candidates[:1]
+        if not candidates:
+            log.warning("Mature protein %r at %d..%d matches no CDS; ignored", product, start, end)
+            continue
+        best = max(candidates, key=lambda i: min(end, feats[i].end) - max(start, feats[i].start))
+        attached.setdefault(best, []).append(Domain(start, end, product))
+
+    return [_with(f, domains=tuple(sorted(attached[i], key=lambda d: d.start)))
+            if i in attached else f
+            for i, f in enumerate(feats)]
 
 
 def _feature(start: int, end: int, strand: str, info: dict, **extra) -> Feature:

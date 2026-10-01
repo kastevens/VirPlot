@@ -131,7 +131,7 @@ showed the spec itself needs a change. Rule numbers refer to the sections above.
 | 1 | Done. Flip-on-overlap with a collision fallback (see A below). | `layout.py` |
 | 2 | Done. Keyword classifier → ICTV palette; `color_mapping` still wins; "putative" → lighter tint. | `settings.py` |
 | 3 | Done. `Feature.strand`/`gene` carried; + above →, − below ←; same-side overlap tiers outward; `auto` picks flip/tier from `two_strand`. | `layout.py`, `plotting.py` |
-| 4 | **Partly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=`; default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=` (linear layout). Polyprotein dividers, sgRNA rows: **not done** (see F). | `plotting.py`, `parsers.py`, `layout.py` |
+| 4 | **Mostly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=`; default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=` (linear layout); **polyprotein domain dividers** from RefSeq's `mature_protein_region_of_CDS` / `mat_peptide` rows, in both layouts (see F). sgRNA rows: **not done**. | `plotting.py`, `parsers.py`, `layout.py`, `models.py` |
 | 5 | **Done differently.** One figure per RNA with a shared y-limit and length-proportional width, not stacked rows (see G). | `cli.py`, `plotting.py` |
 | 6 | Done. `CircularPlotter`: origin at 12 o'clock with stem-loop icon, arcs just outside the circle with arrowheads, clockwise for + and anticlockwise for −, overlap nests inward; depth as an inner ring. `--layout circular|auto`. | `plotting.py` |
 
@@ -183,15 +183,23 @@ classifier covers RdRp/Rep/CP/MP/HSP70/p2x-style names; anything else falls to
 grey unless mapped. That is the right failure mode, but the document's "map
 product names by default" will silently leave many RefSeq genomes grey.
 
-**F. §1 Expression features need an encoding — two now have one.** Frameshift
+**F. §1 Expression features need an encoding — three now have one.** Frameshift
 and readthrough are read from what RefSeq already writes (`exception=ribosomal
 slippage` on the rows of a joined CDS; `transl_except=` on a readthrough
 product) and from VirPlot's `Note=+1 frameshift` / `Note=readthrough`
 convention (docs/GFF_GUIDE.md §8). The frameshift sign is derived from the
 join geometry (skip one base = +1, re-read one = −1). Polyprotein domains
-(`mat_peptide` rows) and sgRNAs still need an encoding decision, and the
-parser still reads only `CDS` rows, so IR/UTR/stem-loop arcs (§3 baseline)
-need `parse_gff_rnas` to accept other types.
+are read from RefSeq's `mature_protein_region_of_CDS` rows (GenBank
+`mat_peptide`; `Parent=` names the CDS, or containment is used) and drawn as
+the §1 rule says — one box, thin lines between segments, a name in each —
+with one addition the rule does not state and Potyviridae Fig. 2 shows:
+**each segment is coloured on its own** (by `color_mapping`, then function
+words), the box's own `product` is not written, and a name too long for its
+segment moves outside the box (`6K1`, `6K2` in that figure). The document
+should add the per-segment colour and the outside-label fallback to the
+Polyprotein row of §1. sgRNAs still need an encoding decision, and
+IR/UTR/stem-loop arcs (§3 baseline) need `parse_gff_rnas` to accept other
+types.
 
 **G. §1 Segmented genomes — stacked vs separate.** The document specifies
 stacked rows, largest first. The branch delivers separate files with a shared
@@ -299,3 +307,15 @@ compared too, and a real fixture added.
   anticlockwise left, nesting) hold. RefSeq's `V1 protein` etc. carry no
   function, so the shipped GFF is curated to `gene=V1;product=CP` and the
   default palette colours it; the RefSeq names are kept in `Note=`.
+* `examples/pvy.gff3` (potato virus Y, NC_001616.1) is the polyprotein
+  fixture, compared with Potyviridae Fig. 2 (drawn from TEV, same
+  organisation). With `pvy.yml` (the figure's per-domain colours, sampled
+  from the image) the ten segments, their dividers and names match; `6K1`
+  and `6K2` go outside the box as in the figure. Two differences remain:
+  the figure draws the polyprotein **on** the line with PIPO above it, where
+  L1 puts the polyprotein above and flips PIPO below; and the figure writes
+  a second row of names under the box (`35K`, `52K`, … sizes inside,
+  functions below), which VirPlot has no second label slot for — the
+  curated file keeps the function names. PIPO is really reached by
+  polymerase slippage (P3N-PIPO); the file carries the figure's `+2 fs`
+  wording as `Note=+2 frameshift`, so the label reads `+2 FS`.

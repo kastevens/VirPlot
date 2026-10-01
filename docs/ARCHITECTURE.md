@@ -56,6 +56,13 @@ unit-testable without rendering.
 classDiagram
     direction LR
 
+    class Domain {
+        <<frozen dataclass>>
+        +int start
+        +int end
+        +str product
+    }
+
     class Feature {
         <<frozen dataclass>>
         +int start
@@ -65,9 +72,12 @@ classDiagram
         +str gene
         +str mechanism
         +int shift
+        +tuple~Domain~ domains
         +forward() bool
         +length() int
         +midpoint() float
+        +domains_within(start, end) list~Domain~
+        +dividers_within(start, end) list~float~
     }
 
     class DepthTrack {
@@ -139,6 +149,8 @@ classDiagram
         +render(rna, thresholds, out_base)
         #_draw_backbone(ax, rna, pad)
         #_draw_annotations(ax, rna)
+        #_draw_domains(...)
+        #_draw_mechanism(...)
         #_arrow_points(...)
         #_draw_depth(ax, rna, tracks, total)
         #_shade_gaps(ax, thresholds)
@@ -150,7 +162,8 @@ classDiagram
         #_theta(pos, seq_len)
         #_depth_radius(values, ymax)
         #_draw_annotations(ax, rna)
-        #_label_feature(...)
+        #_draw_domains(...)
+        #_label_arc(...)
         #_draw_depth(ax, rna, tracks, total)
         #_shade_gaps(ax, rna, thresholds)
         #_draw_axis(ax, rna, total)
@@ -192,6 +205,7 @@ classDiagram
     }
 
     RNA "1" *-- "0..*" Feature : features
+    Feature "1" *-- "0..*" Domain : domains
     RNA "1" *-- "0..*" DepthTrack : depth
     Placement --> Feature
     layout ..> Placement : returns
@@ -238,7 +252,10 @@ accident:
    `exception=ribosomal slippage` become one box per segment with the
    continuation marked `mechanism="frameshift"` (sign from the join
    geometry); a CDS with `transl_except=` is trimmed to its extension and
-   marked `"readthrough"`; `Note=` can state either for hand-written files. `--rnas` selects and orders a subset;
+   marked `"readthrough"`; `Note=` can state either for hand-written files.
+   `mature_protein_region_of_CDS` / `mat_peptide` rows become the `Domain`
+   segments of the CDS named by their `Parent=` (or the smallest CDS that
+   contains them). `--rnas` selects and orders a subset;
    `--topology` overrides circularity for all of them.
 3. **Map reads** — if `-U`/`-1`/`-2` were given, `_map_read_sets` checks
    bowtie2 is on `PATH`, warns where the reference FASTA's lengths disagree
@@ -367,6 +384,7 @@ Suites and what they pin down:
 | `test_circular.py` | `Is_circular` detection, wrapping at the origin, GRBV example end to end |
 | `test_circular_plot.py` | Polar geometry, origin-crossing arcs, pinned radial range, `--layout` selection |
 | `test_mechanisms.py` | RefSeq joins (+1, −1, minus strand, spliced-not-slipped), `Note=` forms, `transl_except` trimming, the always-flip / never-flip rules, and the `FS` / `RT` marks |
+| `test_domains.py` | Mature-protein rows by `Parent=` and by containment, join segments, orphans; clipping and stop-codon snapping; dividers, per-segment colours, inside/outside labels and row staggering in both layouts |
 | `test_conventions.py` | Flip / tier / nest rules, palette precedence, settings keys, arrows, VPg, and the BYV fixture against ICTV Closteroviridae Fig 2 |
 | `test_settings.py`, `test_cli.py` | YAML loading, log formatting |
 
@@ -385,6 +403,7 @@ back to the original figure's thin black outline over a solid fill.
 | `sample_multi.gff3` | The above plus a 3 kb second segment (reads for both in `sample.sam`) | Multi-RNA output and shared scaling |
 | `byv.gff3`, `byv.sam`, `byv.yml` | Beet yellows virus, real NC_001598.1 coordinates with ICTV ORF names; flat simulated reads; the Closteroviridae Fig 2 palette | The L1 flip rule against a published figure — matches it on every ORF |
 | `grbv.gff3`, `grbv.sam`, `grbv.yml` | Grapevine red blotch virus, real NC_022002.1 annotation (circular, both strands); simulated reads continuous across the origin | Circular wrapping, C2 layout, two-strand linear layout |
-| `make_reads.py`, `make_grbv_sam.py`, `make_sample_sam.py` | Deterministic read simulators (SEQ/QUAL are `*`) | Regenerating the `.sam` fixtures |
+| `pvy.gff3`, `pvy.sam`, `pvy.yml` | Potato virus Y, real NC_001616.1 polyprotein with its ten `mature_protein_region_of_CDS` rows and PIPO; the Potyviridae Fig 2 palette | Polyprotein domain dividers, outside labels for short domains |
+| `make_reads.py`, `make_grbv_sam.py`, `make_sample_sam.py`, `make_example_sam.py` | Deterministic read simulators (SEQ/QUAL are `*`) | Regenerating the `.sam` fixtures |
 
-All reads are simulated; the annotations for BYV and GRBV are real.
+All reads are simulated; the annotations for BYV, GRBV and PVY are real.

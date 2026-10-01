@@ -16,10 +16,11 @@ import os
 
 import numpy as np
 from matplotlib.patches import Ellipse, Polygon, Rectangle
+from matplotlib.textpath import TextPath
 import matplotlib.pyplot as plt
 
 from virplot.analysis import smooth_depth
-from virplot.layout import ABOVE, Placement, place_features, resolve_mode
+from virplot.layout import ABOVE, BELOW, Placement, place_features, resolve_mode
 from virplot.models import RNA
 from virplot.settings import Settings
 
@@ -34,6 +35,12 @@ NEAR_GAP_FRACTION = 0.01        # same-colour neighbours closer than this flip a
 ORF_LABEL_FONTSIZE = 7          # ORF name written outside the glyph
 LABEL_PAD_FRACTION = 0.02
 SMALL_FEATURE_THRESHOLD = 500  # bp; features shorter than this get external labels
+# Polyprotein domains: the thin line between two mature proteins; the air a
+# domain name needs around it to count as fitting inside its segment; and the
+# vertical step between rows of outside labels that would otherwise overlap.
+DOMAIN_DIVIDER = dict(color="black", linewidth=0.6, solid_capstyle="butt")
+TEXT_FIT_MARGIN = 1.2
+OUTSIDE_LABEL_ROW = 0.28        # axis units; ~ one 8 pt line in the annotation panel
 SMOOTH_WINDOW = 15
 # Depth trace, measured from the original README figure: a ~0.3 pt black line
 # at alpha ~0.8 over fills at alpha 0.9 (the stacked layers have always used 0.9;
@@ -133,6 +140,19 @@ class Plotter:
 
     def _feature_color(self, product: str) -> str:
         return self.settings.feature_color(product)
+
+    @staticmethod
+    def _text_width_pt(text: str, fontsize: float) -> float:
+        """Width of ``text`` at ``fontsize`` in points, from the font's own metrics.
+
+        ``TextPath`` lays the string out with the default font without needing
+        a renderer, so the answer is the same for every backend.
+        """
+        return TextPath((0, 0), text, size=fontsize).get_extents().width
+
+    def _text_fits(self, text: str, room_pt: float, fontsize: float) -> bool:
+        """Whether ``text`` fits in ``room_pt`` points with a little air either side."""
+        return self._text_width_pt(text, fontsize) * TEXT_FIT_MARGIN <= room_pt
 
 
     def _placements(self, rna: RNA, circular: bool) -> tuple[list[Placement], str]:
@@ -269,19 +289,32 @@ class LinearPlotter(Plotter):
         tiers_up = max([p.tier for p in placements if p.side == ABOVE], default=0) + 1
         tiers_dn = max([p.tier for p in placements if p.side != ABOVE], default=0) + 1
 
+        # points per nucleotide once xlim is (0, seq_len): decides whether a
+        # domain name fits inside its segment
+        pt_per_nt = ax.get_position().width * ax.figure.get_figwidth() * 72 / seq_len
+        # outside labels already placed on each side, per row: [(x0, x1), ...]
+        outside_rows: dict[int, list[list[tuple[float, float]]]] = {ABOVE: [], BELOW: []}
+
         for pl in placements:
             feat = pl.feature
             yb = y0 + pl.tier * H if pl.side == ABOVE else y0 - (pl.tier + 1) * H
             color = self._feature_color(feat.product)
             spans = rna.feature_spans(feat)
             head_span = spans[-1] if feat.forward else spans[0]
+            # outside-label height for this side: clear of every tier on it
+            ly_out = (y0 + tiers_up * H + H / 2 if pl.side == ABOVE
+                      else y0 - tiers_dn * H - H / 2)
             for (s_, e_) in spans:
                 if arrows and (s_, e_) == head_span:
-                    ax.add_patch(Polygon(self._arrow_points(s_, e_, yb, H, feat.forward, seq_len),
-                                         closed=True, facecolor=color, **self._glyph_edge()))
+                    glyph = Polygon(self._arrow_points(s_, e_, yb, H, feat.forward, seq_len),
+                                    closed=True, facecolor=color, **self._glyph_edge())
                 else:
-                    ax.add_patch(Rectangle((s_, yb), e_ - s_, H,
-                                           facecolor=color, **self._glyph_edge()))
+                    glyph = Rectangle((s_, yb), e_ - s_, H, facecolor=color, **self._glyph_edge())
+                ax.add_patch(glyph)
+                if feat.domains:
+                    self._draw_domains(ax, feat, s_, e_, yb, H, glyph, ly_out, pt_per_nt,
+                                       labels=not args.no_label,
+                                       rows=outside_rows[pl.side], up=pl.side == ABOVE)
 
             self._draw_mechanism(ax, feat, spans, yb, H, pl.side == ABOVE)
 
@@ -290,24 +323,70 @@ class LinearPlotter(Plotter):
             covered = sum(e_ - s_ + 1 for s_, e_ in spans)
             mid = ((spans[0][0] - 1 + covered / 2) % seq_len) + 1 if rna.circular else feat.midpoint
             small = covered < SMALL_FEATURE_THRESHOLD
-            if small:
-                # outside the glyph, clear of every tier on this side
-                ly = (y0 + tiers_up * H + H / 2 if pl.side == ABOVE
-                      else y0 - tiers_dn * H - H / 2)
-            else:
-                ly = yb + H / 2
-            ax.text(mid, ly, feat.product, ha="center", va="center",
-                    fontsize=settings.annotation_fontsize, color="black")
+            if not feat.domains:                    # a polyprotein's domains label its box
+                ax.text(mid, ly_out if small else yb + H / 2, feat.product,
+                        ha="center", va="center", fontsize=settings.annotation_fontsize,
+                        color="black")
             if feat.gene and not small:
                 gy = yb + H + 0.12 if pl.side == ABOVE else yb - 0.12
                 ax.text(mid, gy, feat.gene, ha="center",
                         va="bottom" if pl.side == ABOVE else "top",
                         fontsize=ORF_LABEL_FONTSIZE, color="0.25")
 
+        # extra rows of outside domain labels push the panel's edge out
+        extra_up = max(len(outside_rows[ABOVE]) - 1, 0) * OUTSIDE_LABEL_ROW
+        extra_dn = max(len(outside_rows[BELOW]) - 1, 0) * OUTSIDE_LABEL_ROW
         ax.set_xlim(0, seq_len)
-        ax.set_ylim(min(-1.5, y0 - tiers_dn * H - 0.9), max(2.0, y0 + tiers_up * H + 0.9))
+        ax.set_ylim(min(-1.5, y0 - tiers_dn * H - 0.9 - extra_dn),
+                    max(2.0, y0 + tiers_up * H + 0.9 + extra_up))
         ax.axis("off")
         return ends
+
+    def _draw_domains(self, ax: plt.Axes, feat, s_: int, e_: int, yb: float, H: float,
+                      glyph, ly_out: float, pt_per_nt: float, labels: bool,
+                      rows: list, up: bool) -> None:
+        """Split a polyprotein's box into its mature proteins (ICTV §1).
+
+        Each domain is painted in its own colour over the parent glyph and
+        clipped to it, so an arrowhead keeps its shape and any unannotated
+        stretch keeps the polyprotein's colour; thin vertical lines mark the
+        boundaries. A domain name goes inside its segment when it fits, else
+        outside the box at the small-feature label height, as Potyviridae
+        Fig. 2 writes ``6K1``/``6K2`` beside the box. Outside labels that
+        would overlap one already placed on this side step out one row
+        (``rows`` keeps the occupied x-ranges per row across features).
+        """
+        fontsize = self.settings.annotation_fontsize
+        for d in feat.domains_within(s_, e_):
+            seg = Rectangle((d.start, yb), d.end - d.start, H,
+                            facecolor=self._feature_color(d.product), **self._glyph_edge())
+            ax.add_patch(seg)
+            seg.set_clip_path(glyph)
+            if not labels:
+                continue
+            mid = (d.start + d.end) / 2
+            if self._text_fits(d.product, (d.end - d.start) * pt_per_nt, fontsize):
+                ax.text(mid, yb + H / 2, d.product, ha="center", va="center",
+                        fontsize=fontsize, color="black")
+                continue
+            half = self._text_width_pt(d.product, fontsize) * TEXT_FIT_MARGIN / pt_per_nt / 2
+            row = self._free_row(rows, mid - half, mid + half)
+            ly = ly_out + row * OUTSIDE_LABEL_ROW * (1 if up else -1)
+            ax.text(mid, ly, d.product, ha="center", va="center",
+                    fontsize=fontsize, color="black")
+        for x in feat.dividers_within(s_, e_):
+            (line,) = ax.plot([x, x], [yb, yb + H], zorder=3, **DOMAIN_DIVIDER)
+            line.set_clip_path(glyph)                 # stays inside an arrowhead
+
+    @staticmethod
+    def _free_row(rows: list[list[tuple[float, float]]], x0: float, x1: float) -> int:
+        """Index of the first row where ``[x0, x1]`` overlaps nothing; records it there."""
+        for i, taken in enumerate(rows):
+            if all(x1 < a or x0 > b for a, b in taken):
+                taken.append((x0, x1))
+                return i
+        rows.append([(x0, x1)])
+        return len(rows) - 1
 
     def _draw_mechanism(self, ax: plt.Axes, feat, spans, yb: float, H: float, above: bool) -> None:
         """Mark how a continuation ORF is reached, as the ICTV figures do.
@@ -331,7 +410,8 @@ class LinearPlotter(Plotter):
             # the continuation has flipped, so its partner ends at the junction on
             # the other side; write the label there, outside the partner's box,
             # ending at the junction (CTV: "+1FS" under the 3' end of ORF1a)
-            sign = {1: "+1 ", -1: "\u22121 "}.get(feat.shift, "")
+            sign = ("" if feat.shift is None else
+                    f"{'+' if feat.shift > 0 else chr(0x2212)}{abs(feat.shift)} ")
             partner_y = (ANNOTATION_Y_BASE - 0.08) if above else (ANNOTATION_Y_BASE + H + 0.08)
             ax.text(junction, partner_y, f"{sign}FS", ha="right" if feat.forward else "left",
                     va="top" if above else "bottom", fontsize=ORF_LABEL_FONTSIZE, color="black")
@@ -540,14 +620,24 @@ class CircularPlotter(Plotter):
                 th0, th1 = self._theta(s_, L), self._theta(e_ + 1, L)
                 head = self._theta(1 + self._head_length(e_ - s_ + 1, L), L) if (s_, e_) == head_span else 0.0
                 th, r = self._arc_arrow(th0, th1, lane, CIRC_ANN_HEIGHT, feat.forward, head)
-                ax.fill(th, r, facecolor=color, zorder=3, **self._glyph_edge())
+                (glyph,) = ax.fill(th, r, facecolor=color, zorder=3, **self._glyph_edge())
+                if feat.domains:
+                    extra.extend(self._draw_domains(ax, rna, feat, s_, e_, lane, tier, glyph,
+                                                    labels=not args.no_label))
 
             if not args.no_label:
-                if self.settings.circular_labels == "horizontal":
+                horizontal = self.settings.circular_labels == "horizontal"
+                if feat.domains:                     # the domains have labelled the arc
+                    if feat.gene:
+                        extra.append(self._label_horizontal(ax, rna, feat.gene, spans, tier)
+                                     if horizontal else
+                                     self._label_outside(ax, rna, feat.gene, spans,
+                                                         fontsize=ORF_LABEL_FONTSIZE))
+                elif horizontal:
                     text = f"{feat.gene} ({feat.product})" if feat.gene else feat.product
                     extra.append(self._label_horizontal(ax, rna, text, spans, tier))
                 else:
-                    extra.append(self._label_feature(ax, rna, feat, lane, spans))
+                    extra.append(self._label_arc(ax, rna, feat.product, lane, spans))
                     if feat.gene:
                         extra.append(self._label_outside(ax, rna, feat.gene, spans,
                                                          fontsize=ORF_LABEL_FONTSIZE))
@@ -633,8 +723,31 @@ class CircularPlotter(Plotter):
                        rotation_mode="anchor", fontsize=fontsize, color="0.25",
                        clip_on=False, zorder=5)
 
-    def _label_feature(self, ax, rna: RNA, feat, lane: float,
-                       spans: list[tuple[int, int]]):
+    def _draw_domains(self, ax, rna: RNA, feat, s_: int, e_: int, lane: float, tier: int,
+                      glyph, labels: bool) -> list:
+        """Split a polyprotein arc into its mature proteins: own colours, thin
+        radial dividers, one label per domain by the layout's label rule.
+        Mirrors ``LinearPlotter._draw_domains``; see that docstring."""
+        L, H = rna.length, CIRC_ANN_HEIGHT
+        out = []
+        for d in feat.domains_within(s_, e_):
+            th, r = self._arc_arrow(self._theta(d.start, L), self._theta(d.end + 1, L),
+                                    lane, H, feat.forward, head=0.0)
+            (seg,) = ax.fill(th, r, facecolor=self._feature_color(d.product), zorder=3,
+                             **self._glyph_edge())
+            seg.set_clip_path(glyph)
+            if labels:
+                out.append(self._label_horizontal(ax, rna, d.product, [(d.start, d.end)], tier)
+                           if self.settings.circular_labels == "horizontal" else
+                           self._label_arc(ax, rna, d.product, lane, [(d.start, d.end)]))
+        for x in feat.dividers_within(s_, e_):
+            th = float(self._theta(x + 0.5, L))
+            (line,) = ax.plot([th, th], [lane, lane + H], zorder=4, **DOMAIN_DIVIDER)
+            line.set_clip_path(glyph)
+        return out
+
+    def _label_arc(self, ax, rna: RNA, text: str, lane: float,
+                   spans: list[tuple[int, int]]):
         """Label along the arc, or radially outside it when the arc is narrow."""
         fontsize = self.settings.annotation_fontsize
         covered = sum(e - s + 1 for s, e in spans)
@@ -648,13 +761,13 @@ class CircularPlotter(Plotter):
             rotation = -deg
             if 90 < (deg % 360) < 270:          # keep text the right way up
                 rotation += 180
-            return ax.text(theta, lane + CIRC_ANN_HEIGHT / 2, feat.product,
+            return ax.text(theta, lane + CIRC_ANN_HEIGHT / 2, text,
                            ha="center", va="center", rotation=rotation,
                            rotation_mode="anchor", fontsize=fontsize, zorder=5)
 
         # narrow feature: read outwards from the rim
         left = 90 < (deg % 360) < 270
-        return ax.text(theta, getattr(self, "_outside_label_r", CIRC_R_OUTSIDE_LABEL), feat.product,
+        return ax.text(theta, getattr(self, "_outside_label_r", CIRC_R_OUTSIDE_LABEL), text,
                        ha="right" if left else "left", va="center",
                        rotation=(-deg + 180) if left else -deg,
                        rotation_mode="anchor", fontsize=fontsize,

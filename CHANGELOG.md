@@ -10,6 +10,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Polyprotein domain dividers.** RefSeq's `mature_protein_region_of_CDS`
+  rows (GenBank `mat_peptide`; `Parent=` names the CDS, else containment)
+  become `Domain` segments of their CDS. The box is drawn as one glyph split
+  by thin vertical lines, each segment in its own colour (same rule as any
+  product) and labelled with its domain name — inside when it fits at the
+  figure's size, otherwise just outside the box, staggered onto a further
+  row when names would overprint. The polyprotein's own `product` is not
+  written. Works in both layouts. `examples/pvy.gff3` / `pvy.sam` /
+  `pvy.yml` — potato virus Y with its ten mature proteins and PIPO, styled
+  to ICTV Potyviridae Fig. 2 — and `docs/figures/pvy_linear.svg`;
+  docs/GFF_GUIDE.md §9.
+- Frameshift labels carry whatever shift the `Note=` states (`+2 FS` for
+  PIPO), not only ±1.
 - **ICTV reference examples.** Seven curated RefSeq genomes, each labelled
   and coloured as in its ICTV 9th Report family figure, with a style file and
   simulated reads: BYDV-PAV and PLRV (−1 frameshift, readthrough, VPg), LIYV
