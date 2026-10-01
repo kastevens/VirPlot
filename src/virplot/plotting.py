@@ -15,14 +15,15 @@ import logging
 import os
 
 import numpy as np
+from matplotlib.colors import to_rgb
 from matplotlib.patches import Ellipse, Polygon, Rectangle
 from matplotlib.textpath import TextPath
 import matplotlib.pyplot as plt
 
 from virplot.analysis import smooth_depth
 from virplot.layout import ABOVE, BELOW, Placement, place_features, resolve_mode
-from virplot.models import RNA
-from virplot.settings import Settings
+from virplot.models import RNA, Noncoding
+from virplot.settings import DEFAULT_FUNCTION_PALETTE, Settings
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +42,11 @@ SMALL_FEATURE_THRESHOLD = 500  # bp; features shorter than this get external lab
 DOMAIN_DIVIDER = dict(color="black", linewidth=0.6, solid_capstyle="butt")
 TEXT_FIT_MARGIN = 1.2
 OUTSIDE_LABEL_ROW = 0.28        # axis units; ~ one 8 pt line in the annotation panel
+# Non-coding landmarks sit on the genome line itself: a region (UTR, IR) is a
+# bar this tall centred on the line; a stem-loop is a hairpin icon this tall.
+NONCODING_BAR_HEIGHT = 0.22
+STEM_LOOP_HEIGHT = 0.42
+CIRC_NONCODING_HEIGHT = 0.07    # radial thickness of an IR arc astride the circle
 SMOOTH_WINDOW = 15
 # Depth trace, measured from the original README figure: a ~0.3 pt black line
 # at alpha ~0.8 over fills at alpha 0.9 (the stacked layers have always used 0.9;
@@ -140,6 +146,53 @@ class Plotter:
 
     def _feature_color(self, product: str) -> str:
         return self.settings.feature_color(product)
+
+    @staticmethod
+    def _text_on(fill: str, dark_below: float = 0.35) -> str:
+        """Black text on a light fill, white on a dark one (relative luminance).
+
+        The default threshold keeps black on every ICTV palette colour (the
+        figures write black even on purple) and flips only fills a user has
+        mapped really dark; the non-coding grey passes a higher one.
+        """
+        r, g, b = to_rgb(fill)
+        return "white" if 0.2126 * r + 0.7152 * g + 0.0722 * b < dark_below else "black"
+
+    def _noncoding_color(self, nc: Noncoding) -> str:
+        """Grey for every non-coding landmark (ICTV), unless its label is mapped."""
+        s = self.settings
+        if nc.label in s.color_mapping:
+            return s.color_mapping[nc.label]
+        return s.function_palette.get("noncoding", DEFAULT_FUNCTION_PALETTE["noncoding"])
+
+    @staticmethod
+    def _mid(rna: RNA, nc) -> float:
+        spans = rna.feature_spans(nc)
+        covered = sum(e - s + 1 for s, e in spans)
+        return ((spans[0][0] - 1 + covered / 2) % rna.length) + 1
+
+    @staticmethod
+    def _noncoding_labels(rna: RNA, regions: list, loops: list):
+        """Decide where each non-coding name is written, once.
+
+        A region that holds a stem-loop (the begomovirus common region with
+        its hairpin) is named at the hairpin's tip, as the ICTV figures write
+        ``CRA`` over the icon, unless the stem-loop has a name of its own —
+        then the region keeps its name on the arc. Returns
+        ``({id(loop): text}, [(region, text), ...])``.
+        """
+        loop_labels = {id(nc): nc.label for nc in loops}
+        region_labels = []
+        for reg in regions:
+            if not reg.label:
+                continue
+            inside = [lp for lp in loops if not lp.label and any(
+                s <= Plotter._mid(rna, lp) <= e for s, e in rna.feature_spans(reg))]
+            if inside:
+                loop_labels[id(inside[0])] = reg.label
+            else:
+                region_labels.append((reg, reg.label))
+        return loop_labels, region_labels
 
     @staticmethod
     def _text_width_pt(text: str, fontsize: float) -> float:
@@ -326,12 +379,14 @@ class LinearPlotter(Plotter):
             if not feat.domains:                    # a polyprotein's domains label its box
                 ax.text(mid, ly_out if small else yb + H / 2, feat.product,
                         ha="center", va="center", fontsize=settings.annotation_fontsize,
-                        color="black")
+                        color="black" if small else self._text_on(color))
             if feat.gene and not small:
                 gy = yb + H + 0.12 if pl.side == ABOVE else yb - 0.12
                 ax.text(mid, gy, feat.gene, ha="center",
                         va="bottom" if pl.side == ABOVE else "top",
                         fontsize=ORF_LABEL_FONTSIZE, color="0.25")
+
+        ends.extend(self._draw_noncoding(ax, rna, placements, labels=not args.no_label))
 
         # extra rows of outside domain labels push the panel's edge out
         extra_up = max(len(outside_rows[ABOVE]) - 1, 0) * OUTSIDE_LABEL_ROW
@@ -358,8 +413,8 @@ class LinearPlotter(Plotter):
         """
         fontsize = self.settings.annotation_fontsize
         for d in feat.domains_within(s_, e_):
-            seg = Rectangle((d.start, yb), d.end - d.start, H,
-                            facecolor=self._feature_color(d.product), **self._glyph_edge())
+            fill = self._feature_color(d.product)
+            seg = Rectangle((d.start, yb), d.end - d.start, H, facecolor=fill, **self._glyph_edge())
             ax.add_patch(seg)
             seg.set_clip_path(glyph)
             if not labels:
@@ -367,7 +422,7 @@ class LinearPlotter(Plotter):
             mid = (d.start + d.end) / 2
             if self._text_fits(d.product, (d.end - d.start) * pt_per_nt, fontsize):
                 ax.text(mid, yb + H / 2, d.product, ha="center", va="center",
-                        fontsize=fontsize, color="black")
+                        fontsize=fontsize, color=self._text_on(fill))
                 continue
             half = self._text_width_pt(d.product, fontsize) * TEXT_FIT_MARGIN / pt_per_nt / 2
             row = self._free_row(rows, mid - half, mid + half)
@@ -420,6 +475,58 @@ class LinearPlotter(Plotter):
                     linewidth=1.0, solid_capstyle="butt", zorder=4)
             ax.text(junction, far_y, "RT", ha="center", va=va,
                     fontsize=ORF_LABEL_FONTSIZE, color="black")
+
+    def _draw_noncoding(self, ax: plt.Axes, rna: RNA, placements, labels: bool) -> list:
+        """UTRs, intergenic regions and stem-loops, on the genome line (ICTV §1).
+
+        A region is a grey bar astride the line, under the ORF boxes; its name
+        goes in small text on whichever side of the line has no box at that
+        position (below first). A stem-loop is a hairpin icon rising from the
+        line (dropping below it when a box is above), named at its tip, as the
+        ambisense-segment and geminivirus figures draw their hairpins.
+        """
+        y0, H = ANNOTATION_Y_BASE, ANNOTATION_HEIGHT
+        extra: list = []
+
+        def box_at(x: float, above: bool) -> bool:
+            return any((pl.side == ABOVE) == above
+                       and any(s_ <= x <= e_ for s_, e_ in rna.feature_spans(pl.feature))
+                       for pl in placements)
+
+        regions = [nc for nc in rna.noncoding if nc.kind != "stem_loop"]
+        loops = [nc for nc in rna.noncoding if nc.kind == "stem_loop"]
+        loop_labels, region_labels = self._noncoding_labels(rna, regions, loops)
+        region_text = {id(nc): text for nc, text in region_labels}
+
+        for nc in regions:
+            color = self._noncoding_color(nc)
+            h = NONCODING_BAR_HEIGHT
+            for s_, e_ in rna.feature_spans(nc):
+                ax.add_patch(Rectangle((s_, y0 - h / 2), e_ - s_, h, facecolor=color,
+                                       zorder=1.5, **self._glyph_edge()))
+            text = region_text.get(id(nc), "")
+            if labels and text:
+                mid = self._mid(rna, nc)
+                below = not box_at(mid, above=False) or box_at(mid, above=True)
+                ax.text(mid, y0 - h / 2 - 0.08 if below else y0 + h / 2 + 0.08, text,
+                        ha="center", va="top" if below else "bottom",
+                        fontsize=ORF_LABEL_FONTSIZE, color="0.25")
+
+        for nc in loops:
+            mid = self._mid(rna, nc)
+            up = not box_at(mid, above=True) or box_at(mid, above=False)
+            sign = 1 if up else -1
+            tip = y0 + sign * STEM_LOOP_HEIGHT
+            ax.plot([mid, mid], [y0, tip - sign * 0.06], color="black", linewidth=1.0,
+                    zorder=4, solid_capstyle="butt")
+            ax.plot([mid], [tip], marker="o", markersize=5, markerfacecolor="white",
+                    markeredgecolor="black", markeredgewidth=1.0, zorder=4)
+            text = loop_labels.get(id(nc), "")
+            if labels and text:
+                ax.text(mid, tip + sign * 0.12, text, ha="center",
+                        va="bottom" if up else "top", fontsize=ORF_LABEL_FONTSIZE,
+                        color="black")
+        return extra
 
     def _draw_backbone(self, ax: plt.Axes, rna: RNA, pad: int) -> list:
         """The genome line with its end marks (or continuation marks if circular)."""
@@ -609,6 +716,17 @@ class CircularPlotter(Plotter):
         ax.plot(theta, np.full_like(theta, CIRC_R_BASELINE), color="black",
                 linewidth=1.0, zorder=2)
 
+        # non-coding regions: a thick grey arc astride the circle (Begomovirus
+        # CRA), under the ORF arcs; stem-loops are drawn after the ring below
+        regions = [nc for nc in rna.noncoding if nc.kind != "stem_loop"]
+        for nc in regions:
+            r_in = CIRC_R_BASELINE - CIRC_NONCODING_HEIGHT / 2
+            for (s_, e_) in rna.feature_spans(nc):
+                th, r = self._arc_arrow(self._theta(s_, L), self._theta(e_ + 1, L),
+                                        r_in, CIRC_NONCODING_HEIGHT, True, head=0.0)
+                ax.fill(th, r, facecolor=self._noncoding_color(nc), zorder=2.5,
+                        **self._glyph_edge())
+
         for pl in placements:
             feat = pl.feature
             tier = min(pl.tier, CIRC_MAX_TIERS - 1)
@@ -637,21 +755,58 @@ class CircularPlotter(Plotter):
                     text = f"{feat.gene} ({feat.product})" if feat.gene else feat.product
                     extra.append(self._label_horizontal(ax, rna, text, spans, tier))
                 else:
-                    extra.append(self._label_arc(ax, rna, feat.product, lane, spans))
+                    extra.append(self._label_arc(ax, rna, feat.product, lane, spans, fill=color))
                     if feat.gene:
                         extra.append(self._label_outside(ax, rna, feat.gene, spans,
                                                          fontsize=ORF_LABEL_FONTSIZE))
 
-        # origin at 12 o'clock: a dashed radius through the depth band and a
-        # stem-loop icon for the intergenic region / origin of replication
+        # position 1 at 12 o'clock: a dashed radius through the depth band
         ax.plot([0, 0], [CIRC_R_DEPTH_BASE, CIRC_R_BASELINE], color="black",
                 linewidth=0.8, linestyle=(0, (3, 2)), zorder=4)
-        stem_top = self._ring_top + 0.03
-        ax.plot([0, 0], [stem_top, stem_top + 0.04], color="black", linewidth=1.0,
-                zorder=4, clip_on=False)
-        ax.plot([0], [stem_top + 0.055], marker="o", markersize=5, markerfacecolor="white",
-                markeredgecolor="black", markeredgewidth=1.0, zorder=4, clip_on=False)
+
+        # non-coding labels, then stem-loop icons. A GFF stem_loop puts the
+        # hairpin where it belongs (the nick site is rarely exactly at 1);
+        # with none, the icon marks the origin as before, unlabelled.
+        loops = [nc for nc in rna.noncoding if nc.kind == "stem_loop"]
+        loop_labels, region_labels = self._noncoding_labels(rna, regions, loops)
+        if not args.no_label:
+            for nc, text in region_labels:
+                spans = rna.feature_spans(nc)
+                extra.append(self._label_horizontal(ax, rna, text, spans)
+                             if self.settings.circular_labels == "horizontal" else
+                             self._label_arc(ax, rna, text, CIRC_R_BASELINE - CIRC_ANN_HEIGHT / 2,
+                                             spans, fill=self._noncoding_color(nc), dark_below=0.5))
+        for nc in loops or [None]:
+            theta_sl = 0.0 if nc is None else float(self._theta(self._mid(rna, nc), L))
+            text = loop_labels.get(id(nc), "") if nc is not None and not args.no_label else ""
+            extra.append(self._stem_loop_icon(ax, theta_sl, text))
         return [a for a in extra if a is not None]
+
+
+    def _stem_loop_icon(self, ax, theta: float, label: str = ""):
+        """A hairpin standing on the outside of the ring at ``theta``, optionally named."""
+        stem_top = self._ring_top + 0.03
+        ax.plot([theta, theta], [stem_top, stem_top + 0.04], color="black", linewidth=1.0,
+                zorder=4, clip_on=False)
+        ax.plot([theta], [stem_top + 0.055], marker="o", markersize=5, markerfacecolor="white",
+                markeredgecolor="black", markeredgewidth=1.0, zorder=4, clip_on=False)
+        if not label:
+            return None
+        ha, va = self._level_anchor(theta)
+        return ax.annotate(label, xy=(theta, stem_top + 0.085), xytext=(0, 0),
+                           textcoords="offset points", ha=ha, va=va,
+                           fontsize=self.settings.annotation_fontsize,
+                           annotation_clip=False, zorder=5)
+
+    @staticmethod
+    def _level_anchor(theta: float) -> tuple[str, str]:
+        """Text anchor for level text placed outside the ring at ``theta``."""
+        deg = np.degrees(theta) % 360                     # 0 = top, clockwise
+        if deg < 15 or deg > 345:
+            return "center", "bottom"
+        if 165 < deg < 195:
+            return "center", "top"
+        return ("left", "center") if deg < 180 else ("right", "center")
 
     @staticmethod
     def _arc_arrow(th0: float, th1: float, lane: float, height: float,
@@ -695,14 +850,7 @@ class CircularPlotter(Plotter):
         mid = ((spans[0][0] - 1 + covered / 2) % rna.length) + 1
         theta = float(self._theta(mid, rna.length))
         deg = np.degrees(theta) % 360                     # 0 = top, clockwise
-        if deg < 15 or deg > 345:
-            ha, va = "center", "bottom"
-        elif 165 < deg < 195:
-            ha, va = "center", "top"
-        elif deg < 180:
-            ha, va = "left", "center"
-        else:
-            ha, va = "right", "center"
+        ha, va = self._level_anchor(theta)
         line = self.settings.annotation_fontsize * 1.4          # points
         dy = tier * line * (1 if deg < 90 or deg > 270 else -1)
         return ax.annotate(text, xy=(theta, self._outside_label_r + 0.01),
@@ -739,7 +887,8 @@ class CircularPlotter(Plotter):
             if labels:
                 out.append(self._label_horizontal(ax, rna, d.product, [(d.start, d.end)], tier)
                            if self.settings.circular_labels == "horizontal" else
-                           self._label_arc(ax, rna, d.product, lane, [(d.start, d.end)]))
+                           self._label_arc(ax, rna, d.product, lane, [(d.start, d.end)],
+                                           fill=self._feature_color(d.product)))
         for x in feat.dividers_within(s_, e_):
             th = float(self._theta(x + 0.5, L))
             (line,) = ax.plot([th, th], [lane, lane + H], zorder=4, **DOMAIN_DIVIDER)
@@ -747,8 +896,10 @@ class CircularPlotter(Plotter):
         return out
 
     def _label_arc(self, ax, rna: RNA, text: str, lane: float,
-                   spans: list[tuple[int, int]]):
-        """Label along the arc, or radially outside it when the arc is narrow."""
+                   spans: list[tuple[int, int]], fill: str = "white",
+                   dark_below: float = 0.35):
+        """Label along the arc (in a colour that reads on ``fill``), or
+        radially outside it when the arc is narrow."""
         fontsize = self.settings.annotation_fontsize
         covered = sum(e - s + 1 for s, e in spans)
         # midway along the covered arc, which may run through the origin
@@ -763,7 +914,8 @@ class CircularPlotter(Plotter):
                 rotation += 180
             return ax.text(theta, lane + CIRC_ANN_HEIGHT / 2, text,
                            ha="center", va="center", rotation=rotation,
-                           rotation_mode="anchor", fontsize=fontsize, zorder=5)
+                           rotation_mode="anchor", fontsize=fontsize, zorder=5,
+                           color=self._text_on(fill, dark_below))
 
         # narrow feature: read outwards from the rim
         left = 90 < (deg % 360) < 270
@@ -834,9 +986,17 @@ class CircularPlotter(Plotter):
         ymax = getattr(self, "_depth_ymax", total.max() or 1.0)
         fmt = (lambda v: f"{v:.2g}") if self.args.normalize else (lambda v: f"{v:.0f}")
         unit = "" if self.args.normalize else "\u00d7"
-        for radius, text in ((CIRC_R_DEPTH_BASE, f" {fmt(0.0)}"),
-                             (CIRC_R_DEPTH_MAX, f" {fmt(ymax)}{unit} depth")):
-            ax.text(0, radius, text, ha="left", va="bottom",
+        # the ceiling label normally stands on its radius, up against the
+        # genome circle; when a non-coding arc straddles the origin (a
+        # geminivirus common region) it hangs inward instead, clear of the arc
+        near = 0.03 * rna.length
+        covered = any(s_ <= 1 + near or e_ >= rna.length - near
+                      for nc in rna.noncoding if nc.kind != "stem_loop"
+                      for s_, e_ in rna.feature_spans(nc))
+        for radius, text, va in ((CIRC_R_DEPTH_BASE, f" {fmt(0.0)}", "bottom"),
+                                 (CIRC_R_DEPTH_MAX, f" {fmt(ymax)}{unit} depth",
+                                  "top" if covered else "bottom")):
+            ax.text(0, radius, text, ha="left", va=va,
                     fontsize=7, color="0.35", zorder=5)
 
         # the hub is empty: name the molecule there rather than over the trace

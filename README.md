@@ -85,7 +85,7 @@ cp examples/spec.yml my_project.yml
 
 Three input files are required:
 
-1. **GFF3 file** — genome annotations containing CDS features and a `region` entry per RNA giving its length (see [`docs/GFF_GUIDE.md`](docs/GFF_GUIDE.md) for the conventions)
+1. **GFF3 file** — genome annotations: a `region` entry per RNA giving its length, the CDS features, and optionally a polyprotein's mature-protein rows and non-coding landmarks (UTRs, intergenic regions, stem-loops), all as RefSeq writes them (see [`docs/GFF_GUIDE.md`](docs/GFF_GUIDE.md) for the conventions)
 2. **Depth source** — one of
    - FASTQ reads plus a reference FASTA (`-x`, `-U`/`-1`/`-2`); VirPlot runs bowtie2 and reads its SAM, **or**
    - tab-delimited output from `samtools depth -a`, **or**
@@ -249,7 +249,7 @@ See `examples/spec.yml` for a complete template.
 
 | Document | What it covers |
 |---|---|
-| [`docs/GFF_GUIDE.md`](docs/GFF_GUIDE.md) | How to write the GFF3: the two rows VirPlot reads, `product`/`gene` naming, strand and layout, `Is_circular`, origin-crossing features, frameshifts, and the function words that pick default colours |
+| [`docs/GFF_GUIDE.md`](docs/GFF_GUIDE.md) | How to write the GFF3: the rows VirPlot reads, `product`/`gene` naming, strand and layout, `Is_circular`, origin-crossing features, frameshifts and readthrough, polyprotein domains, non-coding landmarks, and the function words that pick default colours |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the code is organised: data model, pipeline, **class diagram**, the behaviours that are easy to get wrong, how to extend it, the test suites |
 | [`docs/ictv_drawing_conventions.md`](docs/ictv_drawing_conventions.md) | The genome-map drawing rules the annotation track follows, their implementation status, and how they compare with the published ICTV figures |
 | [`docs/class_layout.svg`](docs/class_layout.svg) | The class layout as a static diagram |

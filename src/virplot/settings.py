@@ -48,7 +48,8 @@ _FUNCTION_RULES: list[tuple[str, str]] = [
     # named function only: a bare "p20"/"p6" says nothing about role (BYV p6 is
     # a membrane protein and grey in the figure), so pN names fall to default
     (r"\b(silencing|suppressor|vsr|hc-?pro)", "suppressor"),
-    (r"\b(intergenic|\bir\b|utr|stem[- ]loop|hairpin|non-?coding)", "noncoding"),
+    (r"\b(intergenic|\bir\b|\b[ls]ir\b|common[- ]region|\bcr[ab]?\b|utr|untranslated|"
+     r"stem[- ]loop|hairpin|non-?coding|origin of replication|\bori\b)", "noncoding"),
 ]
 
 _PUTATIVE = re.compile(r"\b(putative|probable|possible|hypothetical|predicted|"

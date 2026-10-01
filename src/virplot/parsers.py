@@ -11,7 +11,8 @@ import sys
 import numpy as np
 
 from virplot.alignments import depth_from_alignments, is_alignment_file, resolve_reference
-from virplot.models import RNA, Domain, Feature
+from virplot.models import RNA, Domain, Feature, Noncoding
+from virplot.settings import classify_function
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +25,24 @@ log = logging.getLogger(__name__)
 # mat_peptide, plus the GenBank name itself and the SO synonym, which other
 # converters write.
 _DOMAIN_TYPES = {"mature_protein_region_of_CDS", "mat_peptide", "mature_protein_region"}
+
+# Non-coding landmarks (ICTV: "IR, UTR, stem-loop — grey or black", drawn on
+# the genome line). Two tiers: types that are non-coding by definition are
+# always read; catch-all types (GenBank misc_feature, which NCBI's GFF3 calls
+# sequence_feature, regulatory, repeat_region) are read only when their name
+# or note says intergenic / common region / UTR / stem-loop etc., because
+# RefSeq also uses them for motifs inside ORFs that would clutter the line.
+_NONCODING_ALWAYS = {
+    "five_prime_UTR": ("region", "5\u2032 UTR"),
+    "three_prime_UTR": ("region", "3\u2032 UTR"),
+    "UTR": ("region", "UTR"),
+    "intergenic_region": ("region", "IR"),
+    "origin_of_replication": ("region", "ori"),
+    "stem_loop": ("stem_loop", ""),
+}
+_NONCODING_IF_NAMED = {"sequence_feature", "misc_feature", "regulatory_region", "regulatory",
+                       "repeat_region", "sequence_secondary_structure", "misc_structure"}
+_STEM_LOOP_WORDS = re.compile(r"stem[- ]?loop|hairpin", re.I)
 
 
 def parse_gff_rnas(gff_path: str) -> list[RNA]:
@@ -38,6 +57,7 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
     orphans: set[str] = set()
     rows: dict[str, list[tuple[int, int, str, dict]]] = {}
     domain_rows: dict[str, list[tuple[int, int, str, dict]]] = {}
+    noncoding: dict[str, list[Noncoding]] = {}
 
     with open(gff_path) as fp:
         for line in fp:
@@ -61,12 +81,18 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
                                       circular=circular)
                 continue
 
-            if feature_type != "CDS" and feature_type not in _DOMAIN_TYPES:
+            is_nc = feature_type in _NONCODING_ALWAYS or feature_type in _NONCODING_IF_NAMED
+            if feature_type != "CDS" and feature_type not in _DOMAIN_TYPES and not is_nc:
                 continue
 
             info = dict(
                 kv.split("=", 1) for kv in attributes.split(";") if "=" in kv
             )
+            if is_nc:
+                nc = _noncoding(feature_type, int(start), int(end), strand, info)
+                if nc is not None and seqid in rnas:
+                    noncoding.setdefault(seqid, []).append(nc)
+                continue
             if seqid not in rnas:
                 orphans.add(seqid)
                 continue
@@ -80,6 +106,7 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
     for seqid, rna in rnas.items():
         rna.features.extend(_features_from_rows(rows.get(seqid, []),
                                                 domain_rows.get(seqid, [])))
+        rna.noncoding.extend(noncoding.get(seqid, []))
 
     for seqid in sorted(orphans):
         log.warning("CDS features on %r ignored: no 'region' line for that sequence", seqid)
@@ -284,6 +311,34 @@ def _as_readthrough(f: Feature, feats: list[Feature]) -> Feature:
         if not f.forward and g.end == f.end and g.start > f.start:
             return _with(f, end=g.start - 1, mechanism="readthrough")
     return _with(f, mechanism="readthrough")
+
+
+# --- non-coding landmarks --------------------------------------------------------
+
+def _noncoding(ftype: str, start: int, end: int, strand: str, info: dict) -> Noncoding | None:
+    """Build a ``Noncoding`` from a row, or None if a catch-all row is not one.
+
+    The label is the first of ``Name``, ``product``, ``gene``,
+    ``standard_name``, ``regulatory_class``, then ``Note``; for the dedicated
+    types a default (``5′ UTR``, ``IR``, ``ori``) stands in when none is
+    given, and a ``stem_loop`` row is labelled only when actually named. A
+    short region whose words say stem-loop / hairpin is drawn as one.
+    """
+    named = next((info[k] for k in ("Name", "product", "gene", "standard_name",
+                                    "regulatory_class") if info.get(k)), "")
+    note = info.get("Note", "")
+    text = named or note
+    if ftype in _NONCODING_ALWAYS:
+        kind, default = _NONCODING_ALWAYS[ftype]
+        # a stem-loop's Note is a description, not a name: label it only when named
+        label = (named if kind == "stem_loop" else text) or default
+    else:
+        if classify_function(f"{text} {note}") != "noncoding":
+            return None                      # a motif, promoter, repeat inside an ORF…
+        kind, label = "region", text
+    if kind == "region" and _STEM_LOOP_WORDS.search(f"{text} {note}") and (end - start) < 100:
+        kind = "stem_loop"
+    return Noncoding(start, end, strand, label, kind)
 
 
 def parse_gff(gff_path: str) -> tuple[int, list[Feature]]:

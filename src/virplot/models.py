@@ -1,7 +1,8 @@
-"""Core data model: Feature, Domain and RNA.
+"""Core data model: Feature, Domain, Noncoding and RNA.
 
 These are deliberately thin. ``Feature`` is an immutable record for one CDS
-(with its polyprotein ``Domain`` segments, if any),
+(with its polyprotein ``Domain`` segments, if any), ``Noncoding`` one
+non-coding landmark (UTR, intergenic region, stem-loop),
 ``DepthTrack`` one sample's depth array; ``RNA`` bundles everything VirPlot knows about one molecule (its length, its
 features, and one depth track per sample) so the rest of the code passes a
 single object around instead of parallel lists.
@@ -111,6 +112,27 @@ class Feature:
         return sorted(cuts)
 
 
+@dataclass(frozen=True)
+class Noncoding:
+    """A non-coding landmark: UTR, intergenic / common region, stem-loop, origin.
+
+    Not an ORF, so it takes no part in the flip/tier/nest layout; it is drawn
+    on the genome line itself, as the ICTV figures do — a grey bar or arc for
+    a ``"region"``, a hairpin icon for a ``"stem_loop"`` (Begomovirus ``CRA``
+    with its stem-loop, Mastrevirus ``LIR``/``SIR``).
+    """
+
+    start: int
+    end: int
+    strand: str
+    label: str
+    kind: str = "region"            # "region" | "stem_loop"
+
+    @property
+    def midpoint(self) -> float:
+        return (self.start + self.end) / 2
+
+
 @dataclass
 class DepthTrack:
     """Per-base read depth for one sample over one RNA."""
@@ -129,6 +151,7 @@ class RNA:
     depth: list[DepthTrack] = field(default_factory=list)
     seqid: str | None = None        # sequence id in GFF / SAM / depth files
     circular: bool = False
+    noncoding: list[Noncoding] = field(default_factory=list)  # UTRs, IRs, stem-loops
 
     # --- depth tracks -------------------------------------------------------
 
@@ -168,8 +191,8 @@ class RNA:
         """1-based genome positions, ``[1, 2, ..., length]``."""
         return np.arange(1, self.length + 1, dtype=int)
 
-    def feature_spans(self, feature: Feature) -> list[tuple[int, int]]:
-        """Drawable 1-based inclusive spans for a feature.
+    def feature_spans(self, feature) -> list[tuple[int, int]]:
+        """Drawable 1-based inclusive spans for a feature (or any ``start``/``end`` record).
 
         Normally one span. On a circular molecule a feature crossing the
         origin — written either as ``start > end`` or with an ``end`` past the

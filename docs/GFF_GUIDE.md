@@ -1,7 +1,7 @@
 # Writing a GFF3 file for VirPlot
 
 VirPlot draws the annotation track from a GFF3 file. It reads a deliberately
-small subset of GFF3 — three feature types and a handful of attributes — and
+small subset of GFF3 — a few feature types and a handful of attributes — and
 applies a few conventions of its own for things GFF3 does not standardise
 (circularity, frameshifts, function colours). This guide says exactly what it
 reads, what it ignores, and how to write each situation so the figure comes
@@ -72,7 +72,8 @@ Other attributes (`ID`, `Parent`, `locus_tag`, `Dbxref`, `protein_id`, …) are
 accepted and ignored. `gene` rows and `mRNA` rows are ignored too, so a RefSeq
 GFF3 can be used as is — with two caveats in §8. Mature-protein rows
 (`mature_protein_region_of_CDS` / `mat_peptide`) are read: they split a
-polyprotein's box into domains (§9).
+polyprotein's box into domains (§9). Non-coding rows — UTRs, intergenic
+regions, stem-loops — are drawn on the genome line (§10).
 
 ## 4. Strand
 
@@ -308,10 +309,9 @@ arc nests like any other) but writes no mark yet.
 
 ### Not yet drawn
 
-Subgenomic RNAs and non-coding features (`misc_feature`, `regulatory`,
-`stem_loop`) are ignored by the parser; see §6 F and §7.2 of
+Subgenomic RNAs are ignored by the parser; see §6 F and §7.2 of
 [`ictv_drawing_conventions.md`](ictv_drawing_conventions.md) for the intended
-encodings. The `noncoding` colour class exists for the day they are read.
+encoding.
 
 ## 9. Polyproteins: domains inside one box
 
@@ -369,7 +369,65 @@ holding most of it and drawn clipped to that segment. Domains are drawn in
 both layouts; in the circular layout each domain is labelled by the same
 rule as an arc (along it, or radially outside when narrow).
 
-## 10. Checklist
+## 10. Non-coding features: UTRs, intergenic regions, stem-loops
+
+The ICTV figures mark a few things that are not ORFs: the begomovirus common
+region as a thick grey arc with its stem-loop icon (`CRA`, `IR`), the
+mastrevirus `LIR`/`SIR`, the hairpin between the two ORFs of an ambisense
+segment. VirPlot draws these **on the genome line itself** — they take no
+part in the flip/tier/nest layout — in two shapes:
+
+| Shape | Drawn as | For |
+|---|---|---|
+| region | a grey bar astride the line (linear) or a grey arc astride the circle (circular), named in small text beside it | UTRs, intergenic / common regions, origins |
+| stem-loop | a hairpin icon standing on the line (linear) or on the outside of the ring (circular), named at its tip | stem-loops, hairpins, nick sites |
+
+**Which rows are read.** Two tiers, so that a RefSeq file works as is
+without its motif annotations cluttering the line:
+
+- Always: `five_prime_UTR`, `three_prime_UTR`, `UTR`, `intergenic_region`,
+  `origin_of_replication`, `stem_loop`.
+- Only when their words say so: GenBank's catch-all `misc_feature` (which
+  NCBI's GFF3 spells `sequence_feature`), `regulatory_region` /
+  `regulatory`, `repeat_region`, `sequence_secondary_structure`. These are
+  read when the name or `Note=` contains a non-coding word — `intergenic`,
+  `common region`, `IR`, `LIR`, `SIR`, `CR`/`CRA`/`CRB`, `UTR`,
+  `untranslated`, `stem-loop`, `hairpin`, `non-coding`, `ori` — and skipped
+  otherwise (a `misc_feature` reading `RdRp motif` or a `polyA_signal_sequence`
+  is not drawn). A short region (under 100 nt) whose words say stem-loop /
+  hairpin is drawn as the icon rather than a bar.
+
+**Label.** The first of `Name=`, `product=`, `gene=`, `standard_name=`,
+`regulatory_class=`, then `Note=`. The dedicated types have defaults when
+nothing is given (`5′ UTR`, `3′ UTR`, `IR`, `ori`); a `stem_loop` row is
+labelled only when actually named, since its `Note=` is usually a
+description. A region that contains an unnamed stem-loop is named **once, at
+the hairpin's tip** — the figures write `CRA` over the icon, not along the
+arc. Keep labels short with `Name=`.
+
+**Colour.** Always the `noncoding` grey of the function palette (`#6f6f6f`),
+unless the label is pinned in `color_mapping`.
+
+**Circular origin.** By default the hairpin icon marks position 1. A
+`stem_loop` row moves it to where the stem-loop actually is — the nick site
+is rarely exactly at position 1 in a RefSeq record. Without one, the icon
+stays at the origin, unlabelled.
+
+```
+# RefSeq form (NCBI GFF3), used as is
+NC_001507.1	RefSeq	sequence_feature	2501	326	.	+	.	ID=id-…;Note=common region;gbkey=misc_feature
+NC_001507.1	RefSeq	stem_loop	110	142	.	+	.	ID=id-…;Note=conserved stem-loop structure;gbkey=stem_loop
+
+# hand-written, naming things as the figure does
+A	.	misc_feature	2501	2926	.	+	.	Name=CRA;Note=common region, spans the origin (2600 + 326)
+A	.	stem_loop	110	142	.	+	.	Name=IR
+A	.	five_prime_UTR	1	68	.	+	.	ID=utr5
+```
+
+An origin-crossing region on a circle is written with `end` past the genome
+length (§6), as `examples/grbv.gff3` does for its intergenic region.
+
+## 11. Checklist
 
 - [ ] `##gff-version 3` first line; nine tab-separated columns.
 - [ ] One `region` row per molecule, `end` = genome length,
@@ -386,5 +444,9 @@ rule as an arc (along it, or radially outside when narrow).
 - [ ] Polyproteins: keep RefSeq's `mature_protein_region_of_CDS` rows (or
       write `mat_peptide` rows) and shorten their `product=` to the names you
       want inside the segments.
+- [ ] Non-coding landmarks: `five_prime_UTR` / `three_prime_UTR` /
+      `stem_loop` rows as RefSeq gives them; an intergenic or common region as
+      a `misc_feature` with `Name=IR` (or `CRA`, `LIR`…); a `stem_loop` row
+      where the nick site is, so the hairpin icon sits there.
 - [ ] Products with no function word either renamed or pinned in
       `color_mapping`.

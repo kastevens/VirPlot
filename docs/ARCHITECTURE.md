@@ -80,6 +80,15 @@ classDiagram
         +dividers_within(start, end) list~float~
     }
 
+    class Noncoding {
+        <<frozen dataclass>>
+        +int start
+        +int end
+        +str strand
+        +str label
+        +str kind
+    }
+
     class DepthTrack {
         <<dataclass>>
         +str label
@@ -93,6 +102,7 @@ classDiagram
         +int length
         +bool circular
         +list~Feature~ features
+        +list~Noncoding~ noncoding
         +list~DepthTrack~ depth
         +add_depth(label, y)
         +total_depth() ndarray
@@ -151,6 +161,7 @@ classDiagram
         #_draw_annotations(ax, rna)
         #_draw_domains(...)
         #_draw_mechanism(...)
+        #_draw_noncoding(ax, rna, placements)
         #_arrow_points(...)
         #_draw_depth(ax, rna, tracks, total)
         #_shade_gaps(ax, thresholds)
@@ -163,6 +174,7 @@ classDiagram
         #_depth_radius(values, ymax)
         #_draw_annotations(ax, rna)
         #_draw_domains(...)
+        #_stem_loop_icon(ax, theta, label)
         #_label_arc(...)
         #_draw_depth(ax, rna, tracks, total)
         #_shade_gaps(ax, rna, thresholds)
@@ -207,6 +219,7 @@ classDiagram
     RNA "1" *-- "0..*" Feature : features
     Feature "1" *-- "0..*" Domain : domains
     RNA "1" *-- "0..*" DepthTrack : depth
+    RNA "1" *-- "0..*" Noncoding : noncoding
     Placement --> Feature
     layout ..> Placement : returns
     layout ..> RNA : feature_spans
@@ -255,7 +268,9 @@ accident:
    marked `"readthrough"`; `Note=` can state either for hand-written files.
    `mature_protein_region_of_CDS` / `mat_peptide` rows become the `Domain`
    segments of the CDS named by their `Parent=` (or the smallest CDS that
-   contains them). `--rnas` selects and orders a subset;
+   contains them). UTR, intergenic-region and stem-loop rows become
+   `RNA.noncoding` landmarks (RefSeq's catch-all `sequence_feature` rows only
+   when their words say non-coding). `--rnas` selects and orders a subset;
    `--topology` overrides circularity for all of them.
 3. **Map reads** — if `-U`/`-1`/`-2` were given, `_map_read_sets` checks
    bowtie2 is on `PATH`, warns where the reference FASTA's lengths disagree
@@ -384,6 +399,7 @@ Suites and what they pin down:
 | `test_circular.py` | `Is_circular` detection, wrapping at the origin, GRBV example end to end |
 | `test_circular_plot.py` | Polar geometry, origin-crossing arcs, pinned radial range, `--layout` selection |
 | `test_mechanisms.py` | RefSeq joins (+1, −1, minus strand, spliced-not-slipped), `Note=` forms, `transl_except` trimming, the always-flip / never-flip rules, and the `FS` / `RT` marks |
+| `test_noncoding.py` | Which row types are read and when, label precedence, hairpin-vs-region, origin-crossing regions; bars/arcs astride the line, the hairpin's position and side, one name per region+hairpin, grey unless mapped |
 | `test_domains.py` | Mature-protein rows by `Parent=` and by containment, join segments, orphans; clipping and stop-codon snapping; dividers, per-segment colours, inside/outside labels and row staggering in both layouts |
 | `test_conventions.py` | Flip / tier / nest rules, palette precedence, settings keys, arrows, VPg, and the BYV fixture against ICTV Closteroviridae Fig 2 |
 | `test_settings.py`, `test_cli.py` | YAML loading, log formatting |

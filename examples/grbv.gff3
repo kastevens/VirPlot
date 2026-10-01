@@ -18,7 +18,12 @@
 # C1 RepA, and C1:C2 spliced giving Rep; C3 of unknown function.
 #
 # Virion-sense ORFs V1-V3 are on +, complementary-sense C1-C3 on -. The large
-# intergenic region (3045..3206 + 1..291) spans the origin.
+# intergenic region (3045..3206 + 1..291) spans the origin; it is written
+# below as a misc_feature with end past the genome length (3497 = 3206 + 291),
+# the GFF3 way to cross the origin of a circle, and VirPlot draws it as the
+# grey arc astride the circle of the ICTV begomovirus figures. The record does
+# not place the stem-loop, so none is written; the hairpin icon stays at
+# position 1 (see docs/GFF_GUIDE.md section 10 for a stem_loop row).
 NC_022002.1	RefSeq	region	1	3206	.	+	.	ID=NC_022002.1:1..3206;Dbxref=taxon:1381007;Is_circular=true;isolate=CF214-1;mol_type=genomic DNA;nat-host=Vitis vinifera
 NC_022002.1	RefSeq	CDS	292	807	.	+	0	ID=cds-YP_008400113.1;locus_tag=N761_gp1;gene=V2;product=putative MP;Note=RefSeq product V2 protein; movement-associated
 NC_022002.1	RefSeq	CDS	710	1384	.	+	0	ID=cds-YP_008400114.1;locus_tag=N761_gp2;gene=V1;product=CP;Note=RefSeq product V1 protein; coat protein
@@ -26,3 +31,4 @@ NC_022002.1	RefSeq	CDS	1365	1736	.	+	0	ID=cds-YP_008400115.1;locus_tag=N761_gp3;
 NC_022002.1	RefSeq	CDS	1898	2332	.	-	0	ID=cds-YP_008400116.1;locus_tag=N761_gp4;gene=C2;product=Rep;Note=RefSeq product C2 protein; C1:C2 spliced transcript encodes Rep
 NC_022002.1	RefSeq	CDS	2250	3044	.	-	0	ID=cds-YP_008400117.1;locus_tag=N761_gp5;gene=C1;product=RepA;Note=RefSeq product C1 protein
 NC_022002.1	RefSeq	CDS	2408	2890	.	-	0	ID=cds-YP_008400118.1;locus_tag=N761_gp6;gene=C3;product=C3;Note=RefSeq product C3 protein; function not assigned
+NC_022002.1	RefSeq	misc_feature	3045	3497	.	+	.	ID=ir;Name=IR;Note=large intergenic region, 3045..3206 + 1..291, spanning the origin

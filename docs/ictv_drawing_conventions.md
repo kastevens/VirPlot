@@ -133,7 +133,7 @@ showed the spec itself needs a change. Rule numbers refer to the sections above.
 | 3 | Done. `Feature.strand`/`gene` carried; + above →, − below ←; same-side overlap tiers outward; `auto` picks flip/tier from `two_strand`. | `layout.py`, `plotting.py` |
 | 4 | **Mostly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=`; default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=` (linear layout); **polyprotein domain dividers** from RefSeq's `mature_protein_region_of_CDS` / `mat_peptide` rows, in both layouts (see F). sgRNA rows: **not done**. | `plotting.py`, `parsers.py`, `layout.py`, `models.py` |
 | 5 | **Done differently.** One figure per RNA with a shared y-limit and length-proportional width, not stacked rows (see G). | `cli.py`, `plotting.py` |
-| 6 | Done. `CircularPlotter`: origin at 12 o'clock with stem-loop icon, arcs just outside the circle with arrowheads, clockwise for + and anticlockwise for −, overlap nests inward; depth as an inner ring. `--layout circular|auto`. | `plotting.py` |
+| 6 | Done. `CircularPlotter`: origin at 12 o'clock with stem-loop icon (moved to a GFF `stem_loop` row when there is one), arcs just outside the circle with arrowheads, clockwise for + and anticlockwise for −, overlap nests inward; **IR / UTR as a grey arc astride the circle** from the GFF's non-coding rows; depth as an inner ring. `--layout circular|auto`. | `plotting.py` |
 
 ### Changes the document needs
 
@@ -197,9 +197,17 @@ with one addition the rule does not state and Potyviridae Fig. 2 shows:
 words), the box's own `product` is not written, and a name too long for its
 segment moves outside the box (`6K1`, `6K2` in that figure). The document
 should add the per-segment colour and the outside-label fallback to the
-Polyprotein row of §1. sgRNAs still need an encoding decision, and
-IR/UTR/stem-loop arcs (§3 baseline) need `parse_gff_rnas` to accept other
-types.
+Polyprotein row of §1. Non-coding features (§1 palette, §3 baseline) are
+now read too: RefSeq's `five_prime_UTR` / `three_prime_UTR` / `stem_loop`
+rows always, its catch-all `sequence_feature` (`misc_feature`) /
+`regulatory_region` / `repeat_region` rows only when their words say
+intergenic / common region / IR / UTR / stem-loop, so motif annotations
+inside ORFs stay off the line. A region is a grey bar or arc astride the
+genome line; a stem-loop is the hairpin icon at its own position (which on a
+circle replaces the default icon at position 1); a region holding an unnamed
+stem-loop is named once at the hairpin, as Geminiviridae Fig. 5 writes
+`CRA`. The document should say that these are drawn **on** the line and take
+no part in the ORF layout. sgRNAs still need an encoding decision.
 
 **G. §1 Segmented genomes — stacked vs separate.** The document specifies
 stacked rows, largest first. The branch delivers separate files with a shared
@@ -283,9 +291,14 @@ compared too, and a real fixture added.
   the ring. The figures label nested arcs inside the circle; VirPlot instead
   steps a nested arc's label one line away from the equator per tier so it
   does not overprint the arc it nests in. Rim ticks remain a VirPlot addition.
-* **IR arc and `ORF (function)` labels** — need non-CDS features
-  (`misc_feature`/`regulatory` rows) and a second name per feature in the
-  GFF; see §6 D–F.
+* **IR arc** — drawn from the GFF's non-coding rows (docs/GFF_GUIDE.md §10)
+  as a grey arc astride the circle, under the ORF arcs, with the hairpin icon
+  at the `stem_loop` row's position and the name written once over it, as
+  Fig. 5 draws `CRA`; the Mastrevirus `LIR`/`SIR` are the same two rows.
+  `examples/grbv.gff3` carries its intergenic region this way. The depth
+  ceiling label, which stood against the circle at 12 o'clock, hangs inward
+  when such an arc straddles the origin. `ORF (function)` labels come from
+  `gene=` + `product=` with `circular_labels: horizontal`; see §6 D.
 
 ### 7.3 Test data
 

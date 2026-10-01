@@ -10,6 +10,22 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Non-coding features: UTRs, intergenic regions, stem-loops.** GFF
+  `five_prime_UTR` / `three_prime_UTR` / `stem_loop` / `origin_of_replication`
+  rows are always read; GenBank's catch-all `misc_feature` (NCBI GFF3
+  `sequence_feature`), `regulatory_region` and `repeat_region` rows only when
+  their name or `Note=` says intergenic / common region / IR / UTR /
+  stem-loop, so RefSeq motif annotations stay off the line. A region is a
+  grey bar astride the genome line (linear) or a grey arc astride the circle
+  (circular, the ICTV begomovirus `CRA`), under the ORFs and outside the
+  layout rules; a stem-loop is the hairpin icon at its own position, which on
+  a circle replaces the default icon at position 1. A region holding an
+  unnamed stem-loop is named once, over the hairpin. Labels: `Name=` first,
+  then `product=`/`gene=`/`Note=`, with defaults for the dedicated types.
+  `examples/grbv.gff3` now carries its origin-spanning intergenic region;
+  docs/GFF_GUIDE.md §10.
+- Inside labels switch to white on a really dark fill (`color_mapping`
+  navy, the non-coding grey); every ICTV palette colour keeps black text.
 - **Polyprotein domain dividers.** RefSeq's `mature_protein_region_of_CDS`
   rows (GenBank `mat_peptide`; `Parent=` names the CDS, else containment)
   become `Domain` segments of their CDS. The box is drawn as one glyph split
