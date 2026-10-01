@@ -104,8 +104,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ### Changed (output)
 
 - Feature glyphs are drawn as flat colour with no outline, as in the
-  original VirPlot figure and the ICTV maps. The `--no-border` option is
-  removed (there is nothing to turn off). To keep adjacent same-colour boxes
+  original VirPlot figure and the ICTV maps: `--no-border` is now the
+  default (and still accepted, so existing commands keep working), and the
+  new `--border` restores the black outline. To keep adjacent same-colour boxes
   apart, the one-strand flip rule now also flips a box whose upstream
   neighbour is the same colour and within 1 % of the genome length — the
   choice the ICTV BYV figure makes for CPm/CP. With `examples/byv.yml` (the

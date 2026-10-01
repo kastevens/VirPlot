@@ -293,7 +293,7 @@ raw `start`/`end`.
   a readthrough extension always stays with the box it abuts; otherwise flip
   across the line when overlapping the upstream neighbour, or when that
   neighbour is the same colour and closer than `NEAR_GAP_FRACTION` (1 %) of
-  the genome — glyphs have no outline, so
+  the genome — glyphs have no outline by default (`--no-border`), so
   two adjacent same-colour boxes would otherwise merge (the plotter passes
   this test in as `flip_if`, keeping `layout.py` colour-blind); if the
   wanted side is already occupied there, try the other side, then tier

@@ -252,7 +252,8 @@ compared too, and a real fixture added.
   other on the starting side, "first ORF above" is treated as a convention of
   ours, not theirs.
 * **No outlines** — glyphs are flat colour, as in the figures and the original
-  VirPlot output; there is no option to add an outline. Separation between
+  VirPlot output (`--no-border`, the default); `--border` adds a black
+  outline for those who want it. Separation between
   neighbours comes from colour and from the flip rule above.
 * **Frameshift / readthrough** — read from RefSeq's own attributes and from
   `Note=`; see F above and docs/GFF_GUIDE.md §8. With this, BYV matches

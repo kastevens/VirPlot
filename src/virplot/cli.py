@@ -101,6 +101,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Base name for output file [%(default)s]")
     p.add_argument("--no-label", action="store_true",
                    help="Do not label feature names in feature rectangles")
+    p.add_argument("--border", action=argparse.BooleanOptionalAction, default=False,
+                   help="Outline feature glyphs in black (--border), or draw them as "
+                        "flat colour as the ICTV figures do (--no-border)")
     p.add_argument("-t", "--thresholds", nargs="+", type=int, default=[1, 5],
                    help="Coverage thresholds to call intervals and breaks [%(default)s]")
     p.add_argument("-r", "--report", action="store_true",

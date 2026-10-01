@@ -124,6 +124,13 @@ class Plotter:
             return FIGURE_WIDTH * rna.length / self.max_length
         return FIGURE_WIDTH
 
+    def _glyph_edge(self) -> dict:
+        """Outline for feature glyphs: none by default (flat colour, as in the
+        ICTV figures, ``--no-border``); a thin black edge with ``--border``."""
+        if getattr(self.args, "border", False):
+            return dict(edgecolor="black", linewidth=1.0)
+        return dict(edgecolor="none")
+
     def _feature_color(self, product: str) -> str:
         return self.settings.feature_color(product)
 
@@ -271,10 +278,10 @@ class LinearPlotter(Plotter):
             for (s_, e_) in spans:
                 if arrows and (s_, e_) == head_span:
                     ax.add_patch(Polygon(self._arrow_points(s_, e_, yb, H, feat.forward, seq_len),
-                                         closed=True, facecolor=color, edgecolor="none"))
+                                         closed=True, facecolor=color, **self._glyph_edge()))
                 else:
                     ax.add_patch(Rectangle((s_, yb), e_ - s_, H,
-                                           facecolor=color, edgecolor="none"))
+                                           facecolor=color, **self._glyph_edge()))
 
             self._draw_mechanism(ax, feat, spans, yb, H, pl.side == ABOVE)
 
@@ -533,7 +540,7 @@ class CircularPlotter(Plotter):
                 th0, th1 = self._theta(s_, L), self._theta(e_ + 1, L)
                 head = self._theta(1 + self._head_length(e_ - s_ + 1, L), L) if (s_, e_) == head_span else 0.0
                 th, r = self._arc_arrow(th0, th1, lane, CIRC_ANN_HEIGHT, feat.forward, head)
-                ax.fill(th, r, facecolor=color, edgecolor="none", zorder=3)
+                ax.fill(th, r, facecolor=color, zorder=3, **self._glyph_edge())
 
             if not args.no_label:
                 if self.settings.circular_labels == "horizontal":

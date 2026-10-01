@@ -175,7 +175,7 @@ virplot [-h] [-V] -g GFF [-d DEPTH [DEPTH ...]] [-l LABELS [LABELS ...]]
         [--layout {linear,circular,auto}] [--free-y] [--equal-width]
         [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
         [--yscale {linear,symlog}] [--linthresh LINTHRESH]
-        [--name NAME] [--no-label]
+        [--name NAME] [--no-label] [--border | --no-border]
         [-t THRESHOLDS [THRESHOLDS ...]] [-r] [--shade-breaks]
         [--legend] [--title] [-f {svg,pdf,png}] [-v]
 ```
@@ -209,6 +209,7 @@ virplot [-h] [-V] -g GFF [-d DEPTH [DEPTH ...]] [-l LABELS [LABELS ...]]
 | `--yscale`           | Y-axis scale: `linear` or `symlog` (default: `linear`)         |
 | `--linthresh`        | Symlog linear threshold around 0 (default: `10.0`)             |
 | `--no-label`         | Hide feature labels                                            |
+| `--border`, `--no-border` | Outline feature glyphs in black, or draw them as flat colour (default: `--no-border`) |
 | `-t`, `--thresholds` | Coverage thresholds for interval/gap analysis (default: `1 5`) |
 | `-r`, `--report`     | Write CSV reports of intervals and gaps per threshold          |
 | `--shade-breaks`     | Shade coverage gaps on the depth plot                          |
