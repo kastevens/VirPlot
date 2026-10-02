@@ -174,9 +174,28 @@ outside / product inside needs two names per feature. The code uses
 carries neither an ORF name nor a function — only `locus_tag=N761_gp1` and
 `product=V1 protein`. The shipped `examples/grbv.gff3` is therefore curated
 (`gene=V1;product=CP`, RefSeq name kept in `Note=`), which is what users are
-expected to do; docs/GFF_GUIDE.md §5 says so. Worth deciding whether
-`locus_tag` or `Name` should be accepted as the outside label for uncurated
-files.
+expected to do; docs/GFF_GUIDE.md §5 says so.
+
+**Settled, against a real annotation.** The outside label is now taken from
+`gene=`, then `Name=`, then `locus_tag=`, so an uncurated RefSeq record labels
+its ORFs `N761_gp1` rather than not at all, and a hand annotation that puts the
+ORF name in `Name=` is read as intended.
+
+Testing that against the GLRaV-13 H8881 annotation used in the FPS paper
+(17,564 nt, 13 ORFs) turned up a second rule the document does not state and
+real files need badly: **an outside label equal to the product is dropped.**
+That file carries `gene=` on every ORF, but for eleven of thirteen the gene and
+the product are the *same string* (`gene=CP;product=CP`, `gene=p53;product=p53`),
+because the ORF has one name and no separate known function. Writing it inside
+the box and again above it is noise, not the convention's two names. The same
+holds in the shipped `examples/grbv.gff3`, where `V3` and `C3` are named twice
+for exactly that reason. With the rule, GLRaV-13's one genuine two-name
+feature — `Name=polyprotein_1a;product=Methyltransferase/helicase` — is the only
+ORF that gets a label above its box, which is what §1 is asking for.
+
+§1 should therefore say: outside label from `gene=`, else `Name=`, else
+`locus_tag=`; inside label from `product=`; and the outside label is omitted
+when the two would read the same.
 
 **E. §1 Palette — RefSeq product names are often function-free.** The keyword
 classifier covers RdRp/Rep/CP/MP/HSP70/p2x-style names; anything else falls to

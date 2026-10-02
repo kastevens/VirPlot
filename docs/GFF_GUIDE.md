@@ -62,11 +62,25 @@ Each `CDS` row becomes one glyph. Two attributes name it:
 | Attribute | Drawn | Purpose |
 |---|---|---|
 | `product=` | **Inside** the glyph (or just outside it when the ORF is under 500 bp) | The protein or domain: `RdRp`, `CP`, `Hsp70h`. Also drives the default colour (§5). Missing → `unknown`. |
-| `gene=` | **Outside** the glyph, small grey text | The ORF name: `ORF1a`, `AC1`, `V2`. Optional. |
+| `gene=` | **Outside** the glyph, small grey text | The ORF name: `ORF1a`, `AC1`, `V2`. Optional. `Name=` is used when there is no `gene=`, then `locus_tag=`. |
 
 This is the ICTV figure convention: ORF number outside, product inside. Keep
 `product` short — it has to fit in the box. The long RefSeq description can go
 in `Note=`, which VirPlot ignores (and so never draws).
+
+**One name, written once.** If the outside label would read the same as
+`product`, it is dropped and only the box is labelled. Real annotations very
+often carry `gene=CP;product=CP` or `gene=p53;product=p53`, because the ORF has
+a name and no separately known function — `examples/grbv.gff3` does it for `V3`
+and `C3`. Writing the name inside the box *and* above it is noise. So give the
+two attributes two different things to say, or just one of them:
+
+```gff3
+# two names: ORF name outside, function inside — what the convention wants
+A	.	CDS	1071	7655	.	+	0	ID=a;Name=polyprotein_1a;product=Methyltransferase/helicase
+# one name: labelled once, inside the box
+A	.	CDS	9248	9439	.	+	0	ID=b;gene=p7;product=p7
+```
 
 Other attributes (`ID`, `Parent`, `locus_tag`, `Dbxref`, `protein_id`, …) are
 accepted and ignored. `gene` rows and `mRNA` rows are ignored too, so a RefSeq

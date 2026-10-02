@@ -283,10 +283,34 @@ def _attach_domains(feats: list[Feature],
             for i, f in enumerate(feats)]
 
 
+def _orf_name(info: dict, product: str) -> str | None:
+    """The ORF name written outside the glyph, or None if there isn't one.
+
+    The ICTV convention wants two names per feature — the ORF name outside
+    (``ORF1a``, ``AC1``), the function inside (``RdRp``, ``CP``). GFF3 spells
+    the outside one three ways, so ``gene=`` is tried first, then ``Name=``
+    (which hand annotations and NCBI's own converter both set when there is no
+    ``gene=``), then ``locus_tag=`` for an uncurated RefSeq record whose only
+    per-ORF identifier is ``N761_gp1``.
+
+    A name equal to the product is dropped: real annotations very often carry
+    ``gene=CP;product=CP``, and writing *CP* inside the box and again above it
+    is noise, not the convention's two names.
+    """
+    for key in ("gene", "Name", "locus_tag"):
+        name = str(info.get(key, "")).strip()
+        if name and name.casefold() != product.strip().casefold():
+            return name
+        if name:
+            return None                      # it names the same thing as product
+    return None
+
+
 def _feature(start: int, end: int, strand: str, info: dict, **extra) -> Feature:
+    product = info.get("product", "unknown")
     f = Feature(start=start, end=end, strand=strand,
-                product=info.get("product", "unknown"),
-                gene=info.get("gene") or None, **extra)
+                product=product,
+                gene=_orf_name(info, product), **extra)
     object.__setattr__(f, "_attrs", info)                # frozen dataclass: side channel
     return f
 

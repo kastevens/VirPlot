@@ -166,3 +166,53 @@ def test_wrap_feature_on_linear_region_warns(tmp_path):
         logging.getLogger("virplot.parsers").removeHandler(h)
     assert any("cross the origin" in r.getMessage() for r in records)
     assert rna.feature_spans(rna.features[0]) == [(900, 1000), (1, 100)]
+
+
+# --- the ORF name written outside the glyph -------------------------------------
+#
+# The ICTV convention wants two names per feature: the ORF name outside the box,
+# the function inside. Real annotations spell the outside one three ways, and
+# very often have only one name for both.
+
+def _genes(tmp_path, body, length=4000):
+    from virplot.parsers import parse_gff_rnas
+    p = tmp_path / "n.gff3"
+    p.write_text("##gff-version 3\n"
+                 + f"A\t.\tregion\t1\t{length}\t.\t+\t.\tID=A\n"
+                 + textwrap.dedent(body))
+    (rna,) = parse_gff_rnas(str(p))
+    return [(f.gene, f.product) for f in rna.features]
+
+
+def test_outside_label_prefers_gene_then_name_then_locus_tag(tmp_path):
+    assert _genes(tmp_path, """\
+        A	.	CDS	100	400	.	+	0	ID=a;gene=ORF1a;Name=ignored;product=RdRp
+        A	.	CDS	500	800	.	+	0	ID=b;Name=polyprotein_1a;product=Methyltransferase
+        A	.	CDS	900	1200	.	+	0	ID=c;locus_tag=N761_gp1;product=V1 protein
+    """) == [("ORF1a", "RdRp"),
+             ("polyprotein_1a", "Methyltransferase"),
+             ("N761_gp1", "V1 protein")]
+
+
+def test_an_outside_label_equal_to_the_product_is_dropped(tmp_path):
+    """gene=CP;product=CP is extremely common in real annotations; writing CP
+    inside the box and again above it is noise, not the convention's two names."""
+    assert _genes(tmp_path, """\
+        A	.	CDS	100	400	.	+	0	ID=a;gene=CP;product=CP
+        A	.	CDS	500	800	.	+	0	ID=b;gene=HSP70h;product=hsp70h
+        A	.	CDS	900	1200	.	+	0	ID=c;Name=p7;product=p7
+    """) == [(None, "CP"), (None, "hsp70h"), (None, "p7")]
+
+
+def test_a_duplicate_gene_does_not_fall_through_to_name(tmp_path):
+    """gene= is the authoritative outside label; if it only repeats the
+    product the feature has one name, and Name= must not resurrect a second."""
+    assert _genes(tmp_path, """\
+        A	.	CDS	100	400	.	+	0	ID=a;gene=CP;Name=ORF6;product=CP
+    """) == [(None, "CP")]
+
+
+def test_a_feature_with_no_names_has_no_outside_label(tmp_path):
+    assert _genes(tmp_path, """\
+        A	.	CDS	100	400	.	+	0	ID=a;product=RdRp
+    """) == [(None, "RdRp")]
