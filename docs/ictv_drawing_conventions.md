@@ -301,7 +301,7 @@ aligned to their start, labelled". The branch draws exactly that, longest row
 first, from a transcript row (`mRNA`, `transcript`, `ncRNA`, `misc_RNA`,
 `primary_transcript`, `sequence_feature`, `misc_feature`) whose `Note=` says
 `sgRNA` / `subgenomic`, with `gene=` naming what it expresses
-(docs/GFF_GUIDE.md §12). The marker is required rather than inferred from the
+(docs/GFF_GUIDE.md §11). The marker is required rather than inferred from the
 type, because RefSeq writes real `mRNA` rows — spliced mastrevirus transcripts
 — that are not sgRNAs. `start` is the 5′ terminus; an `end` at or past the
 genome length means the 3′ end, which covers the usual 3′-coterminal set,

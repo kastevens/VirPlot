@@ -447,35 +447,7 @@ A	.	five_prime_UTR	1	68	.	+	.	ID=utr5
 An origin-crossing region on a circle is written with `end` past the genome
 length (§6), as `examples/grbv.gff3` does for its intergenic region.
 
-## 11. Checklist
-
-- [ ] `##gff-version 3` first line; nine tab-separated columns.
-- [ ] One `region` row per molecule, `end` = genome length,
-      `Is_circular=true` if it is a circle.
-- [ ] `seqid` identical across GFF, SAM/BAM `@SQ`, FASTA header, depth file.
-- [ ] One `CDS` row per ORF; `product=` short and naming the **function**;
-      `gene=` for the ORF name; long descriptions in `Note=`.
-- [ ] Strand `+`/`-` correct — it chooses the layout and the arrow direction.
-- [ ] Frameshifts: either leave RefSeq's `exception=ribosomal slippage` rows as
-      they are, or split into named ORFs with `Note=+1 frameshift` / `-1` —
-      **with the sign written**. Readthrough via `transl_except=`, or an
-      extension row that starts at partner end + 1 with `Note=readthrough`.
-- [ ] Origin-crossing features only on `Is_circular=true` molecules.
-- [ ] Polyproteins: keep RefSeq's `mature_protein_region_of_CDS` rows (or
-      write `mat_peptide` rows) and shorten their `product=` to the names you
-      want inside the segments.
-- [ ] Non-coding landmarks: `five_prime_UTR` / `three_prime_UTR` /
-      `stem_loop` rows as RefSeq gives them; an intergenic or common region as
-      a `misc_feature` with `Name=IR` (or `CRA`, `LIR`…); a `stem_loop` row
-      where the nick site is, so the hairpin icon sits there.
-- [ ] Subgenomic RNAs: a `mRNA` (or `transcript`) row per sgRNA with
-      `Note=sgRNA` and `gene=` naming what it expresses; `start` is the 5'
-      terminus, and the end may be left at the genome length for the usual
-      3'-coterminal set.
-- [ ] Products with no function word either renamed or pinned in
-      `color_mapping`.
-
-## 12. Subgenomic RNAs
+## 11. Subgenomic RNAs
 
 Many plus-strand RNA plant viruses express their 3' ORFs from a nested set of
 **3'-coterminal subgenomic RNAs** — *Closteroviridae*, *Alphaflexiviridae*,
@@ -524,3 +496,32 @@ deliberate, not missing: the ICTV draws no transcript rows on circular
 genomes. Geminivirus transcription is bidirectional from the intergenic region
 with overlapping transcripts rather than a 3'-coterminal set, and nanovirus
 components carry one ORF each. `--layout circular` warns and skips them.
+
+## 12. Checklist
+
+- [ ] `##gff-version 3` first line; nine tab-separated columns.
+- [ ] One `region` row per molecule, `end` = genome length,
+      `Is_circular=true` if it is a circle.
+- [ ] `seqid` identical across GFF, SAM/BAM `@SQ`, FASTA header, depth file.
+- [ ] One `CDS` row per ORF; `product=` short and naming the **function**;
+      `gene=` for the ORF name; long descriptions in `Note=`.
+- [ ] Strand `+`/`-` correct — it chooses the layout and the arrow direction.
+- [ ] Frameshifts: either leave RefSeq's `exception=ribosomal slippage` rows as
+      they are, or split into named ORFs with `Note=+1 frameshift` / `-1` —
+      **with the sign written**. Readthrough via `transl_except=`, or an
+      extension row that starts at partner end + 1 with `Note=readthrough`.
+- [ ] Origin-crossing features only on `Is_circular=true` molecules.
+- [ ] Polyproteins: keep RefSeq's `mature_protein_region_of_CDS` rows (or
+      write `mat_peptide` rows) and shorten their `product=` to the names you
+      want inside the segments.
+- [ ] Non-coding landmarks: `five_prime_UTR` / `three_prime_UTR` /
+      `stem_loop` rows as RefSeq gives them; an intergenic or common region as
+      a `misc_feature` with `Name=IR` (or `CRA`, `LIR`…); a `stem_loop` row
+      where the nick site is, so the hairpin icon sits there.
+- [ ] Subgenomic RNAs: a `mRNA` (or `transcript`) row per sgRNA with
+      `Note=sgRNA` and `gene=` naming what it expresses; `start` is the 5'
+      terminus, and the end may be left at the genome length for the usual
+      3'-coterminal set.
+- [ ] Products with no function word either renamed or pinned in
+      `color_mapping`.
+

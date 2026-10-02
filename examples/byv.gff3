@@ -16,7 +16,7 @@ NC_001598.1	RefSeq	CDS	12919	13569	.	+	0	ID=orf5;gene=ORF5;product=CPm;Note=coat
 NC_001598.1	RefSeq	CDS	13640	14254	.	+	0	ID=orf6;gene=ORF6;product=CP;Note=coat protein
 NC_001598.1	RefSeq	CDS	14251	14793	.	+	0	ID=orf7;gene=ORF7;product=p20;Note=long-distance transport factor
 NC_001598.1	RefSeq	CDS	14768	15301	.	+	0	ID=orf8;gene=ORF8;product=p21;Note=RNA silencing suppressor
-# Subgenomic RNAs (VirPlot curation convention, docs/GFF_GUIDE.md §9): a
+# Subgenomic RNAs (VirPlot curation convention, docs/GFF_GUIDE.md §11): a
 # transcript row whose Note says sgRNA. BYV expresses its 3' ORFs from "as
 # many as seven sgRNAs" (Vitushkina et al. 2002, Virology 297:299-307), each
 # with its own 5' terminus; the 3' ends follow the standard closterovirus

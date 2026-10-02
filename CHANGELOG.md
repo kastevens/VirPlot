@@ -81,7 +81,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   Drawn in the linear layout only, deliberately: the ICTV puts no transcript
   rows on circular genomes (geminivirus transcription is bidirectional from
   the IR, nanovirus components carry one ORF each), so `--layout circular`
-  warns and skips. See `docs/GFF_GUIDE.md` §12 and
+  warns and skips. See `docs/GFF_GUIDE.md` §11 and
   `docs/ictv_drawing_conventions.md` §6 K.
 
 - **Non-coding features: UTRs, intergenic regions, stem-loops.** GFF
