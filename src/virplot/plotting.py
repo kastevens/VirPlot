@@ -707,6 +707,15 @@ class CircularPlotter(Plotter):
         if self.args.yscale == "symlog":
             log.warning("--yscale symlog is ignored in the circular layout")
 
+        # Two things the circular layout cannot carry. Now that a circular
+        # genome reaches it without being asked (--layout defaults to auto),
+        # both are said out loud rather than dropped silently.
+        marked = [f.gene or f.product for f in rna.features if f.mechanism]
+        if marked:
+            # the ORF is placed correctly, but no ±1 FS / RT mark is written
+            log.warning("%d ORF(s) reached by a frameshift or readthrough (%s) are placed "
+                        "but not marked: the FS/RT marks are linear-layout only "
+                        "(use --layout linear)", len(marked), ", ".join(marked[:3]))
         if rna.sgrnas:
             # Deliberate: the ICTV figures put no transcript rows on circular
             # genomes. Geminivirus transcription is bidirectional from the IR

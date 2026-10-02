@@ -173,7 +173,16 @@ together.
 
 ## 6. Circular genomes
 
-Set `Is_circular=true` on the `region` row. Three things follow:
+Set `Is_circular=true` on the `region` row. Four things follow:
+
+* **The figure is drawn as a circle**, unless something says otherwise.
+  `--layout` (`auto` by default) decides, falling back to a `layout:` key in
+  spec.yml. Use `--layout linear` — or `layout: linear` in the YAML — for the
+  linear track of a circular genome; do **not** delete `Is_circular=true` to
+  get one, because that would also turn off the two behaviours below. The
+  molecule's shape and the figure's shape are separate settings on purpose.
+  Note the `±1 FS` / `RT` marks (§8) and sgRNA rows (§12) are drawn in the
+  linear layout only, and a circular figure warns when it has to leave them out.
 
 * **Depth wraps.** Reads that run off the end continue from position 1, and
   positions past the end are taken modulo the length. This is what makes a

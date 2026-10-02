@@ -134,7 +134,11 @@ virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml \
   --layout circular --legend --title
 ```
 
-`--layout auto` uses the circle for genomes the GFF marks circular and the linear tracks for the rest, which is what you want when one GFF holds both. Two spec.yml keys move the circle closer to the ICTV figures: `circular_labels: horizontal` writes every label level outside the ring as `ORF (product)`, and `circular_arcs: on_circle` sets the innermost arcs astride the genome circle (`examples/grbv_ictv.yml`). The default stays `linear`: a circle is the honest picture of the molecule, but a linear track carries far more feature labels legibly, so it remains the better default for a densely annotated genome.
+`--layout auto` — **the default** — uses the circle for genomes the GFF marks `Is_circular=true` and the linear track for the rest, which is also what you want when one GFF holds both. A `layout:` key in spec.yml sets a per-example default beside the data it styles; `--layout` overrides it.
+
+To get the linear track of a circular genome, pass `--layout linear` (or set `layout: linear`). Do **not** delete `Is_circular=true` to achieve it: that attribute says what the molecule *is*, and removing it also turns off depth wrapping at the origin and the splitting of origin-crossing features. The linear track is still the better picture of a densely annotated genome — it carries far more labels legibly — and it is the only layout that draws the `±1 FS` / `RT` marks and sgRNA rows, so a circular figure warns when it has to leave those out.
+
+Two spec.yml keys move the circle closer to the ICTV figures: `circular_labels: horizontal` writes every label level outside the ring as `ORF (product)`, and `circular_arcs: on_circle` sets the innermost arcs astride the genome circle (`examples/grbv_ictv.yml`).
 
 Layout and topology are independent. `--topology` decides whether depth wraps at the origin (the arithmetic); `--layout` decides how it is drawn. Drawing a circular genome with `--topology linear` renders the false origin dip as a wedge cut out of the ring at 12 o'clock — a quick way to see whether your pipeline handled the origin.
 

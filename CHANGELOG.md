@@ -8,6 +8,29 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **A circular genome is now drawn as a circle by default.** `--layout`
+  defaults to `auto` rather than `linear`, so a GFF whose region line says
+  `Is_circular=true` produces the circular figure the ICTV conventions
+  describe (§4) without being asked. spec.yml gains a `layout` key
+  (`auto|linear|circular`) so a per-example default lives beside the data it
+  styles; precedence is `--layout`, then the YAML key, then `auto`.
+
+  `--layout linear` is unchanged and now matters more: it is the way to get
+  the linear track of a circular genome. Deleting `Is_circular=true` is not,
+  because that attribute is a fact about the molecule — it drives depth
+  wrapping at the origin and the splitting of origin-crossing features — so
+  removing it would quietly change the data handling too.
+
+  Because the circular layout cannot carry the `±1 FS` / `RT` marks, it now
+  warns when a genome reaching it has frameshifted or read-through ORFs,
+  rather than dropping the annotation silently.
+
+  `docs/make_figures.sh` passes `--layout linear` explicitly for the
+  `grbv_linear` figure, which previously relied on the old default. No shipped
+  figure changes.
+
 ### Added
 
 - **Stacked figures for segmented genomes, by composing.** `bin/stack_figures.py`

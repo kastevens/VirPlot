@@ -20,6 +20,7 @@ _KNOWN_KEYS = {
 
 CIRCULAR_LABELS = ("tangential", "horizontal")
 CIRCULAR_ARCS = ("outside", "on_circle")
+LAYOUTS = ("auto", "linear", "circular")
 
 OVERLAP_MODES = ("auto", "flip", "tier")
 
@@ -98,6 +99,9 @@ class Settings:
     circular_labels: str = "tangential"      # tangential | horizontal
     circular_arcs: str = "outside"           # outside | on_circle
     sgrna_color: str = "#8C2F39"             # subgenomic RNA rows under the line
+    # how this genome should be drawn; --layout overrides it. "auto" draws a
+    # circular molecule as a circle and a linear one as a track.
+    layout: str = "auto"                     # auto | linear | circular
 
     def feature_color(self, product: str) -> str:
         """Colour for a product: explicit mapping, then function class, then default.
@@ -159,4 +163,5 @@ def load_settings(yaml_path: str) -> Settings:
         circular_labels=choice("circular_labels", CIRCULAR_LABELS, Settings.circular_labels),
         circular_arcs=choice("circular_arcs", CIRCULAR_ARCS, Settings.circular_arcs),
         sgrna_color=str(raw.get("sgrna_color", Settings.sgrna_color)),
+        layout=choice("layout", LAYOUTS, Settings.layout),
     )

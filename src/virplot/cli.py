@@ -75,9 +75,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--topology", choices=["auto", "circular", "linear"], default="auto",
                    help="Treat the genome(s) as circular or linear; 'auto' follows the "
                         "GFF region line's Is_circular attribute [%(default)s]")
-    p.add_argument("--layout", choices=["linear", "circular", "auto"], default="linear",
+    p.add_argument("--layout", choices=["linear", "circular", "auto"], default=None,
                    help="Figure layout: a linear track, a circular (polar) plot, or "
-                        "'auto' to draw circular genomes as circles [%(default)s]")
+                        "'auto' to draw circular genomes as circles. Overrides the "
+                        "spec.yml 'layout' key; without either, 'auto' [default: auto]")
     p.add_argument("--free-y", action="store_true",
                    help="With several RNAs, let each figure pick its own depth y-limit "
                         "instead of sharing one")
@@ -285,6 +286,14 @@ def main(argv: list[str] | None = None) -> None:
 
     settings = load_settings(args.yaml)
     log.info("Loaded settings from %s", args.yaml)
+
+    # Layout is a presentation choice, so it is resolved separately from the
+    # molecule's shape: --layout beats the spec.yml 'layout' key, and without
+    # either a circular genome is drawn as a circle. The GFF's Is_circular says
+    # what the molecule *is* (it drives depth wrapping and origin-crossing
+    # features) and is not the place to change how the figure looks.
+    if args.layout is None:
+        args.layout = settings.layout
 
     os.makedirs(args.outdir, exist_ok=True)
     # One prepared plotter per layout, so cross-RNA scaling is shared; --layout

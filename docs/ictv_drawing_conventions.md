@@ -261,8 +261,31 @@ is that figure — one row per segment, largest first, on a shared scale. It is
 §5's stage wording ("→ stacked rows") that should say the rows are composed
 from per-segment figures rather than drawn by one renderer.
 
-**H. §4 Decision logic — layout default.** "circular? → C modes" implies
-circular genomes are drawn as circles by default. The CLI defaults to
+**H. §4 Decision logic — layout default. Settled: the document wins.** A
+circular genome is now drawn as a circle without being asked, as §4 says.
+`--layout` defaults to `auto`, and spec.yml gains a `layout` key so a
+per-example default lives beside the data it styles; precedence is `--layout`,
+then the YAML, then `auto`.
+
+**`--layout linear` stays, and becomes load-bearing.** Three reasons it cannot
+be replaced by editing the GFF. First, `Is_circular=true` is a fact about the
+*molecule*, not the figure: it drives depth wrapping at the origin and the
+splitting of origin-crossing features, so deleting it to get a linear picture
+would silently change the data handling as well. Presentation needs its own
+control, which is why `--topology` (what the molecule is) and `--layout` (how it
+is drawn) are separate axes and should stay separate. Second, the circular
+layout cannot carry everything the linear one can — the `±1 FS` and `RT` marks
+are linear-only (§6 F), as are sgRNA rows (§6 K), so a circular genome with a
+frameshift or a transcript ladder needs a way back to a track; `CircularPlotter`
+now warns rather than dropping those marks silently. Third, legibility: a linear
+track carries far more labels, and circular nesting is bounded at three lanes
+before it clamps (§6 I).
+
+`docs/make_figures.sh` is the immediate proof. Its `grbv_linear` figure asked
+for no layout and relied on the old default; under the new one it would have
+become a circle, so it now passes `--layout linear` explicitly.
+
+The original note, kept for the record: the CLI defaulted to
 `--layout linear` because a linear track carries far more labels legibly;
 `--layout auto` gives the document's behaviour. This is a product decision
 worth making explicit.
