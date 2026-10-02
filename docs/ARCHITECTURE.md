@@ -56,185 +56,126 @@ unit-testable without rendering.
 classDiagram
     direction LR
 
-    class Domain {
-        <<frozen dataclass>>
-        +int start
-        +int end
-        +str product
-    }
-
-    class Feature {
-        <<frozen dataclass>>
-        +int start
-        +int end
-        +str strand
-        +str product
-        +str gene
-        +str mechanism
-        +int shift
-        +tuple~Domain~ domains
-        +forward() bool
-        +length() int
-        +midpoint() float
-        +domains_within(start, end) list~Domain~
-        +dividers_within(start, end) list~float~
-    }
-
-    class Noncoding {
-        <<frozen dataclass>>
-        +int start
-        +int end
-        +str strand
-        +str label
-        +str kind
-    }
-
-    class DepthTrack {
-        <<dataclass>>
-        +str label
-        +ndarray values
-    }
-
+    %% ---------------- model: plain data, no behaviour beyond geometry ----------
     class RNA {
-        <<dataclass>>
-        +str name
-        +str seqid
-        +int length
-        +bool circular
-        +list~Feature~ features
-        +list~Noncoding~ noncoding
-        +list~DepthTrack~ depth
-        +add_depth(label, y)
-        +total_depth() ndarray
-        +labels() list~str~
-        +tracks() list~ndarray~
-        +positions() ndarray
-        +two_strand() bool
-        +feature_spans(feature) list~span~
+        «Aggregate»
+        name, length, circular
+        features, noncoding, depth
+        two_strand()
+        feature_spans(f) spans
     }
-
-    class Settings {
-        <<dataclass>>
-        +dict color_mapping
-        +dict function_palette
-        +str default_color
-        +str overlap_mode
-        +str end_5_label
-        +str end_3_label
-        +str title
-        +feature_color(product) str
+    class Feature {
+        «Value Object»
+        start, end, strand
+        product, gene
+        mechanism, shift
+        domains_within(s, e)
+        dividers_within(s, e)
     }
-
-    class Placement {
-        <<frozen dataclass>>
-        +Feature feature
-        +int side
-        +int tier
+    class Domain {
+        «Value Object»
+        start, end, product
     }
-
-    class layout {
-        <<module>>
-        +place_features(features, spans, mode) list~Placement~
-        +resolve_mode(mode, two_strand) str
-        +spans_overlap(a, b) bool
+    class Noncoding {
+        «Value Object»
+        start, end, label, kind
     }
-
-    class Plotter {
-        +Settings settings
-        +Namespace args
-        +float shared_ymax
-        +float shared_denom
-        +int max_length
-        +prepare(rnas)
-        +render(rna, thresholds, out_base)*
-        #_prepared_tracks(rna)
-        #_placements(rna, circular)
-        #_feature_color(product)
-        #_add_legend(ax, layers, labels)
-        #_add_title(fig, rna)
-        #_save(fig, extra_artists, out_base)
+    class DepthTrack {
+        label, values
     }
+    RNA *-- "0..*" Feature
+    RNA *-- "0..*" Noncoding
+    RNA *-- "0..*" DepthTrack
+    Feature *-- "0..*" Domain
 
-    class LinearPlotter {
-        +render(rna, thresholds, out_base)
-        #_draw_backbone(ax, rna, pad)
-        #_draw_annotations(ax, rna)
-        #_draw_domains(...)
-        #_draw_mechanism(...)
-        #_draw_noncoding(ax, rna, placements)
-        #_arrow_points(...)
-        #_draw_depth(ax, rna, tracks, total)
-        #_shade_gaps(ax, thresholds)
-        #_style_depth_axis(ax, total)
-    }
-
-    class CircularPlotter {
-        +render(rna, thresholds, out_base)
-        #_theta(pos, seq_len)
-        #_depth_radius(values, ymax)
-        #_draw_annotations(ax, rna)
-        #_draw_domains(...)
-        #_stem_loop_icon(ax, theta, label)
-        #_label_arc(...)
-        #_draw_depth(ax, rna, tracks, total)
-        #_shade_gaps(ax, rna, thresholds)
-        #_draw_axis(ax, rna, total)
-    }
-
+    %% ---------------- input: files in, RNA out --------------------------------
     class parsers {
-        <<module>>
-        +parse_gff_rnas(path) list~RNA~
-        +parse_depth(path, seq_len, seqid, ref, circular)
-        +load_depth(path, seq_len, ...) 
+        «module · Builder»
+        parse_gff_rnas(path) RNA[]
+        load_depth(path, ...) ndarray
     }
-
     class alignments {
-        <<module>>
-        +depth_from_alignments(path, seq_len, ...)
-        +open_alignments(path) AlignmentFile
-        +resolve_reference(refs, seqid, ref, path) str
-        +is_alignment_file(path) bool
+        «module · Factory + Iterator»
+        open_alignments(path) AlignmentFile
+        depth_from_alignments(...) ndarray
     }
-
-    class ReadSet {
-        <<dataclass>>
-        +str label
-        +list~str~ unpaired
-        +list~str~ mate1
-        +list~str~ mate2
-        +paired() bool
-        +validate()
-    }
-
     class analysis {
-        <<module>>
-        +smooth_depth(y, window) ndarray
-        +call_blocks(y, threshold)
-        +write_csvs(intervals, gaps, outdir, base, T)
-        +ensure_bowtie2_index(fasta, outdir, threads) str
-        +map_reads(reads, index, out_sam, threads) str
-        +fasta_lengths(fasta) dict
+        «module»
+        smooth_depth() · call_blocks()
+        map_reads() · ensure_bowtie2_index()
+    }
+    parsers ..> RNA : builds
+    parsers ..> alignments : SAM / BAM
+    analysis ..> parsers : bowtie2 SAM
+
+    %% ---------------- rules: pure functions -----------------------------------
+    class layout {
+        «module · Strategy»
+        place_features(features, spans, mode, flip_if) Placement[]
+        flip · tier · nest
+    }
+    class Placement {
+        «Value Object»
+        feature, side, tier
+    }
+    layout ..> Placement : creates
+    class Settings {
+        «Rule table»
+        color_mapping, function_palette
+        feature_color(product) colour
     }
 
-    RNA "1" *-- "0..*" Feature : features
-    Feature "1" *-- "0..*" Domain : domains
-    RNA "1" *-- "0..*" DepthTrack : depth
-    RNA "1" *-- "0..*" Noncoding : noncoding
-    Placement --> Feature
-    layout ..> Placement : returns
-    layout ..> RNA : feature_spans
+    %% ---------------- render -------------------------------------------------
+    class Plotter {
+        «Abstract base · shared helpers»
+        settings, args
+        prepare(rnas)
+        render(rna, thresholds, out)*
+        _placements(rna) · _save(fig)
+    }
+    class LinearPlotter {
+        render()
+        two stacked axes
+    }
+    class CircularPlotter {
+        render()
+        one polar axes
+    }
     Plotter <|-- LinearPlotter
     Plotter <|-- CircularPlotter
     Plotter --> Settings
-    Plotter ..> RNA : render(rna)
-    Plotter ..> layout : _placements
-    Plotter ..> analysis : smooth_depth
-    parsers ..> RNA : builds
-    parsers ..> alignments : load_depth
-    analysis ..> ReadSet : map_reads
+    Plotter ..> layout : flip_if hook
+    Plotter ..> RNA : draws
+    class cli {
+        «module · Strategy selector»
+        main()
+    }
+    cli ..> Plotter : picks by --layout
+    cli ..> parsers
 ```
 
-The same picture as a static image, with data flow left to right:
+Guillemets mark the design patterns the code happens to use — none was
+designed in up front, each fell out of a simpler need:
+
+* **Value Object** — `Feature`, `Domain`, `Noncoding`, `Placement` are frozen
+  dataclasses: compared by value, safe to share, replaced rather than mutated
+  (`parsers._with`).
+* **Aggregate** — `RNA` is the one mutable object; it owns its features,
+  landmarks and depth tracks, and every function downstream takes an `RNA`.
+* **Builder** — `parsers.parse_gff_rnas` assembles RNAs over several passes
+  (rows → joins → mechanisms → domains → landmarks) before anyone sees them.
+* **Factory + Iterator** — `alignments.open_alignments` sniffs SAM vs BAM and
+  returns an `AlignmentFile` whose `records()` is a lazy generator, so a
+  BAM is never held in memory.
+* **Strategy** — twice. `layout.place_features(mode)` dispatches to
+  `flip` / `tier` / `nest`, and the CLI picks `LinearPlotter` or
+  `CircularPlotter` per RNA from `--layout`. `flip_if` is a hook the plotter
+  injects so the pure layout module never learns about colour.
+* **Rule table** — `Settings.feature_color` and `classify_function` are an
+  ordered list of (pattern → class) with explicit overrides first; adding a
+  function class is one row.
+
+The same picture as a static image:
 
 ![VirPlot class layout](class_layout.svg)
 

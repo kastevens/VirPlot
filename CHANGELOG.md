@@ -10,6 +10,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- `docs/ARCHITECTURE.md` §3 class diagram simplified to the objects and
+  modules that matter, with the design patterns the code happens to use
+  marked (Value Object, Aggregate, Builder, Factory + Iterator, Strategy,
+  Rule table); `docs/class_layout.svg` regenerated from it.
 - **Non-coding features: UTRs, intergenic regions, stem-loops.** GFF
   `five_prime_UTR` / `three_prime_UTR` / `stem_loop` / `origin_of_replication`
   rows are always read; GenBank's catch-all `misc_feature` (NCBI GFF3
