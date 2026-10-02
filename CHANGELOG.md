@@ -6,14 +6,84 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Unreleased]
+## [2.2.0] — 2026-10-02
+
+### Changed
+
+- **A circular genome is now drawn as a circle by default.** `--layout`
+  defaults to `auto` rather than `linear`, so a GFF whose region line says
+  `Is_circular=true` produces the circular figure the ICTV conventions
+  describe (§4) without being asked. spec.yml gains a `layout` key
+  (`auto|linear|circular`) so a per-example default lives beside the data it
+  styles; precedence is `--layout`, then the YAML key, then `auto`.
+
+  `--layout linear` is unchanged and now matters more: it is the way to get
+  the linear track of a circular genome. Deleting `Is_circular=true` is not,
+  because that attribute is a fact about the molecule — it drives depth
+  wrapping at the origin and the splitting of origin-crossing features — so
+  removing it would quietly change the data handling too.
+
+  Because the circular layout cannot carry the `±1 FS` / `RT` marks, it now
+  warns when a genome reaching it has frameshifted or read-through ORFs,
+  rather than dropping the annotation silently.
+
+  `docs/make_figures.sh` passes `--layout linear` explicitly for the
+  `grbv_linear` figure, which previously relied on the old default. No shipped
+  figure changes.
 
 ### Added
+
+- **Stacked figures for segmented genomes, by composing.** `bin/stack_figures.py`
+  joins a multipartite genome's per-segment figures into the one stacked figure
+  the ICTV conventions describe — largest first, shared scale, left aligned at
+  the 5' end (Geminiviridae DNA-A/DNA-B, LIYV RNA-1/RNA-2, TSWV L/M/S, nanovirus
+  components). Supporting it: segments now render **largest first** by default
+  (`--rna-order length|gff`), and `--bare-x` drops the repeated x-axis label and
+  tick numbers from every panel but the bottom one.
+
+  There is deliberately no stacked-figure renderer. Within a run the figure
+  width is proportional to genome length and matplotlib's margins are
+  fractional, so the separate panels already share an exact x-scale — measured
+  across TSWV's 3x length spread, 0.0000% drift — which makes stacking a
+  document operation rather than a re-plot. The composer also **aligns the
+  panels' plot areas**, correcting the small offset (0.63 pt on LIYV) that
+  appears when panels carry y-tick labels of different widths and are cropped
+  to a tight bounding box; hand pasting cannot fix that. `tests/test_stacking.py`
+  guards the shared-scale property, since the decision holds only while it does.
+  See `docs/ictv_drawing_conventions.md` §6 G.
 
 - `docs/ARCHITECTURE.md` §3 class diagram simplified to the objects and
   modules that matter, with the design patterns the code happens to use
   marked (Value Object, Aggregate, Builder, Factory + Iterator, Strategy,
   Rule table); `docs/class_layout.svg` regenerated from it.
+- **Subgenomic RNA rows.** The nested sgRNA sets that plus-strand RNA plant
+  viruses use for their 3' ORFs are drawn as shorter lines beneath the genome
+  line, 5' aligned to their start with an arrowhead there, longest row first
+  and each labelled — the ICTV convention. They are read from a transcript row
+  (`mRNA`, `transcript`, `ncRNA`, `misc_RNA`, `primary_transcript`,
+  `sequence_feature`, `misc_feature`) whose `Note=` says `sgRNA` or
+  `subgenomic`, with `gene=` naming what it expresses; the marker is required
+  rather than inferred from the type, because RefSeq writes real `mRNA` rows
+  (spliced mastrevirus transcripts) that are not sgRNAs. `start` is the 5'
+  terminus; an end at or past the genome length means the 3' end, covering the
+  usual 3'-coterminal set, while an earlier end is kept for the 5'-proximal
+  sgRNAs closteroviruses also make. Row colour is `sgrna_color` in spec.yml.
+  `examples/byv.gff3` carries the full closterovirus ladder.
+
+  These rows are annotation and never a depth track: a plant virus sgRNA is
+  co-linear with the genome and carries no leader junction, so its reads
+  cannot be told from genomic reads and per-sgRNA coverage is not recoverable
+  from short reads. The set does leave a step in the aggregate depth at each
+  5' end, which is why the ladder shares the depth track's x-axis — a
+  closterovirus covered 1x over ORF1a and 150x over CP is showing its
+  expression strategy, not a failed assembly.
+
+  Drawn in the linear layout only, deliberately: the ICTV puts no transcript
+  rows on circular genomes (geminivirus transcription is bidirectional from
+  the IR, nanovirus components carry one ORF each), so `--layout circular`
+  warns and skips. See `docs/GFF_GUIDE.md` §11 and
+  `docs/ictv_drawing_conventions.md` §6 K.
+
 - **Non-coding features: UTRs, intergenic regions, stem-loops.** GFF
   `five_prime_UTR` / `three_prime_UTR` / `stem_loop` / `origin_of_replication`
   rows are always read; GenBank's catch-all `misc_feature` (NCBI GFF3

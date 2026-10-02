@@ -131,8 +131,8 @@ showed the spec itself needs a change. Rule numbers refer to the sections above.
 | 1 | Done. Flip-on-overlap with a collision fallback (see A below). | `layout.py` |
 | 2 | Done. Keyword classifier → ICTV palette; `color_mapping` still wins; "putative" → lighter tint. | `settings.py` |
 | 3 | Done. `Feature.strand`/`gene` carried; + above →, − below ←; same-side overlap tiers outward; `auto` picks flip/tier from `two_strand`. | `layout.py`, `plotting.py` |
-| 4 | **Mostly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=`; default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=` (linear layout); **polyprotein domain dividers** from RefSeq's `mature_protein_region_of_CDS` / `mat_peptide` rows, in both layouts (see F). sgRNA rows: **not done**. | `plotting.py`, `parsers.py`, `layout.py`, `models.py` |
-| 5 | **Done differently.** One figure per RNA with a shared y-limit and length-proportional width, not stacked rows (see G). | `cli.py`, `plotting.py` |
+| 4 | **Done.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=` / `Name=` / `locus_tag=`, omitted when it repeats the product (see D); default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=`; **polyprotein domain dividers** from RefSeq's `mature_protein_region_of_CDS` / `mat_peptide` rows, in both layouts (see F); **sgRNA rows** beneath the line, longest first, from a marked transcript row (see K). The FS/RT marks and the sgRNA ladder are linear-layout only, and the circular layout now warns rather than dropping them silently. | `plotting.py`, `parsers.py`, `layout.py`, `models.py` |
+| 5 | **Done by composing.** One figure per segment, largest first, on a shared scale and y-limit; `bin/stack_figures.py` stacks them into the figure §1 describes. A `StackedPlotter` was considered and rejected on a measurement — see G. | `cli.py`, `plotting.py`, `bin/stack_figures.py` |
 | 6 | Done. `CircularPlotter`: origin at 12 o'clock with stem-loop icon (moved to a GFF `stem_loop` row when there is one), arcs just outside the circle with arrowheads, clockwise for + and anticlockwise for −, overlap nests inward; **IR / UTR as a grey arc astride the circle** from the GFF's non-coding rows; depth as an inner ring. `--layout circular|auto`. | `plotting.py` |
 
 ### Changes the document needs
@@ -174,9 +174,28 @@ outside / product inside needs two names per feature. The code uses
 carries neither an ORF name nor a function — only `locus_tag=N761_gp1` and
 `product=V1 protein`. The shipped `examples/grbv.gff3` is therefore curated
 (`gene=V1;product=CP`, RefSeq name kept in `Note=`), which is what users are
-expected to do; docs/GFF_GUIDE.md §5 says so. Worth deciding whether
-`locus_tag` or `Name` should be accepted as the outside label for uncurated
-files.
+expected to do; docs/GFF_GUIDE.md §5 says so.
+
+**Settled, against a real annotation.** The outside label is now taken from
+`gene=`, then `Name=`, then `locus_tag=`, so an uncurated RefSeq record labels
+its ORFs `N761_gp1` rather than not at all, and a hand annotation that puts the
+ORF name in `Name=` is read as intended.
+
+Testing that against the GLRaV-13 H8881 annotation used in the FPS paper
+(17,564 nt, 13 ORFs) turned up a second rule the document does not state and
+real files need badly: **an outside label equal to the product is dropped.**
+That file carries `gene=` on every ORF, but for eleven of thirteen the gene and
+the product are the *same string* (`gene=CP;product=CP`, `gene=p53;product=p53`),
+because the ORF has one name and no separate known function. Writing it inside
+the box and again above it is noise, not the convention's two names. The same
+holds in the shipped `examples/grbv.gff3`, where `V3` and `C3` are named twice
+for exactly that reason. With the rule, GLRaV-13's one genuine two-name
+feature — `Name=polyprotein_1a;product=Methyltransferase/helicase` — is the only
+ORF that gets a label above its box, which is what §1 is asking for.
+
+§1 should therefore say: outside label from `gene=`, else `Name=`, else
+`locus_tag=`; inside label from `product=`; and the outside label is omitted
+when the two would read the same.
 
 **E. §1 Palette — RefSeq product names are often function-free.** The keyword
 classifier covers RdRp/Rep/CP/MP/HSP70/p2x-style names; anything else falls to
@@ -207,17 +226,66 @@ genome line; a stem-loop is the hairpin icon at its own position (which on a
 circle replaces the default icon at position 1); a region holding an unnamed
 stem-loop is named once at the hairpin, as Geminiviridae Fig. 5 writes
 `CRA`. The document should say that these are drawn **on** the line and take
-no part in the ORF layout. sgRNAs still need an encoding decision.
+no part in the ORF layout. sgRNAs are now encoded and drawn; see K.
 
-**G. §1 Segmented genomes — stacked vs separate.** The document specifies
-stacked rows, largest first. The branch delivers separate files with a shared
-depth y-limit and width proportional to length (so they compose honestly), in
-GFF order. Either the document should record that decision or a
-`StackedPlotter` remains a to-do; ordering largest-first is a one-line change
-either way.
+**G. §1 Segmented genomes — rendered separately, composed afterwards.** The
+document specifies stacked rows, largest first. VirPlot renders one figure per
+segment and stacks them with `bin/stack_figures.py` rather than drawing a
+stacked figure directly. **This is a decision, not a missing feature**, and the
+measurement behind it is this: within one run the figure width is proportional
+to genome length and matplotlib's margins are fractional, so the panels already
+share an exact x-scale. Across TSWV's L/M/S (8,897 / 4,821 / 2,916 nt — a 3×
+spread) the measured scale drift is **0.0000%** and the plot areas start at the
+same x to within 0.00 pt. Stacking is therefore a document operation, and a
+`StackedPlotter` would re-implement in matplotlib a figure that already
+composes exactly.
 
-**H. §4 Decision logic — layout default.** "circular? → C modes" implies
-circular genomes are drawn as circles by default. The CLI defaults to
+What the decision buys and costs. The panels stay independently useful (a
+single segment is a figure in its own right, which a stacked-only renderer
+would lose), the circular case needs no second layout pass, and the composer is
+~170 lines of stdlib against a 150–250-line renderer that would have to handle
+unequal-width axes in one `GridSpec` and a radial budget for circular
+components. The cost is one extra command, which `docs/make_figures.sh` shows.
+
+Three pieces close the gap to the document's wording: segments now render
+**largest first** by default (`--rna-order length`), `--bare-x` drops the
+repeated x-axis from every panel but the bottom one, and the composer orders
+panels largest first and **aligns their plot areas** — a panel whose depth axis
+carries wider tick labels starts further right once the figure is cropped to a
+tight bounding box (0.63 pt on LIYV), which hand pasting cannot correct.
+`tests/test_stacking.py` guards the shared-scale property itself, since the
+decision is only sound while it holds.
+
+§1 needs no change: it describes the finished figure, and the composed figure
+is that figure — one row per segment, largest first, on a shared scale. It is
+§5's stage wording ("→ stacked rows") that should say the rows are composed
+from per-segment figures rather than drawn by one renderer.
+
+**H. §4 Decision logic — layout default. Settled: the document wins.** A
+circular genome is now drawn as a circle without being asked, as §4 says.
+`--layout` defaults to `auto`, and spec.yml gains a `layout` key so a
+per-example default lives beside the data it styles; precedence is `--layout`,
+then the YAML, then `auto`.
+
+**`--layout linear` stays, and becomes load-bearing.** Three reasons it cannot
+be replaced by editing the GFF. First, `Is_circular=true` is a fact about the
+*molecule*, not the figure: it drives depth wrapping at the origin and the
+splitting of origin-crossing features, so deleting it to get a linear picture
+would silently change the data handling as well. Presentation needs its own
+control, which is why `--topology` (what the molecule is) and `--layout` (how it
+is drawn) are separate axes and should stay separate. Second, the circular
+layout cannot carry everything the linear one can — the `±1 FS` and `RT` marks
+are linear-only (§6 F), as are sgRNA rows (§6 K), so a circular genome with a
+frameshift or a transcript ladder needs a way back to a track; `CircularPlotter`
+now warns rather than dropping those marks silently. Third, legibility: a linear
+track carries far more labels, and circular nesting is bounded at three lanes
+before it clamps (§6 I).
+
+`docs/make_figures.sh` is the immediate proof. Its `grbv_linear` figure asked
+for no layout and relied on the old default; under the new one it would have
+become a circle, so it now passes `--layout linear` explicitly.
+
+The original note, kept for the record: the CLI defaulted to
 `--layout linear` because a linear track carries far more labels legibly;
 `--layout auto` gives the document's behaviour. This is a product decision
 worth making explicit.
@@ -227,10 +295,57 @@ and the rim; deeper nesting is clamped to the innermost lane with a warning.
 Real cases (nanovirus components, PCV) fit; a very dense circular genome would
 need the depth ring made thinner or the arcs unrolled.
 
-**J. Version.** Stages 1–3 change existing linear output (the synthetic sample
-now has every box above the line, since none of its ORFs overlap, and its `p7`
-takes the small-ORF purple). Per §5 that warrants a minor-version bump; not
-applied on the branch — a release decision.
+**K. §1 sgRNAs — encoded as a curation convention, and linear-only by
+design.** The document asks for "shorter lines stacked beneath the genome, 5′
+aligned to their start, labelled". The branch draws exactly that, longest row
+first, from a transcript row (`mRNA`, `transcript`, `ncRNA`, `misc_RNA`,
+`primary_transcript`, `sequence_feature`, `misc_feature`) whose `Note=` says
+`sgRNA` / `subgenomic`, with `gene=` naming what it expresses
+(docs/GFF_GUIDE.md §11). The marker is required rather than inferred from the
+type, because RefSeq writes real `mRNA` rows — spliced mastrevirus transcripts
+— that are not sgRNAs. `start` is the 5′ terminus; an `end` at or past the
+genome length means the 3′ end, which covers the usual 3′-coterminal set,
+while an earlier end is kept for the 5′-proximal sgRNAs closteroviruses also
+make. `examples/byv.gff3` carries the ladder, with the two 5′ termini mapped
+by Vitushkina et al. (2002, *Virology* 297:299–307) marked as such and the
+other five flagged as illustrative placements.
+
+Two things the document should record. First, **these rows are annotation and
+never a depth track**: a plant virus sgRNA is co-linear with the genome and
+carries no leader junction (unlike *Nidovirales*), so a read from an sgRNA
+cannot be told from a genomic read at the same coordinate and per-sgRNA
+coverage is not recoverable from short reads. What the set leaves is a step in
+the *aggregate* depth at each 5′ end, height proportional to abundance — which
+is the reason to draw the ladder on the same x-axis as the depth trace, and
+which explains a 5′-to-3′ coverage ramp that would otherwise read as a failed
+assembly.
+
+Second, **sgRNA rows are drawn in the linear layout only, deliberately.** The
+ICTV draws no transcript rows on circular genomes: geminivirus transcription
+is bidirectional from the IR with overlapping transcripts rather than a
+3′-coterminal set (Geminiviridae chapter, Fig. 2 shows ORFs and the stem-loop
+and nothing else), and nanovirus components carry one ORF each. Nesting seven
+near-complete arcs would also be unreadable. `--layout circular` warns and
+skips. The genuine circular case is *Caulimoviridae* — CaMV's 35S and 19S —
+which is two arcs, not a ladder, and would fit the existing nesting lanes if
+it is ever wanted. §1 should say the sgRNA row is a linear-genome convention.
+
+**J. Version. Settled: 2.2.0.** Stages 1–3 change existing linear output (the
+synthetic sample now has every box above the line, since none of its ORFs
+overlap, and its `p7` takes the small-ORF purple), and stages 4–6 add features,
+so per §5 this branch is a minor release rather than a patch. The branch also
+changes two defaults — a circular genome now draws as a circle (H), and
+segments render largest first — which users will see without asking for them,
+and that is the other half of the case for a minor bump.
+
+Applied in `src/virplot/__init__.py`, `pyproject.toml` and `CITATION.cff`, with
+the CHANGELOG's `[Unreleased]` section closed as `[2.2.0]`.
+
+**The jump from 2.0.0 is deliberate — there is no 2.1.0, and that is not an
+oversight.** 2.2 is chosen to signal that this is a substantial change rather
+than an increment, while leaving **3.0 reserved** for the release accompanying
+the second paper. Anyone auditing the tags (`v2.0.0` is the only one) should
+read the gap that way rather than as a lost release.
 
 ---
 

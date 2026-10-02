@@ -173,9 +173,36 @@ def test_layout_circular_renders_a_file(tmp_path):
     assert os.listdir(tmp_path) == ["out.svg"]
 
 
-def test_layout_defaults_to_linear_even_for_circular_genome(tmp_path):
+def test_layout_defaults_to_the_shape_of_the_molecule(tmp_path):
+    """A GFF that says Is_circular=true draws as a circle without being asked;
+    a linear one stays a track."""
     used = record_layouts(lambda: run(tmp_path, "grbv.gff3", "grbv.sam", "grbv.yml"))
+    assert used == ["circular"]
+
+    used = record_layouts(lambda: run(tmp_path, "sample.gff3", "sample.dep", "spec.yml"))
     assert used == ["linear"]
+
+
+def test_layout_linear_forces_a_track_for_a_circular_genome(tmp_path):
+    """The escape hatch. Editing Is_circular out of the GFF would also turn off
+    depth wrapping and origin-crossing features, so presentation needs its own
+    control — see docs/ictv_drawing_conventions.md §6 H."""
+    used = record_layouts(
+        lambda: run(tmp_path, "grbv.gff3", "grbv.sam", "grbv.yml", "--layout", "linear"))
+    assert used == ["linear"]
+
+
+def test_spec_yml_can_set_the_layout_and_the_cli_overrides_it(tmp_path):
+    ex = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "examples")
+    yml = tmp_path / "pinned.yml"
+    yml.write_text(open(os.path.join(ex, "grbv.yml")).read() + "\nlayout: linear\n")
+
+    used = record_layouts(lambda: run(tmp_path, "grbv.gff3", "grbv.sam", str(yml)))
+    assert used == ["linear"]                       # the YAML pinned it
+
+    used = record_layouts(
+        lambda: run(tmp_path, "grbv.gff3", "grbv.sam", str(yml), "--layout", "circular"))
+    assert used == ["circular"]                     # the CLI wins
 
 
 def test_layout_auto_follows_topology(tmp_path):
@@ -258,3 +285,19 @@ def test_circular_label_helpers_work_before_annotations_are_drawn():
 def test_tiny_genome_tick_step_is_at_least_one():
     from virplot.plotting import _nice_step
     assert _nice_step(4 / 8) == 1 and _nice_step(0) == 1
+
+
+def test_circular_warns_that_frameshift_marks_are_linear_only(tmp_path, caplog):
+    """GRBV has no frameshift; BYV does. Under the new default a circular
+    genome reaches this layout unasked, so the dropped mark must be said."""
+    import logging
+    with caplog.at_level(logging.WARNING):
+        run(tmp_path, "byv.gff3", "byv.sam", "byv.yml", "--layout", "circular")
+    assert "not marked" in caplog.text and "--layout linear" in caplog.text
+
+
+def test_circular_is_quiet_when_nothing_is_dropped(tmp_path, caplog):
+    import logging
+    with caplog.at_level(logging.WARNING):
+        run(tmp_path, "grbv.gff3", "grbv.sam", "grbv.yml", "--layout", "circular")
+    assert "not marked" not in caplog.text

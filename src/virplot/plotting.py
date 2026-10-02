@@ -46,6 +46,13 @@ OUTSIDE_LABEL_ROW = 0.28        # axis units; ~ one 8 pt line in the annotation 
 # bar this tall centred on the line; a stem-loop is a hairpin icon this tall.
 NONCODING_BAR_HEIGHT = 0.22
 STEM_LOOP_HEIGHT = 0.42
+# Subgenomic RNAs: rows beneath everything else, longest first, each a line
+# from its 5' end with an arrowhead there. The gap clears the lowest ORF tier.
+SGRNA_ROW_STEP = 0.30           # axis units between consecutive sgRNA rows
+SGRNA_TOP_GAP = 0.34            # from the lowest ORF tier down to the first row
+SGRNA_LINE = dict(linewidth=1.4, solid_capstyle="butt")
+SGRNA_LABEL_FONTSIZE = 7
+SGRNA_MARKER_SIZE = 4
 CIRC_NONCODING_HEIGHT = 0.07    # radial thickness of an IR arc astride the circle
 SMOOTH_WINDOW = 15
 # Depth trace, measured from the original README figure: a ~0.3 pt black line
@@ -88,11 +95,30 @@ class Plotter:
         self.shared_denom: float | None = None    # --normalize divisor across RNAs
         self.shared_ymax: float | None = None     # common y-limit across RNAs
         self.max_length: int | None = None        # longest RNA, for width scaling
+        self.bottom_seqid: str | None = None      # last segment rendered; keeps the x-axis
+
+    def _bare_x(self, rna: RNA | None) -> bool:
+        """True when this panel should omit the x-axis label and tick numbers.
+
+        ``--bare-x`` is for panels that will be stacked by
+        bin/stack_figures.py, where one axis row at the bottom serves them
+        all. In a run over several segments the last one rendered is that
+        bottom row and keeps its axis; a lone panel is bare, since it is only
+        asked for when something else carries the axis. The ticks themselves
+        stay so the plot area keeps its geometry and the panels still align.
+        """
+        if not getattr(self.args, "bare_x", False):
+            return False
+        return (rna is None or self.bottom_seqid is None
+                or rna.seqid != self.bottom_seqid)
 
     def prepare(self, rnas: list[RNA]) -> None:
         """Compute cross-RNA scaling so separate figures share axes conventions."""
         if len(rnas) < 2:
             return
+        # the last segment rendered is the bottom row once stacked, so it is
+        # the one that keeps the shared x-axis under --bare-x
+        self.bottom_seqid = rnas[-1].seqid
         raw_max = max(self._smoothed_total(r).max() for r in rnas) or 1.0
         if self.args.normalize and not self.args.free_y:
             self.shared_denom = raw_max
@@ -310,7 +336,7 @@ class LinearPlotter(Plotter):
         if self.args.shade_breaks:
             self._shade_gaps(ax_depth, threshold_results)
 
-        self._style_depth_axis(ax_depth, total)
+        self._style_depth_axis(ax_depth, total, rna)
 
         extra_artists.append(self._add_title(fig, rna))
 
@@ -388,11 +414,47 @@ class LinearPlotter(Plotter):
         # extra rows of outside domain labels push the panel's edge out
         extra_up = max(len(outside_rows[ABOVE]) - 1, 0) * OUTSIDE_LABEL_ROW
         extra_dn = max(len(outside_rows[BELOW]) - 1, 0) * OUTSIDE_LABEL_ROW
+
+        # sgRNA ladder hangs below the lowest ORF tier and its outside labels
+        sg_top = y0 - tiers_dn * H - extra_dn - SGRNA_TOP_GAP
+        sg_bottom = self._draw_sgrnas(ax, rna, sg_top, labels=not args.no_label)
+
         ax.set_xlim(0, seq_len)
-        ax.set_ylim(min(-1.5, y0 - tiers_dn * H - 0.9 - extra_dn),
+        ax.set_ylim(min(-1.5, sg_bottom - 0.5, y0 - tiers_dn * H - 0.9 - extra_dn),
                     max(2.0, y0 + tiers_up * H + 0.9 + extra_up))
         ax.axis("off")
         return ends
+
+    def _draw_sgrnas(self, ax: plt.Axes, rna: RNA, top: float,
+                     labels: bool = True) -> float:
+        """Subgenomic RNA rows beneath the genome, longest first (ICTV §1).
+
+        Each row is a line from the sgRNA's 5' end to its 3' end with an
+        arrowhead at the 5' end, labelled just outside that end. Rows are
+        annotation only: a plant virus sgRNA is co-linear with the genome, so
+        its reads cannot be told from genomic reads and it has no depth track
+        of its own — but each 5' end predicts a step in the shared depth
+        trace below, which is the point of drawing them on the same x-axis.
+
+        Returns the y of the lowest row drawn (``top`` when there are none),
+        so the caller can extend the panel to fit them.
+        """
+        ladder = rna.sgrna_ladder
+        if not ladder:
+            return top
+
+        color = self.settings.sgrna_color
+        pad = rna.length * LABEL_PAD_FRACTION
+        y = top
+        for sg in ladder:
+            y -= SGRNA_ROW_STEP
+            ax.plot([sg.start, sg.end], [y, y], color=color, **SGRNA_LINE)
+            ax.plot([sg.start], [y], marker=">", color=color,
+                    markersize=SGRNA_MARKER_SIZE, linestyle="none")
+            if labels:
+                ax.text(sg.start - pad * 0.35, y, sg.label, ha="right", va="center",
+                        fontsize=SGRNA_LABEL_FONTSIZE, color=color)
+        return y
 
     def _draw_domains(self, ax: plt.Axes, feat, s_: int, e_: int, yb: float, H: float,
                       glyph, ly_out: float, pt_per_nt: float, labels: bool,
@@ -594,10 +656,14 @@ class LinearPlotter(Plotter):
                 ax.axvspan(g["start_bp"], g["end_bp"],
                            color=self.settings.shade_color, alpha=0.15, lw=0)
 
-    def _style_depth_axis(self, ax: plt.Axes, total: np.ndarray) -> None:
+    def _style_depth_axis(self, ax: plt.Axes, total: np.ndarray,
+                          rna: RNA | None = None) -> None:
         args = self.args
         ax.set_ylabel("Read Depth", fontsize=10)
-        ax.set_xlabel("Genome Position (bp)", fontsize=10)
+        if self._bare_x(rna):
+            ax.set_xticklabels([])
+        else:
+            ax.set_xlabel("Genome Position (bp)", fontsize=10)
 
         if args.yscale == "symlog":
             ax.set_yscale("symlog", linthresh=args.linthresh, linscale=1)
@@ -640,6 +706,26 @@ class CircularPlotter(Plotter):
 
         if self.args.yscale == "symlog":
             log.warning("--yscale symlog is ignored in the circular layout")
+
+        # Two things the circular layout cannot carry. Now that a circular
+        # genome reaches it without being asked (--layout defaults to auto),
+        # both are said out loud rather than dropped silently.
+        marked = [f.gene or f.product for f in rna.features if f.mechanism]
+        if marked:
+            # the ORF is placed correctly, but no ±1 FS / RT mark is written
+            log.warning("%d ORF(s) reached by a frameshift or readthrough (%s) are placed "
+                        "but not marked: the FS/RT marks are linear-layout only "
+                        "(use --layout linear)", len(marked), ", ".join(marked[:3]))
+        if rna.sgrnas:
+            # Deliberate: the ICTV figures put no transcript rows on circular
+            # genomes. Geminivirus transcription is bidirectional from the IR
+            # with overlapping transcripts rather than a 3'-coterminal set,
+            # and nanovirus components carry one ORF each, so the ladder is a
+            # linear-genome convention. Nesting near-complete arcs would also
+            # be unreadable. See docs/ictv_drawing_conventions.md §6 K.
+            log.warning("%d subgenomic RNA row(s) not drawn: the sgRNA ladder is "
+                        "a linear-layout convention (use --layout linear)",
+                        len(rna.sgrnas))
 
         extra_artists = self._draw_annotations(ax, rna)
 

@@ -317,8 +317,14 @@ in `settings.OVERLAP_MODES`. Test it with `Feature` objects alone.
 keeps only `CDS`; widening it means deciding how non-coding features are
 drawn (the ICTV figures use grey arcs/boxes) and giving `Feature` a `kind`.
 
-**Expression features** (frameshift, readthrough, sgRNAs) are blocked on an
-encoding decision in the GFF; see §6 F and §7.2 of the conventions doc.
+**Expression features.** Frameshift, readthrough, polyprotein domains and
+subgenomic RNAs are all encoded now — RefSeq's own attributes where it has
+them, a `Note=` curation convention where it does not (`GFF_GUIDE.md` §8, §9,
+§12). sgRNAs live on `RNA.sgrnas` and are drawn by `LinearPlotter._draw_sgrnas`
+beneath the ORF tiers; they are annotation only and add no depth track, since
+a plant virus sgRNA is co-linear with the genome and its reads cannot be
+separated from genomic ones. See §6 K of the conventions doc for why they are
+linear-layout only.
 
 ## 7. Testing
 

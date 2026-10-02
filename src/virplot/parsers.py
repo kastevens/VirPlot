@@ -11,7 +11,7 @@ from urllib.parse import unquote
 import numpy as np
 
 from virplot.alignments import depth_from_alignments, is_alignment_file, resolve_reference
-from virplot.models import RNA, Domain, Feature, Noncoding
+from virplot.models import RNA, Domain, Feature, Noncoding, SubgenomicRNA
 from virplot.settings import classify_function
 
 log = logging.getLogger(__name__)
@@ -48,6 +48,17 @@ _NONCODING_IF_NAMED = {"sequence_feature", "misc_feature", "regulatory_region", 
                        "repeat_region", "sequence_secondary_structure", "misc_structure"}
 _STEM_LOOP_WORDS = re.compile(r"stem[- ]?loop|hairpin", re.I)
 
+# Subgenomic RNAs. GFF3 has no type for "this is a subgenomic RNA", and RefSeq
+# does not annotate them for plant viruses, so — as with frameshift and
+# readthrough (docs/GFF_GUIDE.md §8) — this is a curation convention: a
+# transcript row that *says* it is one. The marker is required rather than
+# inferred, because RefSeq does write real ``mRNA`` rows (spliced mastrevirus
+# transcripts) that are not sgRNAs and must not become ladder rows.
+_SGRNA_TYPES = {"mRNA", "transcript", "ncRNA", "misc_RNA", "primary_transcript",
+                "sequence_feature", "misc_feature"}
+_SGRNA_WORDS = re.compile(r"\bsg\s?RNA\b|\bsub-?genomic\b", re.I)
+_SGRNA_PREFIX = re.compile(r"^\s*(?:sg\s?RNA|sub-?genomic(?:\s+RNA)?)\s*[-:_]?\s*", re.I)
+
 
 def parse_gff_rnas(gff_path: str) -> list[RNA]:
     """Parse a GFF3 file into one ``RNA`` per ``region`` line.
@@ -61,6 +72,7 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
     rows: dict[str, list[tuple[int, int, str, dict]]] = {}
     domain_rows: dict[str, list[tuple[int, int, str, dict]]] = {}
     noncoding: dict[str, list[Noncoding]] = {}
+    sgrna_rows: dict[str, list[tuple[int, int, dict]]] = {}
 
     # Collect everything first, attach afterwards: GFF3 does not require the
     # region line to precede the features of its sequence.
@@ -85,10 +97,20 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
                 continue
 
             is_nc = feature_type in _NONCODING_ALWAYS or feature_type in _NONCODING_IF_NAMED
-            if feature_type != "CDS" and feature_type not in _DOMAIN_TYPES and not is_nc:
+            maybe_sg = feature_type in _SGRNA_TYPES
+            if (feature_type != "CDS" and feature_type not in _DOMAIN_TYPES
+                    and not is_nc and not maybe_sg):
                 continue
 
             info = _attributes(attributes)
+            # an sgRNA row wins over the non-coding catch-all types it shares
+            if maybe_sg and _SGRNA_WORDS.search(_sgrna_text(info)):
+                sgrna_rows.setdefault(seqid, []).append((int(start), int(end), info))
+                continue
+            # a transcript row that did not say it was subgenomic is not ours
+            if (feature_type != "CDS" and feature_type not in _DOMAIN_TYPES
+                    and not is_nc):
+                continue
             if is_nc:
                 nc = _noncoding(feature_type, int(start), int(end), strand, info)
                 if nc is not None:
@@ -104,6 +126,7 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
         rna.features.extend(_features_from_rows(rows.get(seqid, []),
                                                 domain_rows.get(seqid, [])))
         rna.noncoding.extend(noncoding.get(seqid, []))
+        rna.sgrnas.extend(_sgrnas_from_rows(sgrna_rows.get(seqid, []), rna.length))
         if not rna.circular:
             wrapped = [f for f in rna.features if rna.wraps(f)]
             if wrapped:
@@ -260,10 +283,34 @@ def _attach_domains(feats: list[Feature],
             for i, f in enumerate(feats)]
 
 
+def _orf_name(info: dict, product: str) -> str | None:
+    """The ORF name written outside the glyph, or None if there isn't one.
+
+    The ICTV convention wants two names per feature — the ORF name outside
+    (``ORF1a``, ``AC1``), the function inside (``RdRp``, ``CP``). GFF3 spells
+    the outside one three ways, so ``gene=`` is tried first, then ``Name=``
+    (which hand annotations and NCBI's own converter both set when there is no
+    ``gene=``), then ``locus_tag=`` for an uncurated RefSeq record whose only
+    per-ORF identifier is ``N761_gp1``.
+
+    A name equal to the product is dropped: real annotations very often carry
+    ``gene=CP;product=CP``, and writing *CP* inside the box and again above it
+    is noise, not the convention's two names.
+    """
+    for key in ("gene", "Name", "locus_tag"):
+        name = str(info.get(key, "")).strip()
+        if name and name.casefold() != product.strip().casefold():
+            return name
+        if name:
+            return None                      # it names the same thing as product
+    return None
+
+
 def _feature(start: int, end: int, strand: str, info: dict, **extra) -> Feature:
+    product = info.get("product", "unknown")
     f = Feature(start=start, end=end, strand=strand,
-                product=info.get("product", "unknown"),
-                gene=info.get("gene") or None, **extra)
+                product=product,
+                gene=_orf_name(info, product), **extra)
     object.__setattr__(f, "_attrs", info)                # frozen dataclass: side channel
     return f
 
@@ -367,6 +414,55 @@ def _noncoding(ftype: str, start: int, end: int, strand: str, info: dict) -> Non
     if kind == "region" and _STEM_LOOP_WORDS.search(f"{text} {note}") and (end - start) < 100:
         kind = "stem_loop"
     return Noncoding(start, end, strand, label, kind)
+
+
+# --- subgenomic RNAs ---------------------------------------------------------
+
+def _sgrna_text(info: dict) -> str:
+    """The attribute text an sgRNA marker may be written in."""
+    return " ".join(str(info.get(k, "")) for k in
+                    ("Note", "note", "Name", "gene", "product", "ID", "type"))
+
+
+def _sgrna_label(info: dict, index: int) -> str:
+    """Name for an sgRNA row: what it expresses, else ``sgRNA{n}``.
+
+    ``gene=`` / ``Name=`` / ``product=`` are tried in turn and a leading
+    "sgRNA" / "subgenomic RNA" is stripped, so both ``gene=CP`` and
+    ``gene=sgRNA CP`` label the row ``CP``. A row named only by its marker
+    (``Note=sgRNA``) falls back to its position in the ladder.
+    """
+    for key in ("gene", "Name", "product", "label"):
+        raw = str(info.get(key, "")).strip()
+        if not raw:
+            continue
+        name = _SGRNA_PREFIX.sub("", raw).strip()
+        if name:
+            return name
+        return raw.strip()                   # the marker itself was the name
+    return f"sgRNA{index}"
+
+
+def _sgrnas_from_rows(rows: list[tuple[int, int, dict]],
+                      seq_len: int) -> list[SubgenomicRNA]:
+    """Build ``SubgenomicRNA`` records from marked transcript rows.
+
+    Rows are taken in genome order so the ``sgRNA{n}`` fallback numbers them
+    5' to 3'. An end at or past the genome's own end is clamped to it: the
+    common case is a 3'-coterminal set, which curators write either as the
+    genome length or as a bare 5' coordinate repeated in both columns.
+    """
+    out: list[SubgenomicRNA] = []
+    for i, (start, end, info) in enumerate(sorted(rows, key=lambda r: (r[0], r[1])), 1):
+        start = max(1, start)
+        if end <= start or end > seq_len:
+            end = seq_len
+        if start > seq_len:
+            log.warning("sgRNA starting at %d is past the %d bp genome; ignored",
+                        start, seq_len)
+            continue
+        out.append(SubgenomicRNA(start=start, end=end, label=_sgrna_label(info, i)))
+    return out
 
 
 def parse_gff(gff_path: str) -> tuple[int, list[Feature]]:

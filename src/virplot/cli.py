@@ -66,15 +66,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ref",
                    help="Reference name to use from SAM/BAM/depth files when the GFF "
                         "sequence id does not match (single-RNA GFF only)")
+    p.add_argument("--rna-order", choices=["length", "gff"], default="length",
+                   help="Order segments largest first (the ICTV stacking order) "
+                        "or as the GFF lists them [%(default)s]; --rnas sets its own order")
     p.add_argument("--rnas", nargs="+", metavar="SEQID",
                    help="Plot only these GFF sequence ids, in this order "
                         "(default: every 'region' in the GFF)")
     p.add_argument("--topology", choices=["auto", "circular", "linear"], default="auto",
                    help="Treat the genome(s) as circular or linear; 'auto' follows the "
                         "GFF region line's Is_circular attribute [%(default)s]")
-    p.add_argument("--layout", choices=["linear", "circular", "auto"], default="linear",
+    p.add_argument("--layout", choices=["linear", "circular", "auto"], default=None,
                    help="Figure layout: a linear track, a circular (polar) plot, or "
-                        "'auto' to draw circular genomes as circles [%(default)s]")
+                        "'auto' to draw circular genomes as circles. Overrides the "
+                        "spec.yml 'layout' key; without either, 'auto' [default: auto]")
     p.add_argument("--free-y", action="store_true",
                    help="With several RNAs, let each figure pick its own depth y-limit "
                         "instead of sharing one")
@@ -89,6 +93,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Output directory for the plot")
     p.add_argument("-n", "--normalize", action="store_true",
                    help="Normalize depth values to max=1")
+    p.add_argument("--bare-x", action="store_true",
+                   help="Drop the x-axis label and tick numbers, for a panel that will be "
+                        "stacked under another (see bin/stack_figures.py)")
     p.add_argument("--grid", action="store_true",
                    help="Enable background grid on depth plot")
     p.add_argument("--smooth", action="store_true",
@@ -214,6 +221,10 @@ def main(argv: list[str] | None = None) -> None:
                       ", ".join(missing), ", ".join(by_id))
             sys.exit(1)
         rnas = [by_id[x] for x in args.rnas]
+    elif args.rna_order == "length":
+        # ICTV: segments are stacked largest first. An explicit --rnas is the
+        # user's own order and is left alone.
+        rnas = sorted(rnas, key=lambda r: (-r.length, r.seqid or ""))
     if args.ref and len(rnas) > 1:
         log.error("--ref applies to a single RNA; use --rnas to select one, "
                   "or drop --ref so each RNA is matched by its GFF sequence id")
@@ -275,6 +286,14 @@ def main(argv: list[str] | None = None) -> None:
 
     settings = load_settings(args.yaml)
     log.info("Loaded settings from %s", args.yaml)
+
+    # Layout is a presentation choice, so it is resolved separately from the
+    # molecule's shape: --layout beats the spec.yml 'layout' key, and without
+    # either a circular genome is drawn as a circle. The GFF's Is_circular says
+    # what the molecule *is* (it drives depth wrapping and origin-crossing
+    # features) and is not the place to change how the figure looks.
+    if args.layout is None:
+        args.layout = settings.layout
 
     os.makedirs(args.outdir, exist_ok=True)
     # One prepared plotter per layout, so cross-RNA scaling is shared; --layout

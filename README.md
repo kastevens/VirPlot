@@ -12,6 +12,10 @@ Polyprotein — PVY (`examples/pvy.gff3` + `pvy.yml`): RefSeq's mature-protein r
 
 ![PVY](docs/figures/pvy_linear.svg)
 
+Segmented — TSWV (`examples/tswv.gff3` + `tswv.yml`): one figure per segment on a shared scale, composed into the ICTV stacked figure by `bin/stack_figures.py`.
+
+![TSWV stacked](docs/figures/tswv_stacked.svg)
+
 Reads in the examples are simulated; the annotations are real RefSeq records. More renders in [`docs/figures/`](docs/figures/); `sh docs/make_figures.sh` regenerates them.
 
 Developed and maintained by Haoran (Henry) Li for [Foundation Plant Services](https://fps.ucdavis.edu/index.cfm) at [UC Davis](https://www.ucdavis.edu/).
@@ -130,7 +134,11 @@ virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml \
   --layout circular --legend --title
 ```
 
-`--layout auto` uses the circle for genomes the GFF marks circular and the linear tracks for the rest, which is what you want when one GFF holds both. Two spec.yml keys move the circle closer to the ICTV figures: `circular_labels: horizontal` writes every label level outside the ring as `ORF (product)`, and `circular_arcs: on_circle` sets the innermost arcs astride the genome circle (`examples/grbv_ictv.yml`). The default stays `linear`: a circle is the honest picture of the molecule, but a linear track carries far more feature labels legibly, so it remains the better default for a densely annotated genome.
+`--layout auto` — **the default** — uses the circle for genomes the GFF marks `Is_circular=true` and the linear track for the rest, which is also what you want when one GFF holds both. A `layout:` key in spec.yml sets a per-example default beside the data it styles; `--layout` overrides it.
+
+To get the linear track of a circular genome, pass `--layout linear` (or set `layout: linear`). Do **not** delete `Is_circular=true` to achieve it: that attribute says what the molecule *is*, and removing it also turns off depth wrapping at the origin and the splitting of origin-crossing features. The linear track is still the better picture of a densely annotated genome — it carries far more labels legibly — and it is the only layout that draws the `±1 FS` / `RT` marks and sgRNA rows, so a circular figure warns when it has to leave those out.
+
+Two spec.yml keys move the circle closer to the ICTV figures: `circular_labels: horizontal` writes every label level outside the ring as `ORF (product)`, and `circular_arcs: on_circle` sets the innermost arcs astride the genome circle (`examples/grbv_ictv.yml`).
 
 Layout and topology are independent. `--topology` decides whether depth wraps at the origin (the arithmetic); `--layout` decides how it is drawn. Drawing a circular genome with `--topology linear` renders the false origin dip as a wedge cut out of the ring at 12 o'clock — a quick way to see whether your pipeline handled the origin.
 
@@ -268,7 +276,8 @@ The package lives in `src/virplot/`; `python -m virplot` runs the CLI from a che
 
 ## Supplementary Scripts
 
-Two standalone scripts in `bin/` assist with depth file preparation:
+Three standalone scripts in `bin/` assist with depth file preparation and
+figure composition:
 
 - **`depth_filter.py`** — Filter depth entries by sequence header:
 
@@ -281,6 +290,22 @@ Two standalone scripts in `bin/` assist with depth file preparation:
   ```bash
   python3 bin/depth_merger.py -i sample1.dep sample2.dep -o combined.dep
   ```
+
+- **`stack_figures.py`** — Stack a segmented genome's figures into one
+  ICTV-style multipartite figure (DNA-A/DNA-B, LIYV RNA-1/RNA-2, TSWV L/M/S,
+  nanovirus components). Render the segments in **one** run so they share a
+  scale and a depth y-limit, then compose:
+
+  ```bash
+  virplot -g tswv.gff3 -d tswv.sam -y tswv.yml -f svg --bare-x -o out --name tswv
+  python3 bin/stack_figures.py -i out/tswv.*.svg -o out/tswv_stacked.svg
+  ```
+
+  Segments render largest first by default (`--rna-order`), `--bare-x` leaves
+  the x-axis on the bottom panel only, and the composer aligns the panels' plot
+  areas. VirPlot has no stacked-figure renderer because it does not need one:
+  within a run the panels already share an exact x-scale, so stacking is a
+  document operation — see `docs/ictv_drawing_conventions.md` §6 G.
 
 ---
 

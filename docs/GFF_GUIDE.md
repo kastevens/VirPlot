@@ -62,11 +62,25 @@ Each `CDS` row becomes one glyph. Two attributes name it:
 | Attribute | Drawn | Purpose |
 |---|---|---|
 | `product=` | **Inside** the glyph (or just outside it when the ORF is under 500 bp) | The protein or domain: `RdRp`, `CP`, `Hsp70h`. Also drives the default colour (§5). Missing → `unknown`. |
-| `gene=` | **Outside** the glyph, small grey text | The ORF name: `ORF1a`, `AC1`, `V2`. Optional. |
+| `gene=` | **Outside** the glyph, small grey text | The ORF name: `ORF1a`, `AC1`, `V2`. Optional. `Name=` is used when there is no `gene=`, then `locus_tag=`. |
 
 This is the ICTV figure convention: ORF number outside, product inside. Keep
 `product` short — it has to fit in the box. The long RefSeq description can go
 in `Note=`, which VirPlot ignores (and so never draws).
+
+**One name, written once.** If the outside label would read the same as
+`product`, it is dropped and only the box is labelled. Real annotations very
+often carry `gene=CP;product=CP` or `gene=p53;product=p53`, because the ORF has
+a name and no separately known function — `examples/grbv.gff3` does it for `V3`
+and `C3`. Writing the name inside the box *and* above it is noise. So give the
+two attributes two different things to say, or just one of them:
+
+```gff3
+# two names: ORF name outside, function inside — what the convention wants
+A	.	CDS	1071	7655	.	+	0	ID=a;Name=polyprotein_1a;product=Methyltransferase/helicase
+# one name: labelled once, inside the box
+A	.	CDS	9248	9439	.	+	0	ID=b;gene=p7;product=p7
+```
 
 Other attributes (`ID`, `Parent`, `locus_tag`, `Dbxref`, `protein_id`, …) are
 accepted and ignored. `gene` rows and `mRNA` rows are ignored too, so a RefSeq
@@ -159,7 +173,16 @@ together.
 
 ## 6. Circular genomes
 
-Set `Is_circular=true` on the `region` row. Three things follow:
+Set `Is_circular=true` on the `region` row. Four things follow:
+
+* **The figure is drawn as a circle**, unless something says otherwise.
+  `--layout` (`auto` by default) decides, falling back to a `layout:` key in
+  spec.yml. Use `--layout linear` — or `layout: linear` in the YAML — for the
+  linear track of a circular genome; do **not** delete `Is_circular=true` to
+  get one, because that would also turn off the two behaviours below. The
+  molecule's shape and the figure's shape are separate settings on purpose.
+  Note the `±1 FS` / `RT` marks (§8) and sgRNA rows (§12) are drawn in the
+  linear layout only, and a circular figure warns when it has to leave them out.
 
 * **Depth wraps.** Reads that run off the end continue from position 1, and
   positions past the end are taken modulo the length. This is what makes a
@@ -307,11 +330,8 @@ present.
 `--layout circular` places these ORFs correctly (a frameshift or readthrough
 arc nests like any other) but writes no mark yet.
 
-### Not yet drawn
-
-Subgenomic RNAs are ignored by the parser; see §6 F and §7.2 of
-[`ictv_drawing_conventions.md`](ictv_drawing_conventions.md) for the intended
-encoding.
+Subgenomic RNAs are the third expression mechanism; they get their own
+section, §12.
 
 ## 9. Polyproteins: domains inside one box
 
@@ -427,7 +447,57 @@ A	.	five_prime_UTR	1	68	.	+	.	ID=utr5
 An origin-crossing region on a circle is written with `end` past the genome
 length (§6), as `examples/grbv.gff3` does for its intergenic region.
 
-## 11. Checklist
+## 11. Subgenomic RNAs
+
+Many plus-strand RNA plant viruses express their 3' ORFs from a nested set of
+**3'-coterminal subgenomic RNAs** — *Closteroviridae*, *Alphaflexiviridae*,
+*Tombusviridae*, *Virgaviridae*. The ICTV figures draw them as shorter lines
+stacked beneath the genome, 5' aligned to their start. VirPlot does the same,
+longest row first.
+
+GFF3 has no feature type meaning "this is a subgenomic RNA", and RefSeq does
+not annotate them for plant viruses, so — exactly as with frameshift and
+readthrough (§8) — **this is a curation convention: a transcript row that says
+it is one.**
+
+```gff3
+# 5' terminus, 3' end at the genome end, named by what it expresses
+NC_001598.1	VirPlot	mRNA	13570	15480	.	+	.	ID=sg_cp;gene=CP;Note=sgRNA
+```
+
+| Column | Write |
+|---|---|
+| type | `mRNA`, `transcript`, `ncRNA`, `misc_RNA`, `primary_transcript`, `sequence_feature` or `misc_feature` |
+| start | the sgRNA's **5' terminus** — the only coordinate that carries information in a coterminal set |
+| end | the genome length (or anything past it) for a 3'-coterminal sgRNA; an earlier end is kept as written, for the 5'-proximal sgRNAs closteroviruses also make |
+| `Note=` | must match `sgRNA`, `sg RNA`, `subgenomic` or `sub-genomic` — this marker is **required** |
+| `gene=` | what the sgRNA expresses (`CP`, `Hsp70h`); a leading `sgRNA` is stripped, so `gene=sgRNA CP` also labels the row `CP` |
+
+The marker is required rather than inferred from the type, because RefSeq
+writes real `mRNA` rows — spliced mastrevirus transcripts, for instance — that
+are **not** sgRNAs and must not become ladder rows. A row with no name at all
+falls back to `sgRNA1`, `sgRNA2`… numbered 5' to 3'.
+
+`examples/byv.gff3` carries the full closterovirus ladder.
+
+**Why these are annotation and never a depth track.** A plant virus sgRNA is
+co-linear with the genome and carries no leader junction (unlike
+*Nidovirales*, where `periscope` and `LeTRS` count leader-spanning reads), so
+a read from an sgRNA is indistinguishable from a genomic read at the same
+coordinate. Per-sgRNA coverage cannot be recovered from short reads. What the
+set does leave is a **step in the aggregate depth at each 5' end**, with step
+height proportional to that sgRNA's abundance — which is why the rows are
+drawn on the same x-axis as the depth trace. A closterovirus at 1× over ORF1a
+and 150× over CP is not under-sequenced; it is the expression strategy, and
+the ladder is what says so.
+
+**Layout limit.** sgRNA rows are drawn in the **linear layout only**. This is
+deliberate, not missing: the ICTV draws no transcript rows on circular
+genomes. Geminivirus transcription is bidirectional from the intergenic region
+with overlapping transcripts rather than a 3'-coterminal set, and nanovirus
+components carry one ORF each. `--layout circular` warns and skips them.
+
+## 12. Checklist
 
 - [ ] `##gff-version 3` first line; nine tab-separated columns.
 - [ ] One `region` row per molecule, `end` = genome length,
@@ -448,5 +518,10 @@ length (§6), as `examples/grbv.gff3` does for its intergenic region.
       `stem_loop` rows as RefSeq gives them; an intergenic or common region as
       a `misc_feature` with `Name=IR` (or `CRA`, `LIR`…); a `stem_loop` row
       where the nick site is, so the hairpin icon sits there.
+- [ ] Subgenomic RNAs: a `mRNA` (or `transcript`) row per sgRNA with
+      `Note=sgRNA` and `gene=` naming what it expresses; `start` is the 5'
+      terminus, and the end may be left at the genome length for the usual
+      3'-coterminal set.
 - [ ] Products with no function word either renamed or pinned in
       `color_mapping`.
+
