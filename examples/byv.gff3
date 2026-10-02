@@ -16,3 +16,21 @@ NC_001598.1	RefSeq	CDS	12919	13569	.	+	0	ID=orf5;gene=ORF5;product=CPm;Note=coat
 NC_001598.1	RefSeq	CDS	13640	14254	.	+	0	ID=orf6;gene=ORF6;product=CP;Note=coat protein
 NC_001598.1	RefSeq	CDS	14251	14793	.	+	0	ID=orf7;gene=ORF7;product=p20;Note=long-distance transport factor
 NC_001598.1	RefSeq	CDS	14768	15301	.	+	0	ID=orf8;gene=ORF8;product=p21;Note=RNA silencing suppressor
+# Subgenomic RNAs (VirPlot curation convention, docs/GFF_GUIDE.md §9): a
+# transcript row whose Note says sgRNA. BYV expresses its 3' ORFs from "as
+# many as seven sgRNAs" (Vitushkina et al. 2002, Virology 297:299-307), each
+# with its own 5' terminus; the 3' ends follow the standard closterovirus
+# 3'-coterminal model and are written here as the genome end.
+#
+# MAPPED 5' termini, from that paper: p6 sgRNA at G-9402, Hsp70h sgRNA at
+# A-9467. The remaining five are NOT experimentally mapped here - they are
+# placed ~70 nt upstream of the ORF each expresses, which is the right order
+# for this genus but is illustrative, not a measurement. Treat them as a
+# drawing fixture; do not cite these five coordinates.
+NC_001598.1	VirPlot	mRNA	9402	15480	.	+	.	ID=sg_p6;gene=p6;Note=sgRNA; 5' terminus mapped to G-9402
+NC_001598.1	VirPlot	mRNA	9467	15480	.	+	.	ID=sg_hsp70h;gene=Hsp70h;Note=sgRNA; 5' terminus mapped to A-9467
+NC_001598.1	VirPlot	mRNA	11240	15480	.	+	.	ID=sg_p64;gene=p64;Note=sgRNA; 5' terminus approximate
+NC_001598.1	VirPlot	mRNA	12850	15480	.	+	.	ID=sg_cpm;gene=CPm;Note=sgRNA; 5' terminus approximate
+NC_001598.1	VirPlot	mRNA	13570	15480	.	+	.	ID=sg_cp;gene=CP;Note=sgRNA; 5' terminus approximate
+NC_001598.1	VirPlot	mRNA	14180	15480	.	+	.	ID=sg_p20;gene=p20;Note=sgRNA; 5' terminus approximate
+NC_001598.1	VirPlot	mRNA	14700	15480	.	+	.	ID=sg_p21;gene=p21;Note=sgRNA; 5' terminus approximate

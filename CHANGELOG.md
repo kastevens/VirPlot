@@ -14,6 +14,34 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   modules that matter, with the design patterns the code happens to use
   marked (Value Object, Aggregate, Builder, Factory + Iterator, Strategy,
   Rule table); `docs/class_layout.svg` regenerated from it.
+- **Subgenomic RNA rows.** The nested sgRNA sets that plus-strand RNA plant
+  viruses use for their 3' ORFs are drawn as shorter lines beneath the genome
+  line, 5' aligned to their start with an arrowhead there, longest row first
+  and each labelled — the ICTV convention. They are read from a transcript row
+  (`mRNA`, `transcript`, `ncRNA`, `misc_RNA`, `primary_transcript`,
+  `sequence_feature`, `misc_feature`) whose `Note=` says `sgRNA` or
+  `subgenomic`, with `gene=` naming what it expresses; the marker is required
+  rather than inferred from the type, because RefSeq writes real `mRNA` rows
+  (spliced mastrevirus transcripts) that are not sgRNAs. `start` is the 5'
+  terminus; an end at or past the genome length means the 3' end, covering the
+  usual 3'-coterminal set, while an earlier end is kept for the 5'-proximal
+  sgRNAs closteroviruses also make. Row colour is `sgrna_color` in spec.yml.
+  `examples/byv.gff3` carries the full closterovirus ladder.
+
+  These rows are annotation and never a depth track: a plant virus sgRNA is
+  co-linear with the genome and carries no leader junction, so its reads
+  cannot be told from genomic reads and per-sgRNA coverage is not recoverable
+  from short reads. The set does leave a step in the aggregate depth at each
+  5' end, which is why the ladder shares the depth track's x-axis — a
+  closterovirus covered 1x over ORF1a and 150x over CP is showing its
+  expression strategy, not a failed assembly.
+
+  Drawn in the linear layout only, deliberately: the ICTV puts no transcript
+  rows on circular genomes (geminivirus transcription is bidirectional from
+  the IR, nanovirus components carry one ORF each), so `--layout circular`
+  warns and skips. See `docs/GFF_GUIDE.md` §12 and
+  `docs/ictv_drawing_conventions.md` §6 K.
+
 - **Non-coding features: UTRs, intergenic regions, stem-loops.** GFF
   `five_prime_UTR` / `three_prime_UTR` / `stem_loop` / `origin_of_replication`
   rows are always read; GenBank's catch-all `misc_feature` (NCBI GFF3

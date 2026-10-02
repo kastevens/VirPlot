@@ -15,7 +15,7 @@ _KNOWN_KEYS = {
     "color_mapping", "default_color", "depth_line_color", "shade_color",
     "annotation_fontsize", "stacked_area_colors", "legend_location", "title",
     "overlap_mode", "end_5_label", "end_3_label", "function_palette",
-    "circular_labels", "circular_arcs",
+    "circular_labels", "circular_arcs", "sgrna_color",
 }
 
 CIRCULAR_LABELS = ("tangential", "horizontal")
@@ -97,6 +97,7 @@ class Settings:
     # circular layout style (ICTV figures: horizontal labels, arcs on the circle)
     circular_labels: str = "tangential"      # tangential | horizontal
     circular_arcs: str = "outside"           # outside | on_circle
+    sgrna_color: str = "#8C2F39"             # subgenomic RNA rows under the line
 
     def feature_color(self, product: str) -> str:
         """Colour for a product: explicit mapping, then function class, then default.
@@ -157,4 +158,5 @@ def load_settings(yaml_path: str) -> Settings:
         function_palette=palette,
         circular_labels=choice("circular_labels", CIRCULAR_LABELS, Settings.circular_labels),
         circular_arcs=choice("circular_arcs", CIRCULAR_ARCS, Settings.circular_arcs),
+        sgrna_color=str(raw.get("sgrna_color", Settings.sgrna_color)),
     )

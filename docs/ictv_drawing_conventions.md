@@ -131,7 +131,7 @@ showed the spec itself needs a change. Rule numbers refer to the sections above.
 | 1 | Done. Flip-on-overlap with a collision fallback (see A below). | `layout.py` |
 | 2 | Done. Keyword classifier → ICTV palette; `color_mapping` still wins; "putative" → lighter tint. | `settings.py` |
 | 3 | Done. `Feature.strand`/`gene` carried; + above →, − below ←; same-side overlap tiers outward; `auto` picks flip/tier from `two_strand`. | `layout.py`, `plotting.py` |
-| 4 | **Mostly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=`; default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=` (linear layout); **polyprotein domain dividers** from RefSeq's `mature_protein_region_of_CDS` / `mat_peptide` rows, in both layouts (see F). sgRNA rows: **not done**. | `plotting.py`, `parsers.py`, `layout.py`, `models.py` |
+| 4 | **Mostly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=`; default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=` (linear layout); **polyprotein domain dividers** from RefSeq's `mature_protein_region_of_CDS` / `mat_peptide` rows, in both layouts (see F). **sgRNA rows** beneath the line, longest first, from a marked transcript row (linear layout only — see K). | `plotting.py`, `parsers.py`, `layout.py`, `models.py` |
 | 5 | **Done differently.** One figure per RNA with a shared y-limit and length-proportional width, not stacked rows (see G). | `cli.py`, `plotting.py` |
 | 6 | Done. `CircularPlotter`: origin at 12 o'clock with stem-loop icon (moved to a GFF `stem_loop` row when there is one), arcs just outside the circle with arrowheads, clockwise for + and anticlockwise for −, overlap nests inward; **IR / UTR as a grey arc astride the circle** from the GFF's non-coding rows; depth as an inner ring. `--layout circular|auto`. | `plotting.py` |
 
@@ -207,7 +207,7 @@ genome line; a stem-loop is the hairpin icon at its own position (which on a
 circle replaces the default icon at position 1); a region holding an unnamed
 stem-loop is named once at the hairpin, as Geminiviridae Fig. 5 writes
 `CRA`. The document should say that these are drawn **on** the line and take
-no part in the ORF layout. sgRNAs still need an encoding decision.
+no part in the ORF layout. sgRNAs are now encoded and drawn; see K.
 
 **G. §1 Segmented genomes — stacked vs separate.** The document specifies
 stacked rows, largest first. The branch delivers separate files with a shared
@@ -226,6 +226,41 @@ worth making explicit.
 and the rim; deeper nesting is clamped to the innermost lane with a warning.
 Real cases (nanovirus components, PCV) fit; a very dense circular genome would
 need the depth ring made thinner or the arcs unrolled.
+
+**K. §1 sgRNAs — encoded as a curation convention, and linear-only by
+design.** The document asks for "shorter lines stacked beneath the genome, 5′
+aligned to their start, labelled". The branch draws exactly that, longest row
+first, from a transcript row (`mRNA`, `transcript`, `ncRNA`, `misc_RNA`,
+`primary_transcript`, `sequence_feature`, `misc_feature`) whose `Note=` says
+`sgRNA` / `subgenomic`, with `gene=` naming what it expresses
+(docs/GFF_GUIDE.md §12). The marker is required rather than inferred from the
+type, because RefSeq writes real `mRNA` rows — spliced mastrevirus transcripts
+— that are not sgRNAs. `start` is the 5′ terminus; an `end` at or past the
+genome length means the 3′ end, which covers the usual 3′-coterminal set,
+while an earlier end is kept for the 5′-proximal sgRNAs closteroviruses also
+make. `examples/byv.gff3` carries the ladder, with the two 5′ termini mapped
+by Vitushkina et al. (2002, *Virology* 297:299–307) marked as such and the
+other five flagged as illustrative placements.
+
+Two things the document should record. First, **these rows are annotation and
+never a depth track**: a plant virus sgRNA is co-linear with the genome and
+carries no leader junction (unlike *Nidovirales*), so a read from an sgRNA
+cannot be told from a genomic read at the same coordinate and per-sgRNA
+coverage is not recoverable from short reads. What the set leaves is a step in
+the *aggregate* depth at each 5′ end, height proportional to abundance — which
+is the reason to draw the ladder on the same x-axis as the depth trace, and
+which explains a 5′-to-3′ coverage ramp that would otherwise read as a failed
+assembly.
+
+Second, **sgRNA rows are drawn in the linear layout only, deliberately.** The
+ICTV draws no transcript rows on circular genomes: geminivirus transcription
+is bidirectional from the IR with overlapping transcripts rather than a
+3′-coterminal set (Geminiviridae chapter, Fig. 2 shows ORFs and the stem-loop
+and nothing else), and nanovirus components carry one ORF each. Nesting seven
+near-complete arcs would also be unreadable. `--layout circular` warns and
+skips. The genuine circular case is *Caulimoviridae* — CaMV's 35S and 19S —
+which is two arcs, not a ladder, and would fit the existing nesting lanes if
+it is ever wanted. §1 should say the sgRNA row is a linear-genome convention.
 
 **J. Version.** Stages 1–3 change existing linear output (the synthetic sample
 now has every box above the line, since none of its ORFs overlap, and its `p7`

@@ -134,6 +134,40 @@ class Noncoding:
         return (self.start + self.end) / 2
 
 
+@dataclass(frozen=True)
+class SubgenomicRNA:
+    """One subgenomic RNA, in 1-based inclusive bp on the genome it comes from.
+
+    Many plus-strand RNA plant viruses express their 3' ORFs from a nested set
+    of 3'-coterminal sgRNAs, each differing only in where its 5' end lies
+    (*Closteroviridae*, *Alphaflexiviridae*, *Tombusviridae*, *Virgaviridae*).
+    Only ``start`` carries information in that case: ``end`` is the genome's 3'
+    end. A 5'-proximal sgRNA, which closteroviruses also make, ends earlier,
+    so the end is kept rather than assumed.
+
+    These are drawn as rows beneath the genome line and take no part in the
+    ORF layout. They are annotation, never a depth track: because a plant
+    virus sgRNA is co-linear with the genome and carries no leader junction
+    (unlike *Nidovirales*), a read from an sgRNA is indistinguishable from a
+    genomic read at the same coordinate, so per-sgRNA coverage cannot be
+    recovered from short reads. What the set does leave is a step in the
+    aggregate depth at each 5' end — which is what makes these rows worth
+    drawing against the depth track.
+    """
+
+    start: int
+    end: int
+    label: str
+
+    @property
+    def length(self) -> int:
+        return self.end - self.start + 1
+
+    @property
+    def midpoint(self) -> float:
+        return (self.start + self.end) / 2
+
+
 @dataclass
 class DepthTrack:
     """Per-base read depth for one sample over one RNA."""
@@ -153,6 +187,7 @@ class RNA:
     seqid: str | None = None        # sequence id in GFF / SAM / depth files
     circular: bool = False
     noncoding: list[Noncoding] = field(default_factory=list)  # UTRs, IRs, stem-loops
+    sgrnas: list[SubgenomicRNA] = field(default_factory=list)  # drawn beneath the line
 
     # --- depth tracks -------------------------------------------------------
 
@@ -178,6 +213,18 @@ class RNA:
         if not tracks:
             return np.zeros(self.length, dtype=int)
         return np.sum(tracks, axis=0) if len(tracks) > 1 else tracks[0]
+
+    # --- subgenomic RNAs ----------------------------------------------------
+
+    @property
+    def sgrna_ladder(self) -> list[SubgenomicRNA]:
+        """sgRNAs ordered as the ICTV figures stack them: longest first.
+
+        For the usual 3'-coterminal set that is also 5'-most first, so the
+        rows descend like a ladder; ``start`` breaks ties for sgRNAs of equal
+        length.
+        """
+        return sorted(self.sgrnas, key=lambda s: (-s.length, s.start))
 
     @property
     def two_strand(self) -> bool:
