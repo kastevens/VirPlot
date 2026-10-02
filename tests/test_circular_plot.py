@@ -53,9 +53,18 @@ def test_feature_spans_start_after_end_splits():
     assert rna.feature_spans(Feature(90, 10, "+", "p")) == [(90, 100), (1, 10)]
 
 
-def test_feature_spans_linear_rna_is_never_split():
+def test_feature_spans_wrap_spellings_are_split_even_on_a_linear_rna():
+    # --topology linear on a circular genome, or a GFF that forgot Is_circular:
+    # the pieces are drawn where the coordinates say rather than off the axis
     rna = RNA(name="r", length=100, circular=False)
-    assert rna.feature_spans(Feature(90, 110, "+", "p")) == [(90, 110)]
+    assert rna.feature_spans(Feature(90, 110, "+", "p")) == [(90, 100), (1, 10)]
+    assert rna.feature_spans(Feature(90, 10, "+", "p")) == [(90, 100), (1, 10)]
+    assert rna.feature_spans(Feature(10, 50, "+", "p")) == [(10, 50)]
+
+
+def test_feature_spans_reduces_padded_start_modulo_length():
+    rna = RNA(name="r", length=1000, circular=True)
+    assert rna.feature_spans(Feature(1050, 1200, "+", "p")) == [(50, 200)]
 
 
 def test_feature_spans_feature_wrapping_right_round_covers_once():
@@ -229,3 +238,23 @@ def test_on_circle_puts_innermost_lane_astride_the_baseline():
         p._draw_annotations(ax, rna)
         assert p._ring_top == pytest.approx(expect_top), mode
         plt.close(fig)
+
+
+def test_circular_label_helpers_work_before_annotations_are_drawn():
+    # per-figure radii start at sane defaults rather than AttributeError
+    import argparse
+    from virplot.plotting import CircularPlotter
+    from virplot.settings import Settings
+    args = argparse.Namespace(smooth=False, normalize=False, free_y=False, equal_width=False,
+                              legend=False, shade_breaks=False, title=False, grid=False,
+                              no_label=False, yscale="linear", linthresh=10.0,
+                              format="png", outdir=".", name="x", layout="circular")
+    fig = plt.figure(); ax = fig.add_subplot(projection="polar")
+    rna = RNA(name="r", length=1000, circular=True)
+    CircularPlotter(Settings(), args)._label_horizontal(ax, rna, "x", [(1, 100)])
+    plt.close(fig)
+
+
+def test_tiny_genome_tick_step_is_at_least_one():
+    from virplot.plotting import _nice_step
+    assert _nice_step(4 / 8) == 1 and _nice_step(0) == 1

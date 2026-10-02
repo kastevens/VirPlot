@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-import sys
 from urllib.parse import unquote
 
 import numpy as np
@@ -16,6 +15,10 @@ from virplot.models import RNA, Domain, Feature, Noncoding
 from virplot.settings import classify_function
 
 log = logging.getLogger(__name__)
+
+
+class ParseError(ValueError):
+    """A GFF3 or depth file VirPlot cannot use; the message says where and why."""
 
 
 # --------------------------------------------------------------------------
@@ -95,13 +98,18 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
             target.setdefault(seqid, []).append((int(start), int(end), strand, info))
 
     if not rnas:
-        log.error("No 'region' feature found in GFF: %s", gff_path)
-        sys.exit(1)
+        raise ParseError(f"No 'region' feature found in GFF: {gff_path}")
 
     for seqid, rna in rnas.items():
         rna.features.extend(_features_from_rows(rows.get(seqid, []),
                                                 domain_rows.get(seqid, [])))
         rna.noncoding.extend(noncoding.get(seqid, []))
+        if not rna.circular:
+            wrapped = [f for f in rna.features if rna.wraps(f)]
+            if wrapped:
+                log.warning("%s is not marked circular but %d feature(s) cross the origin "
+                            "(%s); add Is_circular=true to its region line or --topology circular",
+                            seqid, len(wrapped), ", ".join(f.product for f in wrapped[:3]))
 
     for seqid in sorted(set(rows) - set(rnas)):
         log.warning("CDS features on %r ignored: no 'region' line for that sequence", seqid)
@@ -398,14 +406,13 @@ def parse_depth(depth_path: str, seq_len: int, *, seqid: str | None = None,
         for lineno, line in enumerate(fp, 1):
             fields = line.rstrip("\n").split("\t")
             if len(fields) != 3:
-                log.error("Malformed depth line in %s:%d — expected 3 "
-                          "tab-separated columns, got %d", depth_path, lineno, len(fields))
-                sys.exit(1)
+                raise ParseError(f"Malformed depth line in {depth_path}:{lineno} — expected 3 "
+                                 f"tab-separated columns, got {len(fields)}")
             try:
                 pos, cov = int(fields[1]), int(fields[2])
             except ValueError:
-                log.error("Non-integer value in %s:%d — %r", depth_path, lineno, line.rstrip())
-                sys.exit(1)
+                raise ParseError(f"Non-integer value in {depth_path}:{lineno} — "
+                                 f"{line.rstrip()!r}") from None
             by_seq.setdefault(fields[0], []).append((pos, cov))
 
     if seqid is None and ref is None:

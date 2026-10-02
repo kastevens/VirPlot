@@ -13,7 +13,7 @@ from virplot.analysis import (MappingError, ReadSet, call_blocks, default_read_l
                               missing_bowtie2_tools, write_csvs)
 from virplot.models import RNA
 from virplot.alignments import AlignmentError
-from virplot.parsers import default_label, load_depth, parse_gff_rnas
+from virplot.parsers import ParseError, default_label, load_depth, parse_gff_rnas
 from virplot.plotting import CircularPlotter, LinearPlotter
 from virplot.settings import load_settings
 
@@ -201,7 +201,11 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1)
 
     # --- parse annotations ---
-    rnas = parse_gff_rnas(args.gff)
+    try:
+        rnas = parse_gff_rnas(args.gff)
+    except ParseError as exc:
+        log.error("%s", exc)
+        sys.exit(1)
     if args.rnas:
         by_id = {r.seqid: r for r in rnas}
         missing = [x for x in args.rnas if x not in by_id]
@@ -252,7 +256,7 @@ def main(argv: list[str] | None = None) -> None:
                 y, n, kind = load_depth(df, rna.length, seqid=rna.seqid,
                                         ref=args.ref, min_mapq=args.min_mapq,
                                         circular=rna.circular)
-            except AlignmentError as exc:
+            except (AlignmentError, ParseError) as exc:
                 log.error("%s", exc)
                 sys.exit(1)
             where = f"{rna.seqid} in {df}" if multi else df
@@ -262,7 +266,9 @@ def main(argv: list[str] | None = None) -> None:
                 log.info("Parsed %d depth entries for %s", n, where)
                 counts.add(n)
             rna.add_depth(label, y)
-        if len(counts) > 1:
+        # a circular genome's depth files may legitimately differ in length
+        # (one made against a padded reference, one not)
+        if len(counts) > 1 and not rna.circular:
             log.error("Mismatching position count across depth files for %s: %s",
                       rna.seqid, counts)
             sys.exit(1)

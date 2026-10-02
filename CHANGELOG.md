@@ -196,6 +196,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   (found at the junction, ±2 nt), not to whichever ORF sorted before it by
   start; a small ORF nested inside ORF1a no longer makes ORF1b land on
   ORF1a's side.
+- Origin-crossing coordinates (`start > end`, or `end` past the length) are
+  split into their two pieces whether or not the molecule is marked circular,
+  so `--topology linear` on a circular genome, or a GFF that forgot
+  `Is_circular`, draws the feature where the coordinates say instead of as
+  an off-axis box; a `start` past the length (padded reference) is reduced
+  modulo the length; the parser warns when a non-circular region has such
+  a feature.
+- Two `samtools depth` files of different row counts no longer abort for a
+  circular genome (one may have been made against a padded reference).
+- `Feature.length` counts bases inclusively (`Feature(1, 3).length == 3`).
+- Malformed GFF or depth text raises `virplot.parsers.ParseError` (caught by
+  the CLI) instead of calling `sys.exit` from library code.
+- The linear depth outline is drawn stepped when the fill is (two or more
+  tracks), so it sits on the fill's edge.
+- All-zero depth no longer trips matplotlib's identical-ylim warning; an
+  `RNA` with no depth track plots as flat zero instead of raising; genomes
+  under eight bases get a tick step of one instead of a division by zero.
+- `CircularPlotter`'s per-figure radii start at sane defaults, so its label
+  helpers can be called in any order.
 - `--report` no longer fails when the output directory does not exist yet.
 
 ### Changed

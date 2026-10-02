@@ -70,7 +70,8 @@ class Feature:
 
     @property
     def length(self) -> int:
-        return self.end - self.start
+        """Bases covered, for 1-based inclusive coordinates (``Feature(1, 3)`` is 3)."""
+        return self.end - self.start + 1
 
     @property
     def midpoint(self) -> float:
@@ -194,19 +195,27 @@ class RNA:
     def feature_spans(self, feature) -> list[tuple[int, int]]:
         """Drawable 1-based inclusive spans for a feature (or any ``start``/``end`` record).
 
-        Normally one span. On a circular molecule a feature crossing the
-        origin — written either as ``start > end`` or with an ``end`` past the
-        genome length, both of which occur in the wild — becomes two spans so
-        it can be drawn continuously.
+        Normally one span. A feature crossing the origin — written either as
+        ``start > end`` or with an ``end`` past the genome length, both of
+        which occur in the wild — becomes two spans so it can be drawn
+        continuously. Coordinates past the length (a padded reference) are
+        taken modulo the length. The same arithmetic is applied whether or
+        not the molecule is marked circular: on a linear one the two pieces
+        are at least drawn where the coordinates say (the parser warns).
         """
+        L = self.length
         start, end = feature.start, feature.end
-        if not self.circular:
-            return [(start, end)]
-        if end > self.length:
-            wrapped = end - self.length
+        if start > L:
+            start, end = ((start - 1) % L) + 1, end - (start - ((start - 1) % L) - 1)
+        if end > L:
+            wrapped = end - L
             if wrapped >= start:                   # wraps right round
-                return [(1, self.length)]
-            return [(start, self.length), (1, wrapped)]
+                return [(1, L)]
+            return [(start, L), (1, wrapped)]
         if start > end:
-            return [(start, self.length), (1, end)]
+            return [(start, L), (1, end)]
         return [(start, end)]
+
+    def wraps(self, feature) -> bool:
+        """True when ``feature`` is written across the origin (two drawable spans)."""
+        return len(self.feature_spans(feature)) > 1

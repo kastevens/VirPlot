@@ -4,7 +4,7 @@ import textwrap
 import numpy as np
 import pytest
 
-from virplot.parsers import parse_gff, parse_depth
+from virplot.parsers import ParseError, parse_gff, parse_depth
 
 
 # parse_gff
@@ -39,7 +39,7 @@ def test_parse_gff_unknown_product(tmp_path):
 def test_parse_gff_no_region(tmp_path):
     gff = tmp_path / "test.gff3"
     gff.write_text("seq1\t.\tCDS\t10\t200\t.\t+\t0\tID=cds1;product=X\n")
-    with pytest.raises(SystemExit):
+    with pytest.raises(ParseError):
         parse_gff(str(gff))
 
 
@@ -76,14 +76,14 @@ def test_parse_depth_out_of_range_ignored(tmp_path):
 def test_parse_depth_malformed_columns(tmp_path):
     dep = tmp_path / "bad.dep"
     dep.write_text("seq1\t1\n")  # only 2 columns
-    with pytest.raises(SystemExit):
+    with pytest.raises(ParseError):
         parse_depth(str(dep), 10)
 
 
 def test_parse_depth_non_integer(tmp_path):
     dep = tmp_path / "bad.dep"
     dep.write_text("seq1\tabc\t10\n")
-    with pytest.raises(SystemExit):
+    with pytest.raises(ParseError):
         parse_depth(str(dep), 10)
 
 
@@ -149,3 +149,20 @@ def test_parse_gff_percent_decodes_attribute_values(tmp_path):
     (f,) = rna.features
     assert f.product == "polyprotein, putative"
     assert f.domains[0].product == "P1/P2"
+
+
+def test_wrap_feature_on_linear_region_warns(tmp_path):
+    import logging
+    from virplot.parsers import parse_gff_rnas
+    p = tmp_path / "t.gff3"
+    p.write_text("##gff-version 3\ns1\t.\tregion\t1\t1000\t.\t+\t.\tID=s1\n"
+                 "s1\t.\tCDS\t900\t100\t.\t+\t0\tID=c;product=Rep\n")
+    records = []
+    h = logging.Handler(); h.emit = records.append
+    logging.getLogger("virplot.parsers").addHandler(h)
+    try:
+        (rna,) = parse_gff_rnas(str(p))
+    finally:
+        logging.getLogger("virplot.parsers").removeHandler(h)
+    assert any("cross the origin" in r.getMessage() for r in records)
+    assert rna.feature_spans(rna.features[0]) == [(900, 1000), (1, 100)]

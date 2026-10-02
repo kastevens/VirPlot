@@ -65,8 +65,6 @@ CIRC_FIGSIZE = 8
 CIRC_R_DEPTH_BASE = 0.30        # depth baseline (zero coverage)
 CIRC_R_DEPTH_MAX = 0.66         # depth at the y-limit
 CIRC_R_BASELINE = 0.71          # the genome circle; ORF arcs sit just outside it
-CIRC_R_ANN_LANES = (0.80, 0.895)  # kept for reference; lanes now come from CIRC_LANE_STEP
-CIRC_R_LANE0 = 0.895            # bottom radius of the outermost arc lane (tier 0)
 CIRC_LANE_STEP = 0.095          # each nesting tier steps this far inward
 CIRC_MAX_TIERS = 3              # deeper nesting than this collides with the depth band
 CIRC_ANN_HEIGHT = 0.085
@@ -110,23 +108,22 @@ class Plotter:
     # --- shared helpers -----------------------------------------------------
 
     def _smoothed_total(self, rna: RNA) -> np.ndarray:
-        tracks = rna.tracks
-        if self.args.smooth:
-            tracks = [smooth_depth(y, window_size=SMOOTH_WINDOW) for y in tracks]
-        return np.sum(tracks, axis=0) if len(tracks) > 1 else tracks[0]
+        return self._prepared_tracks(rna, normalize=False)[1]
 
-    def _prepared_tracks(self, rna: RNA) -> tuple[list[np.ndarray], np.ndarray]:
+    def _prepared_tracks(self, rna: RNA, normalize: bool | None = None
+                         ) -> tuple[list[np.ndarray], np.ndarray]:
         """Apply --smooth / --normalize to the depth tracks.
 
         Returns (per-track arrays, combined array). Smoothing is applied per
         track; normalisation divides everything by the combined maximum (of
         this RNA, or of all RNAs after ``prepare``) so the total peaks at 1.
+        An RNA with no depth track gets one flat zero track.
         """
-        tracks = rna.tracks
+        tracks = rna.tracks or [np.zeros(rna.length, dtype=float)]
         if self.args.smooth:
             tracks = [smooth_depth(y, window_size=SMOOTH_WINDOW) for y in tracks]
         total = np.sum(tracks, axis=0) if len(tracks) > 1 else tracks[0]
-        if self.args.normalize:
+        if self.args.normalize if normalize is None else normalize:
             denom = self.shared_denom or total.max() or 1.0
             tracks = [y / denom for y in tracks]
             total = total / denom
@@ -584,7 +581,9 @@ class LinearPlotter(Plotter):
             colors = (s.stacked_area_colors[:k]
                       + [s.default_color] * max(0, k - len(s.stacked_area_colors)))
             layers = ax.stackplot(x, *reversed(tracks), colors=colors, alpha=0.9, step="pre")
-        ax.plot(x, total, **DEPTH_OUTLINE)
+        # the outline follows the fill's shape: stepped when the fill is
+        ax.plot(x, total, drawstyle="steps-pre" if len(tracks) > 1 else "default",
+                **DEPTH_OUTLINE)
 
         ax.set_xlim(x[0], x[-1])
         return layers
@@ -603,8 +602,8 @@ class LinearPlotter(Plotter):
         if args.yscale == "symlog":
             ax.set_yscale("symlog", linthresh=args.linthresh, linscale=1)
 
-        ymax = self.shared_ymax if self.shared_ymax is not None else total.max()
-        ax.set_ylim(0, ymax * Y_HEADROOM if total.size else 1)
+        ymax = (self.shared_ymax if self.shared_ymax is not None else total.max()) or 1.0
+        ax.set_ylim(0, ymax * Y_HEADROOM)
 
         if args.grid:
             ax.grid(True, linestyle="--", linewidth=0.3)
@@ -616,7 +615,17 @@ class CircularPlotter(Plotter):
     Position *p* maps to θ = 2π(p−1)/L, with position 1 at the top and
     increasing clockwise, so the whole molecule closes on itself and a
     feature or a read crossing the origin is drawn continuously.
+
+    Three radii depend on the figure being drawn and are set by
+    ``_draw_annotations`` / ``_draw_depth`` for the label and axis helpers
+    that run after them; they start at the single-lane defaults.
     """
+
+    def __init__(self, settings: Settings, args: argparse.Namespace):
+        super().__init__(settings, args)
+        self._ring_top = CIRC_R_BASELINE + 0.02 + CIRC_ANN_HEIGHT
+        self._outside_label_r = CIRC_R_OUTSIDE_LABEL
+        self._depth_ymax = 1.0
 
     def render(self, rna: RNA, threshold_results: list[tuple], out_base: str) -> None:
         fig = plt.figure(figsize=(CIRC_FIGSIZE, CIRC_FIGSIZE))
@@ -865,7 +874,7 @@ class CircularPlotter(Plotter):
         theta = float(self._theta(mid, rna.length))
         deg = np.degrees(theta)
         left = 90 < (deg % 360) < 270
-        return ax.text(theta, getattr(self, "_outside_label_r", CIRC_R_OUTSIDE_LABEL), text,
+        return ax.text(theta, self._outside_label_r, text,
                        ha="right" if left else "left", va="center",
                        rotation=(-deg + 180) if left else -deg,
                        rotation_mode="anchor", fontsize=fontsize, color="0.25",
@@ -919,7 +928,7 @@ class CircularPlotter(Plotter):
 
         # narrow feature: read outwards from the rim
         left = 90 < (deg % 360) < 270
-        return ax.text(theta, getattr(self, "_outside_label_r", CIRC_R_OUTSIDE_LABEL), text,
+        return ax.text(theta, self._outside_label_r, text,
                        ha="right" if left else "left", va="center",
                        rotation=(-deg + 180) if left else -deg,
                        rotation_mode="anchor", fontsize=fontsize,
@@ -983,7 +992,7 @@ class CircularPlotter(Plotter):
 
         # depth scale: floor and ceiling on the origin radius, so the radial
         # extent is readable without a second axis
-        ymax = getattr(self, "_depth_ymax", total.max() or 1.0)
+        ymax = self._depth_ymax
         fmt = (lambda v: f"{v:.2g}") if self.args.normalize else (lambda v: f"{v:.0f}")
         unit = "" if self.args.normalize else "\u00d7"
         # the ceiling label normally stands on its radius, up against the
@@ -1011,5 +1020,5 @@ def _nice_step(target: float) -> int:
     exp = 10 ** int(np.floor(np.log10(target)))
     for mult in (1, 2, 5, 10):
         if mult * exp >= target:
-            return int(mult * exp)
-    return int(10 * exp)
+            return max(1, int(mult * exp))
+    return max(1, int(10 * exp))

@@ -8,7 +8,7 @@ from virplot.models import DepthTrack, Feature, RNA
 
 def test_feature_length_and_midpoint():
     f = Feature(start=100, end=400, strand="+", product="CP")
-    assert f.length == 300
+    assert f.length == 301          # 1-based inclusive
     assert f.midpoint == 250.0
 
 
