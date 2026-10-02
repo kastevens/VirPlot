@@ -66,6 +66,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ref",
                    help="Reference name to use from SAM/BAM/depth files when the GFF "
                         "sequence id does not match (single-RNA GFF only)")
+    p.add_argument("--rna-order", choices=["length", "gff"], default="length",
+                   help="Order segments largest first (the ICTV stacking order) "
+                        "or as the GFF lists them [%(default)s]; --rnas sets its own order")
     p.add_argument("--rnas", nargs="+", metavar="SEQID",
                    help="Plot only these GFF sequence ids, in this order "
                         "(default: every 'region' in the GFF)")
@@ -89,6 +92,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Output directory for the plot")
     p.add_argument("-n", "--normalize", action="store_true",
                    help="Normalize depth values to max=1")
+    p.add_argument("--bare-x", action="store_true",
+                   help="Drop the x-axis label and tick numbers, for a panel that will be "
+                        "stacked under another (see bin/stack_figures.py)")
     p.add_argument("--grid", action="store_true",
                    help="Enable background grid on depth plot")
     p.add_argument("--smooth", action="store_true",
@@ -214,6 +220,10 @@ def main(argv: list[str] | None = None) -> None:
                       ", ".join(missing), ", ".join(by_id))
             sys.exit(1)
         rnas = [by_id[x] for x in args.rnas]
+    elif args.rna_order == "length":
+        # ICTV: segments are stacked largest first. An explicit --rnas is the
+        # user's own order and is left alone.
+        rnas = sorted(rnas, key=lambda r: (-r.length, r.seqid or ""))
     if args.ref and len(rnas) > 1:
         log.error("--ref applies to a single RNA; use --rnas to select one, "
                   "or drop --ref so each RNA is matched by its GFF sequence id")

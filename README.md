@@ -12,6 +12,10 @@ Polyprotein — PVY (`examples/pvy.gff3` + `pvy.yml`): RefSeq's mature-protein r
 
 ![PVY](docs/figures/pvy_linear.svg)
 
+Segmented — TSWV (`examples/tswv.gff3` + `tswv.yml`): one figure per segment on a shared scale, composed into the ICTV stacked figure by `bin/stack_figures.py`.
+
+![TSWV stacked](docs/figures/tswv_stacked.svg)
+
 Reads in the examples are simulated; the annotations are real RefSeq records. More renders in [`docs/figures/`](docs/figures/); `sh docs/make_figures.sh` regenerates them.
 
 Developed and maintained by Haoran (Henry) Li for [Foundation Plant Services](https://fps.ucdavis.edu/index.cfm) at [UC Davis](https://www.ucdavis.edu/).
@@ -268,7 +272,8 @@ The package lives in `src/virplot/`; `python -m virplot` runs the CLI from a che
 
 ## Supplementary Scripts
 
-Two standalone scripts in `bin/` assist with depth file preparation:
+Three standalone scripts in `bin/` assist with depth file preparation and
+figure composition:
 
 - **`depth_filter.py`** — Filter depth entries by sequence header:
 
@@ -281,6 +286,22 @@ Two standalone scripts in `bin/` assist with depth file preparation:
   ```bash
   python3 bin/depth_merger.py -i sample1.dep sample2.dep -o combined.dep
   ```
+
+- **`stack_figures.py`** — Stack a segmented genome's figures into one
+  ICTV-style multipartite figure (DNA-A/DNA-B, LIYV RNA-1/RNA-2, TSWV L/M/S,
+  nanovirus components). Render the segments in **one** run so they share a
+  scale and a depth y-limit, then compose:
+
+  ```bash
+  virplot -g tswv.gff3 -d tswv.sam -y tswv.yml -f svg --bare-x -o out --name tswv
+  python3 bin/stack_figures.py -i out/tswv.*.svg -o out/tswv_stacked.svg
+  ```
+
+  Segments render largest first by default (`--rna-order`), `--bare-x` leaves
+  the x-axis on the bottom panel only, and the composer aligns the panels' plot
+  areas. VirPlot has no stacked-figure renderer because it does not need one:
+  within a run the panels already share an exact x-scale, so stacking is a
+  document operation — see `docs/ictv_drawing_conventions.md` §6 G.
 
 ---
 

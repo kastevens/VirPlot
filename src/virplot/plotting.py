@@ -95,11 +95,30 @@ class Plotter:
         self.shared_denom: float | None = None    # --normalize divisor across RNAs
         self.shared_ymax: float | None = None     # common y-limit across RNAs
         self.max_length: int | None = None        # longest RNA, for width scaling
+        self.bottom_seqid: str | None = None      # last segment rendered; keeps the x-axis
+
+    def _bare_x(self, rna: RNA | None) -> bool:
+        """True when this panel should omit the x-axis label and tick numbers.
+
+        ``--bare-x`` is for panels that will be stacked by
+        bin/stack_figures.py, where one axis row at the bottom serves them
+        all. In a run over several segments the last one rendered is that
+        bottom row and keeps its axis; a lone panel is bare, since it is only
+        asked for when something else carries the axis. The ticks themselves
+        stay so the plot area keeps its geometry and the panels still align.
+        """
+        if not getattr(self.args, "bare_x", False):
+            return False
+        return (rna is None or self.bottom_seqid is None
+                or rna.seqid != self.bottom_seqid)
 
     def prepare(self, rnas: list[RNA]) -> None:
         """Compute cross-RNA scaling so separate figures share axes conventions."""
         if len(rnas) < 2:
             return
+        # the last segment rendered is the bottom row once stacked, so it is
+        # the one that keeps the shared x-axis under --bare-x
+        self.bottom_seqid = rnas[-1].seqid
         raw_max = max(self._smoothed_total(r).max() for r in rnas) or 1.0
         if self.args.normalize and not self.args.free_y:
             self.shared_denom = raw_max
@@ -317,7 +336,7 @@ class LinearPlotter(Plotter):
         if self.args.shade_breaks:
             self._shade_gaps(ax_depth, threshold_results)
 
-        self._style_depth_axis(ax_depth, total)
+        self._style_depth_axis(ax_depth, total, rna)
 
         extra_artists.append(self._add_title(fig, rna))
 
@@ -637,10 +656,14 @@ class LinearPlotter(Plotter):
                 ax.axvspan(g["start_bp"], g["end_bp"],
                            color=self.settings.shade_color, alpha=0.15, lw=0)
 
-    def _style_depth_axis(self, ax: plt.Axes, total: np.ndarray) -> None:
+    def _style_depth_axis(self, ax: plt.Axes, total: np.ndarray,
+                          rna: RNA | None = None) -> None:
         args = self.args
         ax.set_ylabel("Read Depth", fontsize=10)
-        ax.set_xlabel("Genome Position (bp)", fontsize=10)
+        if self._bare_x(rna):
+            ax.set_xticklabels([])
+        else:
+            ax.set_xlabel("Genome Position (bp)", fontsize=10)
 
         if args.yscale == "symlog":
             ax.set_yscale("symlog", linthresh=args.linthresh, linscale=1)

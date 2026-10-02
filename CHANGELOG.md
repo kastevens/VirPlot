@@ -10,6 +10,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Stacked figures for segmented genomes, by composing.** `bin/stack_figures.py`
+  joins a multipartite genome's per-segment figures into the one stacked figure
+  the ICTV conventions describe — largest first, shared scale, left aligned at
+  the 5' end (Geminiviridae DNA-A/DNA-B, LIYV RNA-1/RNA-2, TSWV L/M/S, nanovirus
+  components). Supporting it: segments now render **largest first** by default
+  (`--rna-order length|gff`), and `--bare-x` drops the repeated x-axis label and
+  tick numbers from every panel but the bottom one.
+
+  There is deliberately no stacked-figure renderer. Within a run the figure
+  width is proportional to genome length and matplotlib's margins are
+  fractional, so the separate panels already share an exact x-scale — measured
+  across TSWV's 3x length spread, 0.0000% drift — which makes stacking a
+  document operation rather than a re-plot. The composer also **aligns the
+  panels' plot areas**, correcting the small offset (0.63 pt on LIYV) that
+  appears when panels carry y-tick labels of different widths and are cropped
+  to a tight bounding box; hand pasting cannot fix that. `tests/test_stacking.py`
+  guards the shared-scale property, since the decision holds only while it does.
+  See `docs/ictv_drawing_conventions.md` §6 G.
+
 - `docs/ARCHITECTURE.md` §3 class diagram simplified to the objects and
   modules that matter, with the design patterns the code happens to use
   marked (Value Object, Aggregate, Builder, Factory + Iterator, Strategy,

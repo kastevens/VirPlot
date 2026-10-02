@@ -131,8 +131,8 @@ showed the spec itself needs a change. Rule numbers refer to the sections above.
 | 1 | Done. Flip-on-overlap with a collision fallback (see A below). | `layout.py` |
 | 2 | Done. Keyword classifier → ICTV palette; `color_mapping` still wins; "putative" → lighter tint. | `settings.py` |
 | 3 | Done. `Feature.strand`/`gene` carried; + above →, − below ←; same-side overlap tiers outward; `auto` picks flip/tier from `two_strand`. | `layout.py`, `plotting.py` |
-| 4 | **Mostly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=`; default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=` (linear layout); **polyprotein domain dividers** from RefSeq's `mature_protein_region_of_CDS` / `mat_peptide` rows, in both layouts (see F). **sgRNA rows** beneath the line, longest first, from a marked transcript row (linear layout only — see K). | `plotting.py`, `parsers.py`, `layout.py`, `models.py` |
-| 5 | **Done differently.** One figure per RNA with a shared y-limit and length-proportional width, not stacked rows (see G). | `cli.py`, `plotting.py` |
+| 4 | **Done.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=` / `Name=` / `locus_tag=`, omitted when it repeats the product (see D); default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=`; **polyprotein domain dividers** from RefSeq's `mature_protein_region_of_CDS` / `mat_peptide` rows, in both layouts (see F); **sgRNA rows** beneath the line, longest first, from a marked transcript row (see K). The FS/RT marks and the sgRNA ladder are linear-layout only, and the circular layout now warns rather than dropping them silently. | `plotting.py`, `parsers.py`, `layout.py`, `models.py` |
+| 5 | **Done by composing.** One figure per segment, largest first, on a shared scale and y-limit; `bin/stack_figures.py` stacks them into the figure §1 describes. A `StackedPlotter` was considered and rejected on a measurement — see G. | `cli.py`, `plotting.py`, `bin/stack_figures.py` |
 | 6 | Done. `CircularPlotter`: origin at 12 o'clock with stem-loop icon (moved to a GFF `stem_loop` row when there is one), arcs just outside the circle with arrowheads, clockwise for + and anticlockwise for −, overlap nests inward; **IR / UTR as a grey arc astride the circle** from the GFF's non-coding rows; depth as an inner ring. `--layout circular|auto`. | `plotting.py` |
 
 ### Changes the document needs
@@ -209,12 +209,38 @@ stem-loop is named once at the hairpin, as Geminiviridae Fig. 5 writes
 `CRA`. The document should say that these are drawn **on** the line and take
 no part in the ORF layout. sgRNAs are now encoded and drawn; see K.
 
-**G. §1 Segmented genomes — stacked vs separate.** The document specifies
-stacked rows, largest first. The branch delivers separate files with a shared
-depth y-limit and width proportional to length (so they compose honestly), in
-GFF order. Either the document should record that decision or a
-`StackedPlotter` remains a to-do; ordering largest-first is a one-line change
-either way.
+**G. §1 Segmented genomes — rendered separately, composed afterwards.** The
+document specifies stacked rows, largest first. VirPlot renders one figure per
+segment and stacks them with `bin/stack_figures.py` rather than drawing a
+stacked figure directly. **This is a decision, not a missing feature**, and the
+measurement behind it is this: within one run the figure width is proportional
+to genome length and matplotlib's margins are fractional, so the panels already
+share an exact x-scale. Across TSWV's L/M/S (8,897 / 4,821 / 2,916 nt — a 3×
+spread) the measured scale drift is **0.0000%** and the plot areas start at the
+same x to within 0.00 pt. Stacking is therefore a document operation, and a
+`StackedPlotter` would re-implement in matplotlib a figure that already
+composes exactly.
+
+What the decision buys and costs. The panels stay independently useful (a
+single segment is a figure in its own right, which a stacked-only renderer
+would lose), the circular case needs no second layout pass, and the composer is
+~170 lines of stdlib against a 150–250-line renderer that would have to handle
+unequal-width axes in one `GridSpec` and a radial budget for circular
+components. The cost is one extra command, which `docs/make_figures.sh` shows.
+
+Three pieces close the gap to the document's wording: segments now render
+**largest first** by default (`--rna-order length`), `--bare-x` drops the
+repeated x-axis from every panel but the bottom one, and the composer orders
+panels largest first and **aligns their plot areas** — a panel whose depth axis
+carries wider tick labels starts further right once the figure is cropped to a
+tight bounding box (0.63 pt on LIYV), which hand pasting cannot correct.
+`tests/test_stacking.py` guards the shared-scale property itself, since the
+decision is only sound while it holds.
+
+§1 needs no change: it describes the finished figure, and the composed figure
+is that figure — one row per segment, largest first, on a shared scale. It is
+§5's stage wording ("→ stacked rows") that should say the rows are composed
+from per-segment figures rather than drawn by one renderer.
 
 **H. §4 Decision logic — layout default.** "circular? → C modes" implies
 circular genomes are drawn as circles by default. The CLI defaults to
