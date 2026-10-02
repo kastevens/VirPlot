@@ -116,3 +116,36 @@ def test_parse_gff_skips_malformed_columns(tmp_path):
     seq_len, features = parse_gff(str(gff))
     assert seq_len == 500
     assert len(features) == 1
+
+
+# --- row order and attribute escapes --------------------------------------------
+
+def test_parse_gff_rows_before_their_region_line_are_kept(tmp_path):
+    # GFF3 does not require the region line first; NCBI usually writes it first
+    # but hand-edited and concatenated files often do not
+    p = tmp_path / "t.gff3"
+    p.write_text(textwrap.dedent("""\
+        ##gff-version 3
+        s1	.	CDS	10	100	.	+	0	ID=c1;product=CP
+        s1	.	stem_loop	1	30	.	+	.	ID=sl
+        s1	.	region	1	1000	.	+	.	ID=s1
+    """))
+    from virplot.parsers import parse_gff_rnas
+    (rna,) = parse_gff_rnas(str(p))
+    assert [f.product for f in rna.features] == ["CP"]
+    assert len(rna.noncoding) == 1
+
+
+def test_parse_gff_percent_decodes_attribute_values(tmp_path):
+    p = tmp_path / "t.gff3"
+    p.write_text(textwrap.dedent("""\
+        ##gff-version 3
+        s1	.	region	1	1000	.	+	.	ID=s1
+        s1	.	CDS	10	100	.	+	0	ID=c1;product=polyprotein%2C putative;Note=a%3Bb
+        s1	.	mat_peptide	10	60	.	+	.	Parent=c1;product=P1%2FP2
+    """))
+    from virplot.parsers import parse_gff_rnas
+    (rna,) = parse_gff_rnas(str(p))
+    (f,) = rna.features
+    assert f.product == "polyprotein, putative"
+    assert f.domains[0].product == "P1/P2"

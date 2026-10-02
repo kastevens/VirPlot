@@ -180,3 +180,38 @@ def test_join_segment_with_repeated_product_is_labelled_once():
     LinearPlotter(Settings(), make_args())._draw_annotations(ax, r)
     assert texts(ax).count("fusion") == 1
     plt.close(fig)
+
+
+# --- regressions ------------------------------------------------------------------
+
+def test_hand_written_join_with_note_on_both_rows_marks_only_the_continuation(tmp_path):
+    rna = gff(tmp_path, """\
+        A	.	CDS	1	3000	.	+	0	ID=orf1;product=ORF1a;Note=-1 frameshift
+        A	.	CDS	3000	6000	.	+	0	ID=orf1;product=ORF1b;Note=-1 frameshift
+    """)
+    a, b = rna.features
+    assert a.mechanism is None
+    assert b.mechanism == "frameshift" and b.shift == -1
+
+
+def test_in_frame_join_segments_get_no_sign_rather_than_zero(tmp_path):
+    rna = gff(tmp_path, """\
+        A	RefSeq	CDS	1	3000	.	+	0	ID=j;exception=ribosomal slippage;product=pp
+        A	RefSeq	CDS	3001	6000	.	+	0	ID=j;exception=ribosomal slippage;product=pp
+    """)
+    assert rna.features[1].mechanism == "frameshift" and rna.features[1].shift is None
+    fig, ax = plt.subplots()
+    LinearPlotter(Settings(), make_args())._draw_annotations(ax, rna)
+    assert "FS" in texts(ax) and not any(t.endswith("0 FS") for t in texts(ax))
+    plt.close(fig)
+
+
+def test_frameshift_flips_relative_to_the_orf_it_continues_not_the_previous_by_start():
+    # a nested small ORF sorts between ORF1a and ORF1b; ORF1b must still land
+    # on the side opposite ORF1a (junction gap of one base: +1 shift)
+    r = RNA(name="r", length=7000, features=[
+        Feature(1, 3000, "+", "ORF1a"), Feature(1000, 1500, "+", "p20"),
+        Feature(3002, 6000, "+", "ORF1b", mechanism="frameshift", shift=1)])
+    out = {p.feature.product: p.side for p in place_features(r.features, r.feature_spans, "flip")}
+    assert out["ORF1b"] == -out["ORF1a"]
+    assert out["p20"] == -out["ORF1a"]                 # the overlap flip still holds

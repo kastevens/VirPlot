@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass, field
 
 import yaml
+from matplotlib.colors import to_hex, to_rgb
 
 log = logging.getLogger(__name__)
 
@@ -65,14 +66,16 @@ def classify_function(product: str) -> str | None:
     return None
 
 
-def lighter(hex_color: str, amount: float = 0.35) -> str:
-    """Tint a ``#rrggbb`` colour towards white (ICTV: 'putative' = lighter)."""
-    hex_color = hex_color.lstrip("#")
-    if len(hex_color) != 6:
-        return "#" + hex_color
-    r, g, b = (int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
-    mix = lambda c: int(round(c + (255 - c) * amount))
-    return f"#{mix(r):02x}{mix(g):02x}{mix(b):02x}"
+def lighter(color: str, amount: float = 0.35) -> str:
+    """Tint any matplotlib colour (``#rrggbb``, ``#abc``, ``tomato``) towards
+    white (ICTV: 'putative' = lighter); an unparsable colour is returned as is
+    so matplotlib reports it at draw time."""
+    try:
+        r, g, b = to_rgb(color)
+    except ValueError:
+        return color
+    mix = lambda c: c + (1.0 - c) * amount
+    return to_hex((mix(r), mix(g), mix(b)))
 
 
 @dataclass
@@ -140,7 +143,7 @@ def load_settings(yaml_path: str) -> Settings:
         return value
 
     return Settings(
-        color_mapping=raw.get("color_mapping", {}),
+        color_mapping=dict(raw.get("color_mapping") or {}),
         default_color=raw.get("default_color", Settings.default_color),
         depth_line_color=raw.get("depth_line_color", Settings.depth_line_color),
         shade_color=raw.get("shade_color", Settings.shade_color),

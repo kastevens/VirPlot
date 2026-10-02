@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import sys
+from urllib.parse import unquote
 
 import numpy as np
 
@@ -54,11 +55,12 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
     protein rows become ``Domain`` segments of the CDS they belong to.
     """
     rnas: dict[str, RNA] = {}
-    orphans: set[str] = set()
     rows: dict[str, list[tuple[int, int, str, dict]]] = {}
     domain_rows: dict[str, list[tuple[int, int, str, dict]]] = {}
     noncoding: dict[str, list[Noncoding]] = {}
 
+    # Collect everything first, attach afterwards: GFF3 does not require the
+    # region line to precede the features of its sequence.
     with open(gff_path) as fp:
         for line in fp:
             line = line.strip()
@@ -73,9 +75,7 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
 
             if feature_type == "region":
                 if seqid not in rnas:
-                    attrs = dict(
-                        kv.split("=", 1) for kv in attributes.split(";") if "=" in kv
-                    )
+                    attrs = _attributes(attributes)
                     circular = attrs.get("Is_circular", "").lower() == "true"
                     rnas[seqid] = RNA(name=seqid, seqid=seqid, length=int(end),
                                       circular=circular)
@@ -85,16 +85,11 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
             if feature_type != "CDS" and feature_type not in _DOMAIN_TYPES and not is_nc:
                 continue
 
-            info = dict(
-                kv.split("=", 1) for kv in attributes.split(";") if "=" in kv
-            )
+            info = _attributes(attributes)
             if is_nc:
                 nc = _noncoding(feature_type, int(start), int(end), strand, info)
-                if nc is not None and seqid in rnas:
+                if nc is not None:
                     noncoding.setdefault(seqid, []).append(nc)
-                continue
-            if seqid not in rnas:
-                orphans.add(seqid)
                 continue
             target = rows if feature_type == "CDS" else domain_rows
             target.setdefault(seqid, []).append((int(start), int(end), strand, info))
@@ -108,10 +103,26 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
                                                 domain_rows.get(seqid, [])))
         rna.noncoding.extend(noncoding.get(seqid, []))
 
-    for seqid in sorted(orphans):
+    for seqid in sorted(set(rows) - set(rnas)):
         log.warning("CDS features on %r ignored: no 'region' line for that sequence", seqid)
 
     return list(rnas.values())
+
+
+def _attributes(column: str) -> dict[str, str]:
+    """GFF3 column 9 as a dict, with ``%XX`` escapes decoded.
+
+    GFF3 reserves ``;``, ``=``, ``&`` and ``,`` inside values and writes them
+    percent-encoded; NCBI does so routinely (``product=polyprotein%2C putative``,
+    ``transl_except=(pos:3417..3419%2Caa:OTHER)``). Decoding here means labels
+    read naturally and the function-word classifier sees real text.
+    """
+    out: dict[str, str] = {}
+    for kv in column.split(";"):
+        if "=" in kv:
+            key, value = kv.split("=", 1)
+            out[key.strip()] = unquote(value)
+    return out
 
 
 # --- expression mechanisms ---------------------------------------------------
@@ -140,6 +151,7 @@ def _features_from_rows(rows: list[tuple[int, int, str, dict]],
         groups[key].append(row)
 
     feats: list[Feature] = []
+    joined: set[int] = set()         # first segments of slipped joins
     for key in order:
         segs = groups[key]
         if len(segs) == 1:
@@ -158,6 +170,7 @@ def _features_from_rows(rows: list[tuple[int, int, str, dict]],
         segs = sorted(segs, key=lambda r: r[0], reverse=not forward)
         first = _feature(*segs[0])
         feats.append(first)
+        joined.add(id(first))        # its Note describes the join, not itself
         prev = first
         for seg in segs[1:]:
             shift = _shift_between(prev, seg[0], seg[1], forward)
@@ -169,7 +182,7 @@ def _features_from_rows(rows: list[tuple[int, int, str, dict]],
     # 2. single rows that declare a mechanism in their own attributes
     resolved: list[Feature] = []
     for f in feats:
-        if f.mechanism is not None:
+        if f.mechanism is not None or id(f) in joined:
             resolved.append(f); continue
         info = f._attrs                                    # stashed by _feature
         note = info.get("Note", "").lower()
@@ -259,8 +272,9 @@ def _strip_attrs(f: Feature) -> Feature:
     return f
 
 
-def _shift_between(prev: Feature, start: int, end: int, forward: bool) -> int:
+def _shift_between(prev: Feature, start: int, end: int, forward: bool) -> int | None:
     """Frameshift sign from the join geometry: skipping 1 nt is +1, re-reading 1 nt is -1.
+    None (drawn as a bare ``FS``) when the segments are in frame with each other.
 
     LIMIT: this is inference, not annotation. It is exactly right for a RefSeq
     join, whose segment boundaries are the slippage site, but a hand-written
@@ -270,7 +284,7 @@ def _shift_between(prev: Feature, start: int, end: int, forward: bool) -> int:
     docs/GFF_GUIDE.md section 8 tells authors to write one in that case.
     """
     gap = (start - prev.end - 1) if forward else (prev.start - end - 1)
-    return {1: 1, 2: -1}.get(gap % 3, 0)
+    return {1: 1, 2: -1}.get(gap % 3, None)
 
 
 def _shift_from_neighbour(f: Feature, feats: list[Feature]) -> int | None:

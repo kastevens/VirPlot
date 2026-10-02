@@ -177,6 +177,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- GFF3 rows that precede their sequence's `region` line are no longer dropped
+  (with a misleading "no region line" warning); features are attached after
+  the whole file is read.
+- GFF3 attribute values are percent-decoded (`%2C` → `,`, `%3B` → `;`, as
+  NCBI writes inside `product=` and `Note=`), so labels read naturally and the
+  function-word classifier sees real text.
+- A named or 3-digit colour in `function_palette` (`orange`, `#abc`) no
+  longer crashes the "putative = lighter tint" path; `lighter()` accepts any
+  matplotlib colour.
+- `color_mapping:` left empty in the YAML no longer raises `TypeError`.
+- A hand-written join (two rows sharing an `ID`) with `Note=… frameshift` on
+  both rows marks only the continuation as the frameshift, not the first
+  segment too.
+- Join segments that are in frame with each other get no sign (bare `FS`)
+  instead of `−0 FS`.
+- A frameshift continuation now flips relative to the ORF it continues
+  (found at the junction, ±2 nt), not to whichever ORF sorted before it by
+  start; a small ORF nested inside ORF1a no longer makes ORF1b land on
+  ORF1a's side.
 - `--report` no longer fails when the output directory does not exist yet.
 
 ### Changed
