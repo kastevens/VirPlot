@@ -330,10 +330,22 @@ skips. The genuine circular case is *Caulimoviridae* — CaMV's 35S and 19S —
 which is two arcs, not a ladder, and would fit the existing nesting lanes if
 it is ever wanted. §1 should say the sgRNA row is a linear-genome convention.
 
-**J. Version.** Stages 1–3 change existing linear output (the synthetic sample
-now has every box above the line, since none of its ORFs overlap, and its `p7`
-takes the small-ORF purple). Per §5 that warrants a minor-version bump; not
-applied on the branch — a release decision.
+**J. Version. Settled: 2.2.0.** Stages 1–3 change existing linear output (the
+synthetic sample now has every box above the line, since none of its ORFs
+overlap, and its `p7` takes the small-ORF purple), and stages 4–6 add features,
+so per §5 this branch is a minor release rather than a patch. The branch also
+changes two defaults — a circular genome now draws as a circle (H), and
+segments render largest first — which users will see without asking for them,
+and that is the other half of the case for a minor bump.
+
+Applied in `src/virplot/__init__.py`, `pyproject.toml` and `CITATION.cff`, with
+the CHANGELOG's `[Unreleased]` section closed as `[2.2.0]`.
+
+**The jump from 2.0.0 is deliberate — there is no 2.1.0, and that is not an
+oversight.** 2.2 is chosen to signal that this is a substantial change rather
+than an increment, while leaving **3.0 reserved** for the release accompanying
+the second paper. Anyone auditing the tags (`v2.0.0` is the only one) should
+read the gap that way rather than as a lost release.
 
 ---
 

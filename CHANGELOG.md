@@ -6,7 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Unreleased]
+## [2.2.0] — 2026-10-02
 
 ### Changed
 
