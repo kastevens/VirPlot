@@ -1,0 +1,33 @@
+# Style for grapevine leafroll-associated virus 13 isolate H8881
+# (examples/glrav13.gff3), following the Closteroviridae palette of ICTV 9th
+# Report Fig. 2 as examples/byv.yml does, mapped onto this genome's ORFs:
+# replication yellow, HSP70h green, the HSP90 homolog (p53 here, p64 in BYV)
+# teal, CP and CPm the same magenta, the silencing suppressor (p22) orange,
+# the 3'-most ORF (p23) purple, the small hydrophobic p7/p8/p4 ORFs grey.
+#
+# The reads are real (examples/glrav13.bam, 212,285 alignments mapped to
+# examples/glrav13.fa), so unlike the simulated examples the depth trace shows
+# genuine coverage structure: a spiky profile from read-start bias and a mild
+# 3' rise (1.6x over the 5' half), not the flat band a simulated set gives.
+
+color_mapping:
+  Methyltransferase/helicase: '#f5e663'
+  RdRp: '#f5e663'
+  p7: '#9f9f9f'
+  HSP70h: '#7dbb4f'
+  p53: '#3ea6b5'
+  CPm: '#e75480'
+  CP: '#e75480'
+  p22: '#f28e2b'
+  p8: '#9f9f9f'
+  p23: '#7b5ea7'
+  p4: '#9f9f9f'
+
+annotation_fontsize: 9
+default_color: '#9f9f9f'
+shade_color: '#ca4f35'
+depth_line_color: '#85dbec'
+legend_location: "upper left"
+end_5_label: "5'"
+end_3_label: "3'"
+title: "Grapevine leafroll-associated virus 13, GLRaV-13 isolate H8881 (17,564 nts)"

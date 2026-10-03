@@ -18,3 +18,7 @@ virplot -g examples/pvy.gff3  -d examples/pvy.sam  -y examples/pvy.yml  -f svg -
 virplot -g examples/tswv.gff3 -d examples/tswv.sam -y examples/tswv.yml -f svg --title --smooth --bare-x -o "$out" --name tswv_segment
 python3 bin/stack_figures.py -i "$out"/tswv_segment.*.svg -o "$out"/tswv_stacked.svg
 rm -f "$out"/tswv_segment.*.svg
+
+# GLRaV-13: the one example whose reads are real rather than simulated, plotted
+# straight from the mapped-read BAM.
+virplot -g examples/glrav13.gff3 -d examples/glrav13.bam -y examples/glrav13.yml -f svg --title --smooth --grid -o "$out" --name glrav13_linear
