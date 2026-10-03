@@ -16,7 +16,11 @@ Segmented — TSWV (`examples/tswv.gff3` + `tswv.yml`): one figure per segment o
 
 ![TSWV stacked](docs/figures/tswv_stacked.svg)
 
-Reads in the examples are simulated; the annotations are real RefSeq records. More renders in [`docs/figures/`](docs/figures/); `sh docs/make_figures.sh` regenerates them.
+Real reads — GLRaV-13 (`examples/glrav13.gff3` + `glrav13.yml`), plotted straight from `examples/glrav13.bam`: 212,285 alignments against `examples/glrav13.fa`, mean depth 1,173x.
+
+![GLRaV-13](docs/figures/glrav13_linear.svg)
+
+Reads in the other examples are simulated; the annotations are real records. More renders in [`docs/figures/`](docs/figures/); `sh docs/make_figures.sh` regenerates them.
 
 Developed and maintained by Haoran (Henry) Li for [Foundation Plant Services](https://fps.ucdavis.edu/index.cfm) at [UC Davis](https://www.ucdavis.edu/).
 

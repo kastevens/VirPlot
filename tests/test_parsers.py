@@ -216,3 +216,38 @@ def test_a_feature_with_no_names_has_no_outside_label(tmp_path):
     assert _genes(tmp_path, """\
         A	.	CDS	100	400	.	+	0	ID=a;product=RdRp
     """) == [(None, "RdRp")]
+
+
+# --- the GLRaV-13 example: the one fixture whose reads are real ---------------
+
+def test_glrav13_example_is_self_consistent():
+    """Its GFF3, FASTA and BAM must agree on the sequence id and length, so the
+    example plots with no --ref and no name-mismatch warning."""
+    from virplot.alignments import open_alignments
+    from virplot.parsers import gff_seqid, parse_gff_rnas
+
+    (rna,) = parse_gff_rnas("examples/glrav13.gff3")
+    assert rna.seqid == gff_seqid("examples/glrav13.gff3") == "GLRaV13_H8881"
+    assert rna.length == 17564 and not rna.circular
+
+    header, length = None, 0
+    for line in open("examples/glrav13.fa"):
+        if line.startswith(">"):
+            header = line[1:].strip()
+        else:
+            length += len(line.strip())
+    assert header == rna.seqid, "FASTA header must match the GFF3 seqid"
+    assert length == rna.length
+
+    refs = open_alignments("examples/glrav13.bam").references
+    assert refs == {rna.seqid: rna.length}, "BAM @SQ must match the GFF3 seqid and length"
+
+
+def test_glrav13_example_carries_only_mapped_reads():
+    from virplot.alignments import SKIP_FLAGS, open_alignments
+    af = open_alignments("examples/glrav13.bam")
+    n = 0
+    for aln in af.records:
+        assert not aln.flag & SKIP_FLAGS, "unmapped/secondary/QC-fail/duplicate record in the example"
+        n += 1
+    assert n == 212285

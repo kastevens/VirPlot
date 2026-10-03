@@ -6,6 +6,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **A real-read example: GLRaV-13 isolate H8881** (`examples/glrav13.gff3`,
+  `glrav13.fa`, `glrav13.bam`, `glrav13.yml`). Every other example ships
+  simulated reads; this one carries 212,285 real alignments against the real
+  reference, mean depth 1,173x with 100% of the genome at >=1x, so the depth
+  trace shows genuine coverage structure instead of a flat band.
+
+  The BAM holds only the reads VirPlot counts: the source alignment had 23.0M
+  records, of which 212,285 survive the unmapped / secondary / QC-fail /
+  duplicate filter, taking it from 899 MB to 4.7 MB. The depth it yields is
+  identical to the depth from the unfiltered file. Its `@SQ` name and the
+  FASTA header were both changed from the assembler's contig name
+  (`GVLRaV13_H8881NODE_4_length_...`) to the GFF3's `GLRaV13_H8881`, so the
+  example plots with no `--ref` and no name-mismatch warning — the §7 problem,
+  avoided rather than demonstrated.
+
 ## [2.2.0] — 2026-10-02
 
 ### Changed
