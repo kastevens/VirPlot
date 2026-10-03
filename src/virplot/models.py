@@ -150,9 +150,13 @@ class SubgenomicRNA:
     virus sgRNA is co-linear with the genome and carries no leader junction
     (unlike *Nidovirales*), a read from an sgRNA is indistinguishable from a
     genomic read at the same coordinate, so per-sgRNA coverage cannot be
-    recovered from short reads. What the set does leave is a step in the
-    aggregate depth at each 5' end — which is what makes these rows worth
-    drawing against the depth track.
+    recovered from short reads. A nested set would leave a monotonic staircase
+    in the *aggregate* depth — each sgRNA covers its 5' end through to the
+    genome's 3' end, so depth steps up at each terminus and never down — which
+    is what makes these rows worth drawing against the depth track: the ladder
+    states a prediction the trace can be checked against. Whether a library
+    shows it depends on the preparation, and many do not; see
+    docs/GFF_GUIDE.md §11.
     """
 
     start: int

@@ -8,7 +8,7 @@
 # The reads are real (examples/glrav13.bam, 212,285 alignments mapped to
 # examples/glrav13.fa), so unlike the simulated examples the depth trace shows
 # genuine coverage structure: a spiky profile from read-start bias and a mild
-# 3' rise (1.6x over the 5' half), not the flat band a simulated set gives.
+# 3' rise (1.55x over the 5' half), not the flat band a simulated set gives.
 
 color_mapping:
   Methyltransferase/helicase: '#f5e663'
