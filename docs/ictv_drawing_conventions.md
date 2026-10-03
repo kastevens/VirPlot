@@ -314,11 +314,23 @@ Two things the document should record. First, **these rows are annotation and
 never a depth track**: a plant virus sgRNA is co-linear with the genome and
 carries no leader junction (unlike *Nidovirales*), so a read from an sgRNA
 cannot be told from a genomic read at the same coordinate and per-sgRNA
-coverage is not recoverable from short reads. What the set leaves is a step in
-the *aggregate* depth at each 5′ end, height proportional to abundance — which
-is the reason to draw the ladder on the same x-axis as the depth trace, and
-which explains a 5′-to-3′ coverage ramp that would otherwise read as a failed
-assembly.
+coverage is not recoverable from short reads. What a nested set *would* leave
+in the *aggregate* depth is a monotonic staircase — each sgRNA runs from its
+own 5′ end to the genome's 3′ end, so depth can only rise 3′-ward, stepping up
+at each terminus by that sgRNA's abundance. That is the reason to draw the
+ladder on the same x-axis as the depth trace: it makes the prediction
+checkable.
+
+It should be recorded as a prediction rather than an expectation, because the
+first real library in the repository does not show it. `examples/glrav13.bam`
+is a closterovirus at 1,173× mean depth with a 3′/5′ ratio of **1.55×**, and
+its per-ORF step ratios run from 0.55× to 1.93×, four of the thirteen going
+down; a 3′-coterminal ladder cannot step down at all. Whether sgRNAs dominate a library
+depends on its preparation — dsRNA enrichment captures replicative forms and
+flattens the gradient — so §1 should say the rows predict a staircase that a
+given dataset may or may not show, and that a genuine staircase explains a
+5′-to-3′ gradient which would otherwise read as a failed assembly, while its
+absence says nothing about the assembly.
 
 Second, **sgRNA rows are drawn in the linear layout only, deliberately.** The
 ICTV draws no transcript rows on circular genomes: geminivirus transcription

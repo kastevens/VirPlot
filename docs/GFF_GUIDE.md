@@ -484,12 +484,39 @@ falls back to `sgRNA1`, `sgRNA2`… numbered 5' to 3'.
 co-linear with the genome and carries no leader junction (unlike
 *Nidovirales*, where `periscope` and `LeTRS` count leader-spanning reads), so
 a read from an sgRNA is indistinguishable from a genomic read at the same
-coordinate. Per-sgRNA coverage cannot be recovered from short reads. What the
-set does leave is a **step in the aggregate depth at each 5' end**, with step
-height proportional to that sgRNA's abundance — which is why the rows are
-drawn on the same x-axis as the depth trace. A closterovirus at 1× over ORF1a
-and 150× over CP is not under-sequenced; it is the expression strategy, and
-the ladder is what says so.
+coordinate. Per-sgRNA coverage cannot be recovered from short reads.
+
+What a nested set *would* leave in the aggregate depth is a **monotonic
+staircase**: every sgRNA covers its own 5' end through to the genome's 3' end,
+so depth can only rise as you read 3'-ward, stepping up at each 5' terminus by
+that sgRNA's abundance. That is why the rows share the depth track's x-axis —
+not because the staircase is always there, but because drawing them together
+is what lets you check.
+
+**Whether a given library shows it is an empirical question, and often the
+answer is no.** The abundance of sgRNAs relative to genomic RNA depends on the
+preparation: a dsRNA-enriched library captures replicative forms and flattens
+the gradient, while poly(A) or random-primed total RNA may show it strongly.
+The real-read example shipped here is the cautionary case —
+`examples/glrav13.bam`, a closterovirus at 1,173× mean depth, has a 3'/5'
+ratio of only **1.55×**, and stepping across its ORF starts gives ratios from
+0.55× to 1.93× — **four of its thirteen steps go down.** A true 3'-coterminal
+ladder cannot step down at all, so that profile is a mild 3' bias, not a
+staircase.
+
+So read the ladder as a **prediction to test against the depth trace**, not as
+an explanation to apply to it:
+
+| What you see | What it means |
+|---|---|
+| steps up at the annotated 5' ends, never down | the set is expressed and abundant in this library |
+| a step with no annotated sgRNA | an unannotated sgRNA, a DI RNA, or mismapping |
+| an annotated sgRNA with no step | not expressed here, mis-annotated, or a preparation that flattens sgRNAs |
+| no monotonic structure at all | the usual case for many preparations — judge coverage on its own terms |
+
+A genuine staircase does explain a 5'-to-3' coverage gradient that would
+otherwise read as a failed assembly. Its absence proves nothing about the
+assembly either way.
 
 **Layout limit.** sgRNA rows are drawn in the **linear layout only**. This is
 deliberate, not missing: the ICTV draws no transcript rows on circular

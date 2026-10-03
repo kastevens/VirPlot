@@ -433,8 +433,10 @@ class LinearPlotter(Plotter):
         arrowhead at the 5' end, labelled just outside that end. Rows are
         annotation only: a plant virus sgRNA is co-linear with the genome, so
         its reads cannot be told from genomic reads and it has no depth track
-        of its own — but each 5' end predicts a step in the shared depth
-        trace below, which is the point of drawing them on the same x-axis.
+        of its own — but a nested set predicts a monotonic staircase in the
+        shared depth trace below, stepping up at each 5' end and never down,
+        which is the point of drawing them on the same x-axis. The prediction
+        is there to be tested; many preparations do not show it.
 
         Returns the y of the lowest row drawn (``top`` when there are none),
         so the caller can extend the panel to fit them.

@@ -8,6 +8,28 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The subgenomic-RNA coverage descriptions now state a prediction rather
+  than an expectation.** The documentation asserted that a nested sgRNA set
+  leaves a step in the aggregate depth at each 5' end, and used a closterovirus
+  covered 1x over ORF1a and 150x over CP as the illustration. The mechanism is
+  right — each sgRNA runs from its own 5' end to the genome's 3' end, so the
+  set predicts a *monotonic* staircase that can only rise 3'-ward — but whether
+  a library shows one depends on its preparation, and the first real library in
+  the repository does not. `examples/glrav13.bam`, a closterovirus at 1,173x
+  mean depth, has a 3'/5' ratio of 1.55x and per-ORF step ratios from 0.55x to
+  1.93x, four of thirteen going down; a 3'-coterminal ladder cannot step down
+  at all.
+
+  The ladder is therefore documented as something to test the depth trace
+  against, with a table of what each outcome means, rather than as an
+  explanation to apply to it. A genuine staircase still explains a 5'-to-3'
+  gradient that would otherwise read as a failed assembly; its absence says
+  nothing about the assembly. `GFF_GUIDE.md` §11,
+  `ictv_drawing_conventions.md` §6 K, and the `SubgenomicRNA` and
+  `_draw_sgrnas` docstrings.
+
 ### Added
 
 - **A real-read example: GLRaV-13 isolate H8881** (`examples/glrav13.gff3`,
@@ -92,10 +114,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   These rows are annotation and never a depth track: a plant virus sgRNA is
   co-linear with the genome and carries no leader junction, so its reads
   cannot be told from genomic reads and per-sgRNA coverage is not recoverable
-  from short reads. The set does leave a step in the aggregate depth at each
-  5' end, which is why the ladder shares the depth track's x-axis — a
-  closterovirus covered 1x over ORF1a and 150x over CP is showing its
-  expression strategy, not a failed assembly.
+  from short reads. A nested set predicts a monotonic staircase in the
+  aggregate depth — each sgRNA runs from its 5' end to the genome's 3' end, so
+  depth steps up at each terminus and never down — which is why the ladder
+  shares the depth track's x-axis: it makes the prediction checkable. Whether
+  a library shows it depends on its preparation, and many do not.
 
   Drawn in the linear layout only, deliberately: the ICTV puts no transcript
   rows on circular genomes (geminivirus transcription is bidirectional from
