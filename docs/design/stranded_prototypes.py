@@ -1,4 +1,7 @@
-"""Prototype figures for docs/stranded_depth.md. Not part of VirPlot.
+"""Prototype figure for docs/stranded_depth.md. Not part of VirPlot.
+
+Writes docs/stranded_prototypes.svg (docs/*.svg is tracked; docs/figures/
+is emptied by make_figures.sh on every run, so the figure does not live there).
 
 Splits the real GLRaV-13 H8881 reads (examples/glrav13.bam) by strand of
 origin and draws them six ways: two linear (mirrored, linear and symlog) and
@@ -21,7 +24,7 @@ from virplot.plotting import CIRC_R_BASELINE, CIRC_R_DEPTH_BASE, CIRC_R_DEPTH_MA
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BAM = os.path.join(HERE, "..", "..", "examples", "glrav13.bam")
-OUT = os.path.join(HERE, "stranded_prototypes.png")
+OUT = os.path.normpath(os.path.join(HERE, "..", "stranded_prototypes.svg"))
 
 PC, MC = "#7fc8d6", "#d68a7f"                  # + strand, - strand
 LINE = dict(color="black", linewidth=0.3, alpha=0.8)
@@ -61,8 +64,12 @@ def main() -> None:
     plus, minus = strand_depth(BAM, length)
     k = np.ones(15) / 15
     plus, minus = np.convolve(plus, k, "same"), np.convolve(minus, k, "same")
-    x = np.arange(1, length + 1)
+    # every 16th base after smoothing (the 15-base window already set the detail)
+    step = 16
+    plus, minus = plus[::step], minus[::step]
+    x = np.arange(1, length + 1, step)
     theta = np.append(2 * np.pi * (x - 1) / length, 2 * np.pi)
+    n = len(x)
     close = lambda a: np.append(a, a[0])
     base, top = CIRC_R_DEPTH_BASE, CIRC_R_DEPTH_MAX
     mid, half = (base + top) / 2, (top - base) / 2
@@ -73,10 +80,10 @@ def main() -> None:
     for col, (title, log) in enumerate((("Linear, mirrored, shared linear scale", False),
                                         ("Linear, mirrored, shared symlog scale", True))):
         ax = fig.add_subplot(gs[0, 2 * col:2 * col + 2])
-        ax.fill_between(x, plus, color=PC, lw=0)
-        ax.fill_between(x, -minus, color=MC, lw=0)
-        ax.plot(x, plus, **LINE)
-        ax.plot(x, -minus, **LINE)
+        ax.fill_between(x, plus, color=PC, lw=0, rasterized=True)
+        ax.fill_between(x, -minus, color=MC, lw=0, rasterized=True)
+        ax.plot(x, plus, rasterized=True, **LINE)
+        ax.plot(x, -minus, rasterized=True, **LINE)
         ax.axhline(0, color="black", lw=0.6)
         if log:
             ax.set_yscale("symlog", linthresh=LINTHRESH)
@@ -91,15 +98,16 @@ def main() -> None:
         ax.set_theta_direction(-1)
         ax.set_ylim(0, 0.78)
         ax.axis("off")
-        ax.plot(theta, np.full(length + 1, CIRC_R_BASELINE), color="black", lw=1.2)
+        ax.plot(theta, np.full(n + 1, CIRC_R_BASELINE), color="black", lw=1.2)
         ax.set_title(title, fontsize=9, pad=2)
         return ax
 
     def band(ax, r0, r1, color):
-        ax.fill_between(theta, close(r0), close(r1), color=color, lw=0, zorder=2)
-        ax.plot(theta, close(r1), zorder=3, **LINE)
+        # polar paths are subdivided per segment; raster bands keep the SVG small
+        ax.fill_between(theta, close(r0), close(r1), color=color, lw=0, zorder=2, rasterized=True)
+        ax.plot(theta, close(r1), zorder=3, rasterized=True, **LINE)
 
-    flat = np.full(length, mid)
+    flat = np.full(n, mid)
     shared = max(plus.max(), minus.max()) * 1.05
 
     ax = polar(0, "A. Mirrored, shared linear scale")
@@ -113,9 +121,9 @@ def main() -> None:
     ax = polar(2, "C. Two bands, both outward,\nown scales (+ outer, − inner)")
     gap = 0.02
     hb = (top - base - gap) / 2
-    band(ax, np.full(length, base), base + minus / (minus.max() * 1.05) * hb, MC)
+    band(ax, np.full(n, base), base + minus / (minus.max() * 1.05) * hb, MC)
     b2 = base + hb + gap
-    band(ax, np.full(length, b2), b2 + plus / (plus.max() * 1.05) * hb, PC)
+    band(ax, np.full(n, b2), b2 + plus / (plus.max() * 1.05) * hb, PC)
 
     ax = polar(3, "D. Mirrored, shared symlog scale\n(dotted: 10×, 100×, 1000×)")
     s_top = symlog(shared)
@@ -123,12 +131,14 @@ def main() -> None:
     band(ax, flat, mid - symlog(minus) / s_top * half, MC)
     for d in (10, 100, 1000):
         for sign in (1, -1):
-            ax.plot(theta, np.full(length + 1, mid + sign * symlog(d) / s_top * half),
+            ax.plot(theta, np.full(n + 1, mid + sign * symlog(d) / s_top * half),
                     color="0.45", lw=0.35, ls=":", zorder=4)
 
     fig.suptitle("Stranded depth prototypes: GLRaV-13 H8881, real reverse-stranded reads "
                  "(+ blue, − red; circular panels test geometry only)", fontsize=10, y=0.995)
-    fig.savefig(OUT, dpi=110, bbox_inches="tight")
+    plt.rcParams["svg.hashsalt"] = "virplot"     # stable ids, so reruns give the same file
+    plt.rcParams["svg.fonttype"] = "none"        # text as text, not glyph paths
+    fig.savefig(OUT, bbox_inches="tight", dpi=150, metadata={"Date": None})
     print(f"wrote {OUT}  (+ mean {plus.mean():.0f}x, - mean {minus.mean():.0f}x)")
 
 

@@ -4,7 +4,7 @@ Branch `feature/stranded-maf`. Status: **investigation**; nothing on this
 branch changes VirPlot's behaviour yet. Minor-allele frequency (MAF) is the
 second feature planned for the branch and is sketched in §6.
 
-![Prototypes](design/stranded_prototypes.png)
+![Prototypes](stranded_prototypes.svg)
 
 The figure is made by `docs/design/stranded_prototypes.py` from the shipped
 GLRaV-13 reads (`PYTHONPATH=src python3 docs/design/stranded_prototypes.py`).
