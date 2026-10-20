@@ -13,6 +13,11 @@ it.  Defaults reproduce ``samtools depth -a`` as closely as practical:
 Both SAM (text) and BAM (BGZF-compressed binary) are read with the standard
 library only — BGZF is a valid multi-member gzip stream, so :mod:`gzip`
 decodes it.  CRAM is not supported.
+
+Depth is counted in two halves by the orientation of each fragment's read 1
+(a read 2 counts with its orientation flipped, so both mates of a pair land
+together). The halves sum to the unstranded depth; for a stranded library,
+``--stranded`` says which half is the + RNA strand (docs/stranded_depth.md).
 """
 
 from __future__ import annotations
@@ -31,6 +36,11 @@ log = logging.getLogger(__name__)
 
 # SAM flag bits skipped by default (samtools depth: UNMAP,SECONDARY,QCFAIL,DUP)
 SKIP_FLAGS = 0x4 | 0x100 | 0x200 | 0x400
+
+# Library strandedness, as --stranded takes it. "reverse": the read (read 1 of
+# a pair) is antisense to the RNA it came from, as in dUTP-type kits; "forward":
+# it is sense.
+STRANDED = ("no", "forward", "reverse")
 
 _CIGAR_RE = re.compile(r"(\d+)([MIDNSHP=X])")
 _BAM_CIGAR_OPS = "MIDNSHP=X"
@@ -60,6 +70,56 @@ class AlignmentFile:
     path: str
     references: dict[str, int]      # name -> length from @SQ
     records: Iterator[Alignment]
+
+
+@dataclass
+class OrientedDepth:
+    """Per-base depth split by the orientation of each fragment's read 1.
+
+    ``forward`` counts reads whose fragment's read 1 aligned forward,
+    ``reverse`` the rest; a read 2 is counted with its orientation flipped.
+    ``total`` is the unstranded depth, identical to counting every read
+    together.
+    """
+
+    forward: np.ndarray
+    reverse: np.ndarray
+    n_forward: int
+    n_reverse: int
+
+    @property
+    def counted(self) -> int:
+        return self.n_forward + self.n_reverse
+
+    @property
+    def total(self) -> np.ndarray:
+        return self.forward + self.reverse
+
+    @property
+    def reverse_fraction(self) -> float | None:
+        """Share of counted reads whose fragment's read 1 aligned in reverse."""
+        return self.n_reverse / self.counted if self.counted else None
+
+    def strands(self, library: str) -> tuple[np.ndarray, np.ndarray]:
+        """``(+ strand, − strand)`` depth for a ``forward`` or ``reverse`` library."""
+        if library == "reverse":           # read 1 antisense: reverse reads are + RNA
+            return self.reverse, self.forward
+        if library == "forward":
+            return self.forward, self.reverse
+        raise ValueError(f"strands() needs a stranded library, not {library!r}")
+
+
+def read1_reverse(flag: int) -> bool:
+    """True when the fragment's read 1 aligned in reverse.
+
+    A single-end read or a read 1 reports its own orientation (flag 0x10); a
+    read 2 of a pair (0x1 and 0x80) reports the opposite, since the mates of
+    a fragment align on opposite strands.
+    """
+    reverse = bool(flag & 0x10)
+    if flag & 0x1 and flag & 0x80:
+        reverse = not reverse
+    return reverse
 
 
 # --------------------------------------------------------------------------
@@ -111,6 +171,25 @@ def depth_from_alignments(
 
     Returns ``(depth_array of length seq_len, n_reads_counted)``.
     """
+    od = oriented_depth_from_alignments(path, seq_len, seqid=seqid, ref=ref,
+                                        min_mapq=min_mapq, circular=circular)
+    return od.total, od.counted
+
+
+def oriented_depth_from_alignments(
+    path: str,
+    seq_len: int,
+    *,
+    seqid: str | None = None,
+    ref: str | None = None,
+    min_mapq: int = 0,
+    circular: bool = False,
+) -> OrientedDepth:
+    """Per-base depth for one reference, split by read-1 orientation.
+
+    Same filters, reference choice and origin wrapping as
+    :func:`depth_from_alignments`, which is this summed.
+    """
     af = open_alignments(path)
     target = resolve_reference(af.references, seqid=seqid, ref=ref, path=path)
 
@@ -121,13 +200,16 @@ def depth_from_alignments(
             "the GFF length are ignored", target, ref_len, os.path.basename(path), seq_len,
         )
 
-    # difference-array trick: +1 at start, -1 after end, cumulative sum at the end
-    diff = np.zeros(seq_len + 1, dtype=np.int64)
-    counted = 0
+    # difference-array trick: +1 at start, -1 after end, cumulative sum at the
+    # end; one array per read-1 orientation (index 1 = reverse)
+    diffs = (np.zeros(seq_len + 1, dtype=np.int64), np.zeros(seq_len + 1, dtype=np.int64))
+    counts = [0, 0]
     for aln in af.records:
         if aln.ref != target or aln.flag & SKIP_FLAGS or aln.mapq < min_mapq:
             continue
-        counted += 1
+        side = 1 if read1_reverse(aln.flag) else 0
+        counts[side] += 1
+        diff = diffs[side]
         pos = aln.pos - 1                  # 0-based
         for length, op in aln.cigar:
             if op in _DEPTH_OPS:
@@ -141,8 +223,8 @@ def depth_from_alignments(
             if op in _REF_CONSUMING:
                 pos += length
 
-    depth = np.cumsum(diff[:-1]).astype(int)
-    return depth, counted
+    forward, reverse = (np.cumsum(d[:-1]).astype(int) for d in diffs)
+    return OrientedDepth(forward, reverse, counts[0], counts[1])
 
 
 def _add_wrapped(diff: np.ndarray, start: int, length: int, seq_len: int) -> None:

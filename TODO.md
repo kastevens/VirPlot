@@ -55,3 +55,21 @@ same-colour flip, §2) has been written in. E, H and J need no change.
 
 Known differences from the published figures are recorded in §7 of the same
 document and are not on this list.
+
+## Stranded depth and MAF (`feature/stranded-maf`)
+
+Stranded depth is in (`--stranded`; `docs/stranded_depth.md`). Left:
+
+- [ ] **Per-strand reports.** Coverage intervals, gaps and the CSV reports
+      use the two strands' sum. Add + and − columns, or per-strand reports.
+- [ ] **Re-measure the sgRNA staircase on the + strand.** The − strand reads
+      in `glrav13.bam` are concentrated toward the 5′ end (+ : − is 4.4 in
+      the first 2 kb, 13–25 elsewhere). Adding them to the 5′ end flattens
+      the aggregate 5′→3′ comparison in `ictv_drawing_conventions.md` §6 K
+      and `GFF_GUIDE.md` §11.
+- [ ] **A stranded circular dataset.** Nothing in the repository checks the
+      circular layout against a real stranded library, or measures how
+      balanced the strands of a DNA virus are.
+- [ ] **Minor-allele frequency.** Decode SEQ and QUAL, count alleles per
+      position, and draw MAF against depth; the strand split gives a
+      strand-bias filter (`docs/stranded_depth.md` §6).

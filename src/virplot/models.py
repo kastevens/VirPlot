@@ -174,10 +174,16 @@ class SubgenomicRNA:
 
 @dataclass
 class DepthTrack:
-    """Per-base read depth for one sample over one RNA."""
+    """Per-base read depth for one sample over one RNA.
+
+    ``strand`` is ``"+"`` or ``"-"`` when a stranded library was split by RNA
+    strand (``--stranded``), and ``None`` for unstranded depth. A split sample
+    contributes one track of each strand under the same label.
+    """
 
     label: str
     values: np.ndarray
+    strand: str | None = None
 
 
 @dataclass
@@ -195,24 +201,44 @@ class RNA:
 
     # --- depth tracks -------------------------------------------------------
 
-    def add_depth(self, label: str, y: np.ndarray) -> None:
+    def add_depth(self, label: str, y: np.ndarray, strand: str | None = None) -> None:
         """Attach a depth track; the array must have one value per position."""
         if len(y) != self.length:
             raise ValueError(
                 f"Depth track {label!r} has {len(y)} positions, expected {self.length}"
             )
-        self.depth.append(DepthTrack(label, y))
+        if strand not in (None, "+", "-"):
+            raise ValueError(f"Depth track strand must be '+', '-' or None, not {strand!r}")
+        self.depth.append(DepthTrack(label, y, strand))
 
     @property
     def labels(self) -> list[str]:
         return [t.label for t in self.depth]
 
     @property
+    def stranded(self) -> bool:
+        """True when the depth was split by RNA strand."""
+        return any(t.strand is not None for t in self.depth)
+
+    def strand_tracks(self, strand: str) -> list[DepthTrack]:
+        """The tracks of one strand (``"+"`` or ``"-"``), in sample order."""
+        return [t for t in self.depth if t.strand == strand]
+
+    @property
+    def sample_labels(self) -> list[str]:
+        """One label per sample: a stranded sample's two tracks share one."""
+        return list(dict.fromkeys(self.labels))
+
+    @property
     def tracks(self) -> list[np.ndarray]:
         return [t.values for t in self.depth]
 
     def total_depth(self) -> np.ndarray:
-        """Sum of all depth tracks (the single track if there is only one)."""
+        """Sum of all depth tracks (the single track if there is only one).
+
+        For stranded depth that is + plus −, the unstranded depth, so coverage
+        intervals, gaps and reports mean the same with or without a split.
+        """
         tracks = self.tracks
         if not tracks:
             return np.zeros(self.length, dtype=int)

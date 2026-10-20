@@ -1,7 +1,7 @@
 # Stranded depth — design notes
 
-Branch `feature/stranded-maf`. Status: **investigation**; nothing on this
-branch changes VirPlot's behaviour yet. Minor-allele frequency (MAF) is the
+Branch `feature/stranded-maf`. Status: **stranded depth implemented**
+(`--stranded`; decisions in §4 and §5). Minor-allele frequency (MAF) is the
 second feature planned for the branch and is sketched in §6.
 
 ![Prototypes](stranded_prototypes.svg)
@@ -89,8 +89,12 @@ covers.
   on one scale, so no space is spent on an empty half. At 16:1 the − band is
   thin but visible (top left of the figure).
 * **`--yscale symlog`** already works in the linear layout and makes both
-  strands readable on one honest scale (top right). It should be the
-  suggested setting for +ssRNA libraries.
+  strands readable on one honest scale (top right). It stays available.
+
+**Decision: a shared linear scale** (top left of the figure), with each side
+as tall as its strand needs. Tick labels are unsigned on both sides, the
+halves are named beside the axis, and one sample is drawn in
+`depth_line_color` above and `minus_strand_color` below.
 * **Several samples** stack per strand: upward for +, downward for −, one
   colour per sample on both sides.
 * **Segmented genomes**: `prepare()` shares one maximum per strand across
@@ -134,11 +138,27 @@ transcription runs in both directions from the intergenic region, so their
 strand ratio may be much less lopsided than a +ssRNA virus's 16:1. This is
 not measured: the repository has no stranded circular dataset.
 
-**Recommendation.** Mirror in both layouts, with + outward and − inward on
-the circle, on one shared scale. Add radial symlog to `CircularPlotter`
-(panel D) with dotted reference rings. Do not offer per-strand scales by
-default. Record the in/out area bias as a known limitation. Panel C (two
-bands, both outward) is the fallback if review finds the bias objectionable.
+**Decision: A, made area-true.** Mirror on one shared linear scale, + outward
+and − inward, and remove the area bias (problem 1) instead of recording it.
+Scaling the − side by a constant (about 1.4) would balance the areas at one
+depth only, since the bias grows with depth (table above). Mapping depth to
+*area* balances them at every depth:
+
+* The zero ring sits where the band's outer and inner parts have equal area,
+  r₀ = √((r_in² + r_out²) / 2) = 0.513 for the 0.30–0.66 band
+  (`CIRC_R_STRAND_ZERO`).
+* A depth d on the + side reaches r = √(r₀² + k·d), and on the − side
+  r = √(r₀² − k·d). k is set so the scale maximum reaches the band's edge on
+  either side.
+* Equal depth then covers equal area on both sides. The radial heights
+  differ instead: the − side is 1.00× as tall near zero, 1.18× at half
+  scale and 1.44× at full scale, which is the constant multiple the
+  approximation would have used.
+
+Problems 2 and 3 remain. A 16:1 − strand is thin on a linear scale, which
+was accepted with A. The scale reads `0` on the zero ring, `+ N× depth` at
+the outer edge and `− N×` at the inner edge. Radial symlog (D) was not
+adopted, so the circular layout still ignores `--yscale symlog`.
 
 ## 6. Minor-allele frequency (later on this branch)
 
@@ -151,16 +171,16 @@ bands, both outward) is the fallback if review finds the bias objectionable.
   artefact. The strand-split counts from §3 give a strand-bias filter at no
   extra cost.
 
-## 7. Proposed order of work
+## 7. Order of work
 
-1. `alignments.py`: per-strand counting, `--stranded`, the orientation
+1. [x] `alignments.py`: per-strand counting, `--stranded`, the orientation
    report. Tests: the sum invariant; single-end, read 1 and read 2 under each
-   setting; GLRaV-13's 94/6 split.
-2. Model and CLI: strand on `DepthTrack`; reject `--stranded` with depth
+   setting; GLRaV-13's 94/6 split (`tests/test_stranded.py`).
+2. [x] Model and CLI: strand on `DepthTrack`; reject `--stranded` with depth
    files.
-3. Linear mirrored drawing, legend, shared limits, stacked samples.
-4. Circular: mirrored ring and radial symlog.
-5. Per-strand CSV columns.
-6. GLRaV-13 drawn with `--stranded reverse` in `docs/make_figures.sh`;
-   README and GFF/CLI docs.
-7. MAF.
+3. [x] Linear mirrored drawing, legend, shared limits, stacked samples.
+4. [x] Circular: mirrored ring, area-true (radial symlog not adopted).
+5. [ ] Per-strand CSV columns.
+6. [x] GLRaV-13 drawn with `--stranded reverse` in `docs/make_figures.sh`
+   (`docs/figures/glrav13_stranded.svg`); README.
+7. [ ] MAF.

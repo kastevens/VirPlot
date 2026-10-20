@@ -8,6 +8,31 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **Stranded depth.** `--stranded reverse|forward` splits SAM/BAM depth by
+  the RNA strand each read came from: `reverse` when the read (read 1) is
+  antisense to the RNA, as in dUTP-type kits; `forward` when it is sense. A
+  read 2 counts with its mate. The default, `no`, draws one track as before,
+  and the two strands always sum to it, so coverage intervals, gaps and
+  reports are unchanged. Linear: + above the axis and − below on one linear
+  scale, each side as tall as its strand needs, tick labels unsigned, the
+  halves named beside the axis. Circular: + outward and − inward from a zero
+  ring, with depth mapped to annulus area so equal depth covers equal area
+  on both sides (the zero ring sits where the band's two parts have equal
+  area; at full scale the − side is drawn 1.44x taller). One sample takes
+  `depth_line_color` and the new `minus_strand_color` (default `#d68a7f`);
+  several stack away from the axis in their own colours. Segmented genomes
+  share one limit per strand. A `samtools depth` file records no strand and
+  is refused with `--stranded`. Design: docs/stranded_depth.md.
+- **Read orientation report.** Every SAM/BAM logs its read-1 orientation
+  split. An unstranded library gives about half each way, so a split of 80/20
+  or more without `--stranded` gets a warning suggesting it; a near-even split
+  with `--stranded` gets one too (an unstranded library, or both strands about
+  equally abundant). `examples/glrav13.bam` is reverse-stranded: 93.8% of its
+  reads align in reverse; + strand 1,105x, − strand 68x.
+- `docs/figures/glrav13_stranded.svg`, the real library split by strand.
+
 ## [2.2.0] — 2026-10-19
 
 ### Changed

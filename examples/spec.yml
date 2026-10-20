@@ -22,6 +22,8 @@ default_color: '#9f9f9f'
 shade_color: '#ca4f35'
 
 depth_line_color: '#85dbec'   # the original figure's top layer (sample 1), alpha 0.9 under a thin black line
+minus_strand_color: '#d68a7f' # with --stranded and one sample: the - strand, below the axis
+                              # (several samples keep their own colours on both sides)
 
 stacked_area_colors:            # bottom layer first; these are the original README figure's colours
   - '#567eb0'

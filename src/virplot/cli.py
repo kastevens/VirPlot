@@ -12,12 +12,40 @@ from virplot.analysis import (MappingError, ReadSet, call_blocks, default_read_l
                               ensure_bowtie2_index, fasta_lengths, map_reads,
                               missing_bowtie2_tools, write_csvs)
 from virplot.models import RNA
-from virplot.alignments import AlignmentError
-from virplot.parsers import ParseError, default_label, load_depth, parse_gff_rnas
+from virplot.alignments import STRANDED, AlignmentError, is_alignment_file
+from virplot.parsers import ParseError, default_label, load_depth_tracks, parse_gff_rnas
 from virplot.plotting import CircularPlotter, LinearPlotter
 from virplot.settings import load_settings
 
 log = logging.getLogger(__name__)
+
+
+# Below this many reads the orientation split says little, so it is not reported.
+ORIENTATION_MIN_READS = 200
+
+
+def _report_orientation(loaded, where: str, stranded: str) -> None:
+    """Log the read-1 orientation split, and say when it contradicts --stranded.
+
+    An unstranded library puts about half the fragments each way whatever the
+    virus, so a lopsided split means the library is stranded. A stranded one
+    can still split evenly when both RNA strands are about equally abundant
+    (a dsRNA preparation), so that case is reported, not refused.
+    """
+    f = loaded.reverse_fraction
+    if f is None or loaded.n < ORIENTATION_MIN_READS:
+        return
+    log.info("Read 1 orientation in %s: %.1f%% reverse, %.1f%% forward",
+             where, 100 * f, 100 * (1 - f))
+    skew = max(f, 1 - f)
+    if stranded == "no" and skew >= 0.8:
+        log.warning("%s looks stranded: %.1f%% of reads align one way, where an unstranded "
+                    "library gives about half each way. Pass --stranded reverse (dUTP-type "
+                    "kits) or --stranded forward to split depth by strand", where, 100 * skew)
+    elif stranded != "no" and skew <= 0.6:
+        log.warning("%s splits nearly evenly (%.1f%% reverse): either the library is "
+                    "unstranded, or both strands are about equally abundant (a dsRNA "
+                    "preparation, for one)", where, 100 * f)
 
 
 class _Formatter(logging.Formatter):
@@ -87,6 +115,11 @@ def build_parser() -> argparse.ArgumentParser:
                         "proportional to RNA length")
     p.add_argument("--min-mapq", type=int, default=0,
                    help="Skip SAM/BAM reads with MAPQ below this [%(default)s]")
+    p.add_argument("--stranded", choices=list(STRANDED), default="no",
+                   help="Split depth by RNA strand for a stranded library: 'reverse' when "
+                        "the read (read 1) is antisense to the RNA, as in dUTP-type kits; "
+                        "'forward' when it is sense. + depth is drawn above the axis "
+                        "(outward on a circle), - below. Needs SAM/BAM input [%(default)s]")
     p.add_argument("-y", "--yaml", required=True,
                    help="YAML file for color mapping and other specs")
     p.add_argument("-o", "--outdir", default=".",
@@ -196,6 +229,10 @@ def main(argv: list[str] | None = None) -> None:
         if not os.path.isfile(f):
             log.error("Depth file not found: %s", f)
             sys.exit(1)
+        if args.stranded != "no" and not is_alignment_file(f):
+            log.error("--stranded needs SAM/BAM input, but %s is a depth file, which "
+                      "records no strand", f)
+            sys.exit(1)
 
     read_sets = _read_sets(args)
     if not args.depth and not read_sets:
@@ -279,19 +316,27 @@ def main(argv: list[str] | None = None) -> None:
         counts: set[int] = set()
         for label, df in zip(labels, depth_sources):
             try:
-                y, n, kind = load_depth(df, rna.length, seqid=rna.seqid,
-                                        ref=args.ref, min_mapq=args.min_mapq,
-                                        circular=rna.circular)
+                loaded = load_depth_tracks(df, rna.length, stranded=args.stranded,
+                                           seqid=rna.seqid, ref=args.ref,
+                                           min_mapq=args.min_mapq, circular=rna.circular)
             except (AlignmentError, ParseError) as exc:
                 log.error("%s", exc)
                 sys.exit(1)
             where = f"{rna.seqid} in {df}" if multi else df
-            if kind == "alignments":
-                log.info("Counted %d aligned reads for %s", n, where)
+            if loaded.kind == "alignments":
+                log.info("Counted %d aligned reads for %s", loaded.n, where)
+                _report_orientation(loaded, where, args.stranded)
             else:
-                log.info("Parsed %d depth entries for %s", n, where)
-                counts.add(n)
-            rna.add_depth(label, y)
+                log.info("Parsed %d depth entries for %s", loaded.n, where)
+                counts.add(loaded.n)
+            for strand, y in loaded.tracks:
+                rna.add_depth(label, y, strand)
+        if rna.stranded:
+            plus = sum(t.values for t in rna.strand_tracks("+"))
+            minus = sum(t.values for t in rna.strand_tracks("-"))
+            ratio = (f"{plus.mean() / minus.mean():.1f} : 1" if minus.mean() else "no − strand")
+            log.info("%s+ strand mean %.0fx, - strand mean %.0fx (+ : - = %s)",
+                     f"{rna.seqid}: " if multi else "", plus.mean(), minus.mean(), ratio)
         # a circular genome's depth files may legitimately differ in length
         # (one made against a padded reference, one not)
         if len(counts) > 1 and not rna.circular:

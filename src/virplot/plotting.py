@@ -18,6 +18,7 @@ import numpy as np
 from matplotlib.colors import to_rgb
 from matplotlib.patches import Ellipse, Polygon, Rectangle
 from matplotlib.textpath import TextPath
+from matplotlib.ticker import Formatter
 import matplotlib.pyplot as plt
 
 from virplot.analysis import smooth_depth
@@ -78,6 +79,17 @@ CIRC_ANN_HEIGHT = 0.085
 CIRC_R_OUTSIDE_LABEL = 1.01     # labels for features too narrow to hold text
 CIRC_RMAX = 1.22                # leaves room for position ticks; rim is hidden
 CIRC_SMALL_FEATURE_FRACTION = 0.055  # of the circle; below this the label goes outside
+# Stranded depth on a circle: + grows outward and - inward from a zero ring
+# inside the depth band. Depth is mapped to *area*, not radius: a ring drawn
+# farther out covers more area per unit of height, so equal radial heights
+# would give the + side up to 1.46x the area of the - side for equal depth.
+# The zero ring sits where the band's outer and inner parts have equal area,
+# r0 = sqrt((r_in^2 + r_out^2) / 2), so both sides reach the band's edges at
+# the scale maximum and equal depth covers equal area at every depth. At full
+# scale the - side is drawn ~1.45x taller than the + side to make that so.
+CIRC_R_STRAND_ZERO = float(np.sqrt((CIRC_R_DEPTH_BASE ** 2 + CIRC_R_DEPTH_MAX ** 2) / 2))
+# - strand label beside the axis of a linear stranded depth panel
+STRAND_LABEL = dict(fontsize=7, color="0.35")
 
 
 class Plotter:
@@ -94,6 +106,8 @@ class Plotter:
         self.args = args
         self.shared_denom: float | None = None    # --normalize divisor across RNAs
         self.shared_ymax: float | None = None     # common y-limit across RNAs
+        # stranded depth: common (+ limit, - limit) across RNAs
+        self.shared_strand_ymax: tuple[float, float] | None = None
         self.max_length: int | None = None        # longest RNA, for width scaling
         self.bottom_seqid: str | None = None      # last segment rendered; keeps the x-axis
 
@@ -119,13 +133,25 @@ class Plotter:
         # the last segment rendered is the bottom row once stacked, so it is
         # the one that keeps the shared x-axis under --bare-x
         self.bottom_seqid = rnas[-1].seqid
+        if not self.args.equal_width:
+            self.max_length = max(r.length for r in rnas)
+        if any(r.stranded for r in rnas):
+            # one scale for both strands, shared across RNAs; each strand keeps
+            # its own extent so neither half of the axis is left empty
+            maxima = [self._strand_maxima(r) for r in rnas]
+            pmax, mmax = max(m[0] for m in maxima), max(m[1] for m in maxima)
+            raw_max = max(pmax, mmax) or 1.0
+            if self.args.normalize and not self.args.free_y:
+                self.shared_denom = raw_max
+            if not self.args.free_y:
+                self.shared_strand_ymax = ((pmax / raw_max, mmax / raw_max)
+                                           if self.args.normalize else (pmax, mmax))
+            return
         raw_max = max(self._smoothed_total(r).max() for r in rnas) or 1.0
         if self.args.normalize and not self.args.free_y:
             self.shared_denom = raw_max
         if not self.args.free_y:
             self.shared_ymax = 1.0 if self.args.normalize else raw_max
-        if not self.args.equal_width:
-            self.max_length = max(r.length for r in rnas)
 
     def render(self, rna: RNA, threshold_results: list[tuple], out_base: str) -> None:
         """Build the figure for ``rna`` and save it as ``<out_base>.<format>``."""
@@ -135,6 +161,49 @@ class Plotter:
 
     def _smoothed_total(self, rna: RNA) -> np.ndarray:
         return self._prepared_tracks(rna, normalize=False)[1]
+
+    def _strand_maxima(self, rna: RNA) -> tuple[float, float]:
+        """Peak smoothed + and - depth of a stranded RNA, before --normalize."""
+        _, ptot, _, mtot = self._prepared_strands(rna, normalize=False)
+        return float(ptot.max()), float(mtot.max())
+
+    def _prepared_strands(self, rna: RNA, normalize: bool | None = None):
+        """Apply --smooth / --normalize to stranded depth.
+
+        Returns ``(plus_tracks, plus_total, minus_tracks, minus_total)``, one
+        track per sample on each side. Both strands are divided by the same
+        number under --normalize (the larger strand's peak, or the shared one
+        after ``prepare``), so they stay on one scale.
+        """
+        def side(strand: str):
+            ys = [t.values for t in rna.strand_tracks(strand)] or [np.zeros(rna.length)]
+            if self.args.smooth:
+                ys = [smooth_depth(y, window_size=SMOOTH_WINDOW) for y in ys]
+            return ys, (np.sum(ys, axis=0) if len(ys) > 1 else ys[0])
+
+        pt, ptot = side("+")
+        mt, mtot = side("-")
+        if self.args.normalize if normalize is None else normalize:
+            denom = self.shared_denom or max(ptot.max(), mtot.max()) or 1.0
+            pt, mt = [y / denom for y in pt], [y / denom for y in mt]
+            ptot, mtot = ptot / denom, mtot / denom
+        return pt, ptot, mt, mtot
+
+    def _strand_limits(self, ptot: np.ndarray, mtot: np.ndarray) -> tuple[float, float]:
+        """(+ limit, - limit) before headroom: shared across RNAs, else this one's."""
+        if self.shared_strand_ymax is not None:
+            pmax, mmax = self.shared_strand_ymax
+        else:
+            pmax, mmax = float(ptot.max()), float(mtot.max())
+        if not pmax and not mmax:
+            pmax = 1.0
+        return pmax, mmax
+
+    def _strand_names(self, rna: RNA, n_samples: int) -> list[str]:
+        """Legend names: the strands for one sample, else the samples."""
+        if n_samples == 1:
+            return ["+ strand", "\u2212 strand"]
+        return rna.sample_labels
 
     def _prepared_tracks(self, rna: RNA, normalize: bool | None = None
                          ) -> tuple[list[np.ndarray], np.ndarray]:
@@ -327,16 +396,25 @@ class LinearPlotter(Plotter):
 
         extra_artists = self._draw_annotations(ax_ann, rna)
 
-        tracks, total = self._prepared_tracks(rna)
-        layers = self._draw_depth(ax_depth, rna, tracks, total)
+        if rna.stranded:
+            pt, ptot, mt, mtot = self._prepared_strands(rna)
+            layers, names = self._draw_stranded_depth(ax_depth, rna, pt, ptot, mt, mtot)
+            if self.args.legend:
+                self._add_legend(ax_depth, layers, names)
+            if self.args.shade_breaks:
+                self._shade_gaps(ax_depth, threshold_results)
+            extra_artists += self._style_stranded_axis(ax_depth, ptot, mtot, rna)
+        else:
+            tracks, total = self._prepared_tracks(rna)
+            layers = self._draw_depth(ax_depth, rna, tracks, total)
 
-        if self.args.legend:
-            self._add_legend(ax_depth, layers, rna.labels)
+            if self.args.legend:
+                self._add_legend(ax_depth, layers, rna.labels)
 
-        if self.args.shade_breaks:
-            self._shade_gaps(ax_depth, threshold_results)
+            if self.args.shade_breaks:
+                self._shade_gaps(ax_depth, threshold_results)
 
-        self._style_depth_axis(ax_depth, total, rna)
+            self._style_depth_axis(ax_depth, total, rna)
 
         extra_artists.append(self._add_title(fig, rna))
 
@@ -676,6 +754,92 @@ class LinearPlotter(Plotter):
         if args.grid:
             ax.grid(True, linestyle="--", linewidth=0.3)
 
+    # --- stranded depth -----------------------------------------------------
+
+    def _draw_stranded_depth(self, ax: plt.Axes, rna: RNA, pt: list[np.ndarray],
+                             ptot: np.ndarray, mt: list[np.ndarray],
+                             mtot: np.ndarray) -> tuple[list, list[str]]:
+        """+ strand above the axis, - strand below it, on one linear scale.
+
+        One sample: + in ``depth_line_color``, - in ``minus_strand_color``.
+        Several: each strand stacks its samples away from the axis, a sample
+        keeping its colour on both sides. Returns the layers and their legend
+        names.
+        """
+        s = self.settings
+        x = rna.positions
+        if len(pt) == 1:
+            up = ax.fill_between(x, ptot, color=s.depth_line_color,
+                                 alpha=DEPTH_FILL_ALPHA, linewidth=0)
+            down = ax.fill_between(x, -mtot, color=s.minus_strand_color,
+                                   alpha=DEPTH_FILL_ALPHA, linewidth=0)
+            layers = [down, up]                     # _add_legend lists them reversed
+            style = "default"
+        else:
+            k = len(pt)
+            colors = (s.stacked_area_colors[:k]
+                      + [s.default_color] * max(0, k - len(s.stacked_area_colors)))
+            layers = ax.stackplot(x, *reversed(pt), colors=colors, alpha=0.9, step="pre")
+            ax.stackplot(x, *[-y for y in reversed(mt)], colors=colors, alpha=0.9, step="pre")
+            style = "steps-pre"
+        ax.plot(x, ptot, drawstyle=style, **DEPTH_OUTLINE)
+        ax.plot(x, -mtot, drawstyle=style, **DEPTH_OUTLINE)
+        ax.axhline(0, color="black", linewidth=0.6, zorder=3)
+        ax.set_xlim(x[0], x[-1])
+        return layers, self._strand_names(rna, len(pt))
+
+    def _style_stranded_axis(self, ax: plt.Axes, ptot: np.ndarray, mtot: np.ndarray,
+                             rna: RNA | None = None) -> list:
+        """Axis for mirrored depth: one scale, each side as tall as its strand needs.
+
+        Tick labels read as depth on both sides (no minus sign below the
+        axis), and the two halves are named beside the axis. Returns the
+        strand labels, which sit outside the axes and must be kept by the
+        tight crop.
+        """
+        args = self.args
+        ax.set_ylabel("Read Depth", fontsize=10)
+        if self._bare_x(rna):
+            ax.set_xticklabels([])
+        else:
+            ax.set_xlabel("Genome Position (bp)", fontsize=10)
+
+        if args.yscale == "symlog":
+            ax.set_yscale("symlog", linthresh=args.linthresh, linscale=1)
+
+        pmax, mmax = self._strand_limits(ptot, mtot)
+        ax.set_ylim(-mmax * Y_HEADROOM, pmax * Y_HEADROOM)
+        ax.yaxis.set_major_formatter(_Absolute(ax.yaxis.get_major_formatter()))
+
+        if args.grid:
+            ax.grid(True, linestyle="--", linewidth=0.3)
+
+        # name each half beside the axis, centred on it, clear of the trace
+        zero = ax.transAxes.inverted().transform(ax.transData.transform((0, 0)))[1]
+        return [ax.text(1.01, y, name, transform=ax.transAxes, ha="left", va="center",
+                        **STRAND_LABEL)
+                for y, name in (((1 + zero) / 2, "+ strand"), (zero / 2, "− strand"))]
+
+
+class _Absolute(Formatter):
+    """Wrap a tick formatter so values below a mirrored axis read as positive."""
+
+    def __init__(self, inner: Formatter):
+        self.inner = inner
+
+    def set_axis(self, axis):
+        super().set_axis(axis)
+        self.inner.set_axis(axis)
+
+    def set_locs(self, locs):
+        self.inner.set_locs([abs(v) for v in locs])
+
+    def get_offset(self):
+        return self.inner.get_offset()
+
+    def __call__(self, x, pos=None):
+        return self.inner(abs(x), pos)
+
 
 class CircularPlotter(Plotter):
     """One polar axes: feature arcs in an outer ring, depth as an inner band.
@@ -694,6 +858,7 @@ class CircularPlotter(Plotter):
         self._ring_top = CIRC_R_BASELINE + 0.02 + CIRC_ANN_HEIGHT
         self._outside_label_r = CIRC_R_OUTSIDE_LABEL
         self._depth_ymax = 1.0
+        self._depth_stranded = False      # the scale labels differ for mirrored depth
 
     def render(self, rna: RNA, threshold_results: list[tuple], out_base: str) -> None:
         fig = plt.figure(figsize=(CIRC_FIGSIZE, CIRC_FIGSIZE))
@@ -731,8 +896,13 @@ class CircularPlotter(Plotter):
 
         extra_artists = self._draw_annotations(ax, rna)
 
-        tracks, total = self._prepared_tracks(rna)
-        layers = self._draw_depth(ax, rna, tracks, total)
+        if rna.stranded:
+            pt, ptot, mt, mtot = self._prepared_strands(rna)
+            layers, names = self._draw_stranded_depth(ax, rna, pt, ptot, mt, mtot)
+            total = ptot + mtot
+        else:
+            tracks, total = self._prepared_tracks(rna)
+            layers, names = self._draw_depth(ax, rna, tracks, total), rna.labels
 
         if self.args.shade_breaks:
             self._shade_gaps(ax, rna, threshold_results)
@@ -740,7 +910,7 @@ class CircularPlotter(Plotter):
         self._draw_axis(ax, rna, total)
 
         if self.args.legend:
-            self._add_legend(ax, layers, rna.labels)
+            self._add_legend(ax, layers, names)
 
         extra_artists.append(self._add_title(fig, rna))
 
@@ -1057,7 +1227,67 @@ class CircularPlotter(Plotter):
             ax.plot(th, rc, zorder=3, **DEPTH_OUTLINE)
 
         self._depth_ymax = ymax
+        self._depth_stranded = False
         return layers
+
+    @staticmethod
+    def _strand_radius(values: np.ndarray, scale: float, sign: int) -> np.ndarray:
+        """Radius for stranded depth: + (sign 1) outward, - (sign -1) inward.
+
+        Depth is proportional to the annulus area between the zero ring and
+        the returned radius, the same on both sides (see CIRC_R_STRAND_ZERO),
+        and the scale maximum reaches the band's edge on either side.
+        """
+        r0sq = CIRC_R_STRAND_ZERO ** 2
+        per_unit = (CIRC_R_DEPTH_MAX ** 2 - r0sq) / scale if scale else 0.0
+        clipped = np.clip(values, 0.0, scale) if scale else np.zeros_like(values, dtype=float)
+        return np.sqrt(r0sq + sign * per_unit * clipped)
+
+    def _draw_stranded_depth(self, ax, rna: RNA, pt: list[np.ndarray], ptot: np.ndarray,
+                             mt: list[np.ndarray], mtot: np.ndarray) -> tuple[list, list[str]]:
+        """+ strand outward and - strand inward from a zero ring, area-true.
+
+        One linear scale for both strands, shared across RNAs; equal depth
+        covers equal area on either side. One sample takes
+        ``depth_line_color`` and ``minus_strand_color``; several stack their
+        samples away from the zero ring in their own colours on both sides.
+        """
+        s = self.settings
+        pmax, mmax = self._strand_limits(ptot, mtot)
+        scale = max(pmax, mmax) * Y_HEADROOM
+        theta = self._theta(rna.positions, rna.length)
+        zero = CIRC_R_STRAND_ZERO
+
+        ax.plot(*self._close(theta, np.full(rna.length, zero)),
+                color="black", linewidth=0.5, alpha=0.4, zorder=1)
+
+        def stack(ys, sign, colors):
+            layers, lower = [], np.zeros(rna.length, dtype=float)
+            for y, color in zip(reversed(ys), colors):
+                upper = lower + y
+                th, r0, r1 = self._close(theta, self._strand_radius(lower, scale, sign),
+                                         self._strand_radius(upper, scale, sign))
+                layers.append(ax.fill_between(th, r0, r1, color=color,
+                                              alpha=DEPTH_FILL_ALPHA, linewidth=0, zorder=2))
+                lower = upper
+            ax.plot(*self._close(theta, self._strand_radius(lower, scale, sign)),
+                    zorder=3, **DEPTH_OUTLINE)
+            return layers
+
+        if len(pt) == 1:
+            up = stack(pt, 1, [s.depth_line_color])
+            down = stack(mt, -1, [s.minus_strand_color])
+            layers = down + up                       # _add_legend lists them reversed
+        else:
+            k = len(pt)
+            colors = (s.stacked_area_colors[:k]
+                      + [s.default_color] * max(0, k - len(s.stacked_area_colors)))
+            layers = stack(pt, 1, colors)
+            stack(mt, -1, colors)
+
+        self._depth_ymax = scale
+        self._depth_stranded = True
+        return layers, self._strand_names(rna, len(pt))
 
     def _shade_gaps(self, ax, rna: RNA, threshold_results: list[tuple]) -> None:
         height = CIRC_R_DEPTH_MAX - CIRC_R_DEPTH_BASE
@@ -1090,9 +1320,17 @@ class CircularPlotter(Plotter):
         covered = any(s_ <= 1 + near or e_ >= rna.length - near
                       for nc in rna.noncoding if nc.kind != "stem_loop"
                       for s_, e_ in rna.feature_spans(nc))
-        for radius, text, va in ((CIRC_R_DEPTH_BASE, f" {fmt(0.0)}", "bottom"),
-                                 (CIRC_R_DEPTH_MAX, f" {fmt(ymax)}{unit} depth",
-                                  "top" if covered else "bottom")):
+        if self._depth_stranded:
+            # mirrored: zero on its ring, the + ceiling outward, the - floor inward
+            scale = ((CIRC_R_STRAND_ZERO, f" {fmt(0.0)}", "center"),
+                     (CIRC_R_DEPTH_MAX, f" + {fmt(ymax)}{unit} depth",
+                      "top" if covered else "bottom"),
+                     (CIRC_R_DEPTH_BASE, f" − {fmt(ymax)}{unit}", "top"))
+        else:
+            scale = ((CIRC_R_DEPTH_BASE, f" {fmt(0.0)}", "bottom"),
+                     (CIRC_R_DEPTH_MAX, f" {fmt(ymax)}{unit} depth",
+                      "top" if covered else "bottom"))
+        for radius, text, va in scale:
             ax.text(0, radius, text, ha="left", va=va,
                     fontsize=7, color="0.35", zorder=5)
 

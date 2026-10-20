@@ -6,11 +6,17 @@ from __future__ import annotations
 import logging
 import os
 import re
+from dataclasses import dataclass
 from urllib.parse import unquote
 
 import numpy as np
 
-from virplot.alignments import depth_from_alignments, is_alignment_file, resolve_reference
+from virplot.alignments import (
+    depth_from_alignments,
+    is_alignment_file,
+    oriented_depth_from_alignments,
+    resolve_reference,
+)
 from virplot.models import RNA, Domain, Feature, Noncoding, SubgenomicRNA
 from virplot.settings import classify_function
 
@@ -559,6 +565,54 @@ def load_depth(
         return y, n, "alignments"
     y, n = parse_depth(path, seq_len, seqid=seqid, ref=ref, circular=circular)
     return y, n, "depth"
+
+
+@dataclass
+class LoadedDepth:
+    """One depth source read for one RNA.
+
+    ``tracks`` is ``[(None, depth)]`` for unstranded input, or
+    ``[("+", plus), ("-", minus)]`` when ``--stranded`` splits it.
+    ``reverse_fraction`` is the share of reads whose fragment's read 1
+    aligned in reverse (SAM/BAM only), the evidence for strandedness.
+    """
+
+    tracks: list[tuple[str | None, np.ndarray]]
+    n: int
+    kind: str                           # "depth" or "alignments"
+    reverse_fraction: float | None = None
+
+
+def load_depth_tracks(
+    path: str,
+    seq_len: int,
+    *,
+    stranded: str = "no",
+    seqid: str | None = None,
+    ref: str | None = None,
+    min_mapq: int = 0,
+    circular: bool = False,
+) -> LoadedDepth:
+    """Load a depth source as one unstranded track or a + / − pair.
+
+    ``stranded`` is ``no``, ``forward`` or ``reverse`` (see
+    :data:`virplot.alignments.STRANDED`). A ``samtools depth`` file carries no
+    strand, so asking to split one is an error.
+    """
+    if is_alignment_file(path):
+        od = oriented_depth_from_alignments(path, seq_len, seqid=seqid, ref=ref,
+                                            min_mapq=min_mapq, circular=circular)
+        if stranded == "no":
+            tracks = [(None, od.total)]
+        else:
+            plus, minus = od.strands(stranded)
+            tracks = [("+", plus), ("-", minus)]
+        return LoadedDepth(tracks, od.counted, "alignments", od.reverse_fraction)
+    if stranded != "no":
+        raise ParseError(f"{os.path.basename(path)} is a depth file, which records no "
+                         "strand; --stranded needs SAM/BAM input (or reads mapped with -x)")
+    y, n = parse_depth(path, seq_len, seqid=seqid, ref=ref, circular=circular)
+    return LoadedDepth([(None, y)], n, "depth")
 
 
 def default_label(path: str) -> str:

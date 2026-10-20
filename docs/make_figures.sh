@@ -22,3 +22,4 @@ rm -f "$out"/tswv_segment.*.svg
 # GLRaV-13: the one example whose reads are real rather than simulated, plotted
 # straight from the mapped-read BAM.
 virplot -g examples/glrav13.gff3 -d examples/glrav13.bam -y examples/glrav13.yml -f svg --title --smooth --grid -o "$out" --name glrav13_linear
+virplot -g examples/glrav13.gff3 -d examples/glrav13.bam -y examples/glrav13.yml -f svg --title --smooth --grid --stranded reverse -o "$out" --name glrav13_stranded

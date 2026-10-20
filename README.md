@@ -20,6 +20,10 @@ Real reads — GLRaV-13 (`examples/glrav13.gff3` + `glrav13.yml`), plotted strai
 
 ![GLRaV-13](docs/figures/glrav13_linear.svg)
 
+The same library is stranded (dUTP-type: 93.8% of reads align in reverse), so `--stranded reverse` splits it by RNA strand, genomic (+) above the axis and antigenomic (−) below on one scale: 1,105x against 68x.
+
+![GLRaV-13 stranded](docs/figures/glrav13_stranded.svg)
+
 Reads in the other examples are simulated; the annotations are real records. More renders in [`docs/figures/`](docs/figures/); `sh docs/make_figures.sh` regenerates them.
 
 Developed and maintained by Haoran (Henry) Li for [Foundation Plant Services](https://fps.ucdavis.edu/index.cfm) at [UC Davis](https://www.ucdavis.edu/).
@@ -179,6 +183,16 @@ The file type is detected from the extension (`.sam`, `.bam`) or, failing that, 
 
 The reference to plot is taken from the GFF `region` line's sequence id. If the SAM/BAM header has a single `@SQ` entry that one is used regardless; if it has several and none matches, pass `--ref NAME`. BAM is read via the standard library's gzip module; CRAM is not supported.
 
+### Stranded libraries
+
+```bash
+virplot -g examples/glrav13.gff3 -d examples/glrav13.bam -y examples/glrav13.yml --smooth --stranded reverse
+```
+
+`--stranded` splits depth by the RNA strand each read came from: `reverse` when the read (read 1 of a pair) is antisense to the RNA, as in dUTP-type kits; `forward` when it is sense. A read 2 counts with its mate. The + strand is drawn above the axis and the − strand below, on one linear scale, each side as tall as its strand needs; on a circle + grows outward and − inward from a zero ring, with depth mapped to area so equal depth covers equal area on both sides. One sample is drawn in `depth_line_color` and `minus_strand_color`; several samples stack away from the axis in their own colours on both sides. Coverage intervals, gaps and reports use the two strands' sum, which is the unstranded depth.
+
+VirPlot logs the read orientation of every SAM/BAM. An unstranded library splits about half and half, so a lopsided split without `--stranded` gets a warning, as does a near-even split with it (an unstranded library, or both strands equally abundant). Splitting needs SAM/BAM (or reads mapped with `-x`); a `samtools depth` file records no strand. Design notes: [`docs/stranded_depth.md`](docs/stranded_depth.md).
+
 ---
 
 ## Usage
@@ -189,7 +203,8 @@ virplot [-h] [-V] -g GFF [-d DEPTH [DEPTH ...]] [-l LABELS [LABELS ...]]
         [-p THREADS] [--bowtie2-args ARGS]
         [--ref REF] [--rnas SEQID [SEQID ...]] [--topology {auto,circular,linear}]
         [--layout {linear,circular,auto}] [--free-y] [--equal-width]
-        [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
+        [--min-mapq MIN_MAPQ] [--stranded {no,forward,reverse}]
+        -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
         [--yscale {linear,symlog}] [--linthresh LINTHRESH]
         [--name NAME] [--no-label] [--border | --no-border]
         [-t THRESHOLDS [THRESHOLDS ...]] [-r] [--shade-breaks]
@@ -213,6 +228,7 @@ virplot [-h] [-V] -g GFF [-d DEPTH [DEPTH ...]] [-l LABELS [LABELS ...]]
 | `--free-y`           | With several RNAs, let each figure pick its own y-limit          |
 | `--equal-width`      | With several RNAs, draw every figure at full width               |
 | `--min-mapq`         | Skip SAM/BAM reads with MAPQ below this (default: 0)           |
+| `--stranded`         | Split depth by RNA strand: `reverse` (dUTP-type, read 1 antisense), `forward`, or `no` (default) |
 | `--topology`         | `auto` (from the GFF `Is_circular` attribute), `circular` or `linear` |
 | `--layout`           | `linear` (default), `circular`, or `auto` to draw circular genomes as circles |
 | `-y`, `--yaml`       | YAML file for color mapping and other specs                    |
@@ -246,6 +262,7 @@ All visual elements are customizable via the YAML file:
 | `default_color`       | Color for unmapped products           |
 | `shade_color`         | Color for shaded gap regions          |
 | `depth_line_color`    | Fill colour of a single depth track (default `#85dbec`) |
+| `minus_strand_color`  | With `--stranded` and one sample, the − strand's fill (default `#d68a7f`) |
 | `circular_labels`     | `tangential` (default, along the arc) or `horizontal` (level, outside the ring, `ORF (product)`, as in the ICTV figures) |
 | `circular_arcs`       | `outside` (default, arcs just outside the genome circle) or `on_circle` (innermost arcs astride the circle, as in the ICTV figures) |
 | `annotation_fontsize` | Font size for feature labels          |
