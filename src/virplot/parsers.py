@@ -67,6 +67,11 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
     are attached to the RNA whose sequence id (column 1) they carry; a CDS on
     a sequence id with no ``region`` line is skipped with a warning. Mature
     protein rows become ``Domain`` segments of the CDS they belong to.
+
+    An RNA's display name — its figure title and the hub of a circular map —
+    is the region's ``Name=`` when it has one (``RNA-1``, ``DNA-A``, ``L``),
+    else the sequence id. The sequence id stays the key for everything else:
+    depth matching, ``--ref``, and output file names.
     """
     rnas: dict[str, RNA] = {}
     rows: dict[str, list[tuple[int, int, str, dict]]] = {}
@@ -92,7 +97,8 @@ def parse_gff_rnas(gff_path: str) -> list[RNA]:
                 if seqid not in rnas:
                     attrs = _attributes(attributes)
                     circular = attrs.get("Is_circular", "").lower() == "true"
-                    rnas[seqid] = RNA(name=seqid, seqid=seqid, length=int(end),
+                    name = attrs.get("Name", "").strip() or seqid
+                    rnas[seqid] = RNA(name=name, seqid=seqid, length=int(end),
                                       circular=circular)
                 continue
 

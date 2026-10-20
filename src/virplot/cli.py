@@ -70,8 +70,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Order segments largest first (the ICTV stacking order) "
                         "or as the GFF lists them [%(default)s]; --rnas sets its own order")
     p.add_argument("--rnas", nargs="+", metavar="SEQID",
-                   help="Plot only these GFF sequence ids, in this order "
-                        "(default: every 'region' in the GFF)")
+                   help="Plot only these RNAs, in this order, each given by GFF sequence "
+                        "id or by its region's Name= (default: every 'region' in the GFF)")
     p.add_argument("--topology", choices=["auto", "circular", "linear"], default="auto",
                    help="Treat the genome(s) as circular or linear; 'auto' follows the "
                         "GFF region line's Is_circular attribute [%(default)s]")
@@ -214,13 +214,27 @@ def main(argv: list[str] | None = None) -> None:
         log.error("%s", exc)
         sys.exit(1)
     if args.rnas:
+        # A sequence id wins; a region Name= is accepted when it names exactly
+        # one RNA, so `--rnas RNA-1` selects what the figure title calls RNA-1.
         by_id = {r.seqid: r for r in rnas}
-        missing = [x for x in args.rnas if x not in by_id]
+        by_name: dict[str, list] = {}
+        for r in rnas:
+            by_name.setdefault(r.name, []).append(r)
+        chosen, missing = [], []
+        for x in args.rnas:
+            if x in by_id:
+                chosen.append(by_id[x])
+            elif len(by_name.get(x, [])) == 1:
+                chosen.append(by_name[x][0])
+            else:
+                missing.append(x)
         if missing:
+            available = [r.seqid if r.name == r.seqid else f"{r.seqid} ({r.name})"
+                         for r in rnas]
             log.error("--rnas not found in GFF: %s (available: %s)",
-                      ", ".join(missing), ", ".join(by_id))
+                      ", ".join(missing), ", ".join(available))
             sys.exit(1)
-        rnas = [by_id[x] for x in args.rnas]
+        rnas = chosen
     elif args.rna_order == "length":
         # ICTV: segments are stacked largest first. An explicit --rnas is the
         # user's own order and is left alone.
@@ -237,7 +251,8 @@ def main(argv: list[str] | None = None) -> None:
     for rna in rnas:
         shape = "circular" if rna.circular else "linear"
         if multi:
-            log.info("%s: %d bp, %d features, %s", rna.seqid, rna.length,
+            named = rna.seqid if rna.name == rna.seqid else f"{rna.seqid} ({rna.name})"
+            log.info("%s: %d bp, %d features, %s", named, rna.length,
                      len(rna.features), shape)
         else:
             log.info("Parsed %d features from GFF (%d bp, %s)",

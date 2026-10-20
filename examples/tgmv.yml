@@ -18,4 +18,4 @@ shade_color: '#ca4f35'
 depth_line_color: '#85dbec'
 stacked_area_colors: ['#567eb0', '#55b9d9', '#85dbec']
 legend_location: "upper left"
-title: ""   # empty -> "<seqid> (length nts)" per component
+title: ""   # empty -> "<region Name=, else seqid> (length nts)" per component

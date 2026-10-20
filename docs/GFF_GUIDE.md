@@ -53,7 +53,20 @@ NC_022002.1	RefSeq	region	1	3206	.	+	.	ID=NC_022002.1;Is_circular=true
 * A CDS whose `seqid` has no `region` row is dropped with a warning; a file
   with no `region` row at all is an error.
 
-The molecule's display name (in titles and the circular hub) is the `seqid`.
+**Name the segment with `Name=`.** The molecule's display name — the figure
+title (`RNA-1 (8,118 nts)`) and the text at the centre of a circular map — is
+the region's `Name=` when it has one, otherwise the `seqid`. A segmented genome
+therefore reads as the ICTV figures label it:
+
+```gff3
+NC_003617.1	RefSeq	region	1	8118	.	+	.	ID=NC_003617.1;Name=RNA-1
+NC_003618.1	RefSeq	region	1	7193	.	+	.	ID=NC_003618.1;Name=RNA-2
+```
+
+`Name=` is display only. The `seqid` remains the key for matching depth (§7),
+for `--ref`, and for output file names (`<name>.NC_003617.1.svg`). `--rnas`
+accepts either, so `--rnas RNA-2` and `--rnas NC_003618.1` select the same
+segment. A YAML `title:` replaces the default title for every segment.
 
 ## 3. `CDS` rows: one per ORF
 
@@ -528,7 +541,8 @@ components carry one ORF each. `--layout circular` warns and skips them.
 
 - [ ] `##gff-version 3` first line; nine tab-separated columns.
 - [ ] One `region` row per molecule, `end` = genome length,
-      `Is_circular=true` if it is a circle.
+      `Is_circular=true` if it is a circle, `Name=` for its segment name
+      (`RNA-1`, `DNA-A`).
 - [ ] `seqid` identical across GFF, SAM/BAM `@SQ`, FASTA header, depth file.
 - [ ] One `CDS` row per ORF; `product=` short and naming the **function**;
       `gene=` for the ORF name; long descriptions in `Note=`.

@@ -184,11 +184,11 @@ class DepthTrack:
 class RNA:
     """A single RNA molecule with its annotation and per-sample depth tracks."""
 
-    name: str                       # display / output name
+    name: str                       # display name: region Name=, else the seqid
     length: int
     features: list[Feature] = field(default_factory=list)
     depth: list[DepthTrack] = field(default_factory=list)
-    seqid: str | None = None        # sequence id in GFF / SAM / depth files
+    seqid: str | None = None        # sequence id in GFF / SAM / depth files; names outputs
     circular: bool = False
     noncoding: list[Noncoding] = field(default_factory=list)  # UTRs, IRs, stem-loops
     sgrnas: list[SubgenomicRNA] = field(default_factory=list)  # drawn beneath the line

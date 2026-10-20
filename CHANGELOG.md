@@ -10,6 +10,22 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- **Segment names in titles and on circular hubs.** A `region` row's `Name=`
+  (`RNA-1`, `DNA-A`, `L`) now names the molecule in the figure title and at
+  the centre of a circular map, so a segmented genome reads as the ICTV
+  figures label it rather than by accession (`RNA-1 (8,118 nts)`, not
+  `NC_003617.1 (8,118 nts)`). Without `Name=`, the sequence id is used as
+  before; a YAML `title:` still overrides the default title. **Output changes
+  for any GFF whose region rows carry `Name=`**: among the shipped examples,
+  the `--title` titles of LIYV, TSWV, TGMV and FBNYV, and the hub text of
+  TGMV and FBNYV. BYDV, PLRV, PVX and PVY carry `Name=` but set their titles
+  in YAML, and GRBV has no `Name=`, so those are unchanged.
+  File names, depth matching and `--ref` still go by sequence id, so
+  `<name>.<seqid>.<format>` outputs keep their names. `--rnas` now accepts
+  either form (`--rnas RNA-1` or `--rnas NC_003617.1`); a `Name=` shared by
+  two regions is not accepted as a selector. `docs/figures/tswv_stacked.svg`
+  regenerated; docs/GFF_GUIDE.md §2.
+
 - **The subgenomic-RNA coverage descriptions now state a prediction rather
   than an expectation.** The documentation asserted that a nested sgRNA set
   leaves a step in the aggregate depth at each 5' end, and used a closterovirus

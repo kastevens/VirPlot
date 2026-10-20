@@ -111,7 +111,7 @@ virplot -g examples/sample_multi.gff3 -d examples/sample.sam -y examples/spec.ym
 # -> virplot.SyntheticVirus1.svg, virplot.SyntheticVirus2.svg
 ```
 
-So the separate figures can be laid side by side without misleading the reader, they share one depth y-limit and their widths are proportional to RNA length. `--free-y` and `--equal-width` switch either behaviour off; `--rnas SEQID [SEQID ...]` selects and orders a subset. With `--normalize`, depth is scaled by the maximum across all plotted RNAs.
+So the separate figures can be laid side by side without misleading the reader, they share one depth y-limit and their widths are proportional to RNA length. `--free-y` and `--equal-width` switch either behaviour off; `--rnas SEQID [SEQID ...]` selects and orders a subset, by sequence id or by the region's `Name=`. Each figure is titled by its region's `Name=` when the GFF gives one (`RNA-1 (8,118 nts)`), otherwise by its sequence id; file names always use the sequence id. With `--normalize`, depth is scaled by the maximum across all plotted RNAs.
 
 ### Circular genomes
 
@@ -209,7 +209,7 @@ virplot [-h] [-V] -g GFF [-d DEPTH [DEPTH ...]] [-l LABELS [LABELS ...]]
 | `--bowtie2-args`     | Extra options passed to bowtie2 verbatim |
 | `-l`, `--labels`     | Label(s) for each depth source (same order as `--depth`)       |
 | `--ref`              | Reference name to use from SAM/BAM/depth files when it differs from the GFF sequence id (single-RNA GFF only) |
-| `--rnas`             | Plot only these GFF sequence ids, in this order (default: every `region`) |
+| `--rnas`             | Plot only these RNAs, in this order, by sequence id or region `Name=` (default: every `region`) |
 | `--free-y`           | With several RNAs, let each figure pick its own y-limit          |
 | `--equal-width`      | With several RNAs, draw every figure at full width               |
 | `--min-mapq`         | Skip SAM/BAM reads with MAPQ below this (default: 0)           |

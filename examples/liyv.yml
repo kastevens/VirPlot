@@ -23,4 +23,4 @@ stacked_area_colors: ['#567eb0', '#55b9d9', '#85dbec']
 legend_location: "upper left"
 end_5_label: "5' m7G?"
 end_3_label: "3' OH"
-title: ""   # empty -> "<seqid> (length nts)" per RNA
+title: ""   # empty -> "<region Name=, else seqid> (length nts)" per RNA
