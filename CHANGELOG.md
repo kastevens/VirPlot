@@ -8,8 +8,189 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Segment names in titles and on circular hubs.** A `region` row's `Name=`
+  (`RNA-1`, `DNA-A`, `L`) now names the molecule in the figure title and at
+  the centre of a circular map, so a segmented genome reads as the ICTV
+  figures label it rather than by accession (`RNA-1 (8,118 nts)`, not
+  `NC_003617.1 (8,118 nts)`). Without `Name=`, the sequence id is used as
+  before; a YAML `title:` still overrides the default title. **Output changes
+  for any GFF whose region rows carry `Name=`**: among the shipped examples,
+  the `--title` titles of LIYV, TSWV, TGMV and FBNYV, and the hub text of
+  TGMV and FBNYV. BYDV, PLRV, PVX and PVY carry `Name=` but set their titles
+  in YAML, and GRBV has no `Name=`, so those are unchanged.
+  File names, depth matching and `--ref` still go by sequence id, so
+  `<name>.<seqid>.<format>` outputs keep their names. `--rnas` now accepts
+  either form (`--rnas RNA-1` or `--rnas NC_003617.1`); a `Name=` shared by
+  two regions is not accepted as a selector. `docs/figures/tswv_stacked.svg`
+  regenerated; docs/GFF_GUIDE.md §2.
+
+- **The subgenomic-RNA coverage descriptions now state a prediction rather
+  than an expectation.** The documentation asserted that a nested sgRNA set
+  leaves a step in the aggregate depth at each 5' end, and used a closterovirus
+  covered 1x over ORF1a and 150x over CP as the illustration. The mechanism is
+  right — each sgRNA runs from its own 5' end to the genome's 3' end, so the
+  set predicts a *monotonic* staircase that can only rise 3'-ward — but whether
+  a library shows one depends on its preparation, and the first real library in
+  the repository does not. `examples/glrav13.bam`, a closterovirus at 1,173x
+  mean depth, has a 3'/5' ratio of 1.55x and per-ORF step ratios from 0.55x to
+  1.93x, four of thirteen going down; a 3'-coterminal ladder cannot step down
+  at all.
+
+  The ladder is therefore documented as something to test the depth trace
+  against, with a table of what each outcome means, rather than as an
+  explanation to apply to it. A genuine staircase still explains a 5'-to-3'
+  gradient that would otherwise read as a failed assembly; its absence says
+  nothing about the assembly. `GFF_GUIDE.md` §11,
+  `ictv_drawing_conventions.md` §6 K, and the `SubgenomicRNA` and
+  `_draw_sgrnas` docstrings.
+
 ### Added
 
+- **A real-read example: GLRaV-13 isolate H8881** (`examples/glrav13.gff3`,
+  `glrav13.fa`, `glrav13.bam`, `glrav13.yml`). Every other example ships
+  simulated reads; this one carries 212,285 real alignments against the real
+  reference, mean depth 1,173x with 100% of the genome at >=1x, so the depth
+  trace shows genuine coverage structure instead of a flat band.
+
+  The BAM holds only the reads VirPlot counts: the source alignment had 23.0M
+  records, of which 212,285 survive the unmapped / secondary / QC-fail /
+  duplicate filter, taking it from 899 MB to 4.7 MB. The depth it yields is
+  identical to the depth from the unfiltered file. Its `@SQ` name and the
+  FASTA header were both changed from the assembler's contig name
+  (`GVLRaV13_H8881NODE_4_length_...`) to the GFF3's `GLRaV13_H8881`, so the
+  example plots with no `--ref` and no name-mismatch warning — the §7 problem,
+  avoided rather than demonstrated.
+
+## [2.2.0] — 2026-10-02
+
+### Changed
+
+- **A circular genome is now drawn as a circle by default.** `--layout`
+  defaults to `auto` rather than `linear`, so a GFF whose region line says
+  `Is_circular=true` produces the circular figure the ICTV conventions
+  describe (§4) without being asked. spec.yml gains a `layout` key
+  (`auto|linear|circular`) so a per-example default lives beside the data it
+  styles; precedence is `--layout`, then the YAML key, then `auto`.
+
+  `--layout linear` is unchanged and now matters more: it is the way to get
+  the linear track of a circular genome. Deleting `Is_circular=true` is not,
+  because that attribute is a fact about the molecule — it drives depth
+  wrapping at the origin and the splitting of origin-crossing features — so
+  removing it would quietly change the data handling too.
+
+  Because the circular layout cannot carry the `±1 FS` / `RT` marks, it now
+  warns when a genome reaching it has frameshifted or read-through ORFs,
+  rather than dropping the annotation silently.
+
+  `docs/make_figures.sh` passes `--layout linear` explicitly for the
+  `grbv_linear` figure, which previously relied on the old default. No shipped
+  figure changes.
+
+### Added
+
+- **Stacked figures for segmented genomes, by composing.** `bin/stack_figures.py`
+  joins a multipartite genome's per-segment figures into the one stacked figure
+  the ICTV conventions describe — largest first, shared scale, left aligned at
+  the 5' end (Geminiviridae DNA-A/DNA-B, LIYV RNA-1/RNA-2, TSWV L/M/S, nanovirus
+  components). Supporting it: segments now render **largest first** by default
+  (`--rna-order length|gff`), and `--bare-x` drops the repeated x-axis label and
+  tick numbers from every panel but the bottom one.
+
+  There is deliberately no stacked-figure renderer. Within a run the figure
+  width is proportional to genome length and matplotlib's margins are
+  fractional, so the separate panels already share an exact x-scale — measured
+  across TSWV's 3x length spread, 0.0000% drift — which makes stacking a
+  document operation rather than a re-plot. The composer also **aligns the
+  panels' plot areas**, correcting the small offset (0.63 pt on LIYV) that
+  appears when panels carry y-tick labels of different widths and are cropped
+  to a tight bounding box; hand pasting cannot fix that. `tests/test_stacking.py`
+  guards the shared-scale property, since the decision holds only while it does.
+  See `docs/ictv_drawing_conventions.md` §6 G.
+
+- `docs/ARCHITECTURE.md` §3 class diagram simplified to the objects and
+  modules that matter, with the design patterns the code happens to use
+  marked (Value Object, Aggregate, Builder, Factory + Iterator, Strategy,
+  Rule table); `docs/class_layout.svg` regenerated from it.
+- **Subgenomic RNA rows.** The nested sgRNA sets that plus-strand RNA plant
+  viruses use for their 3' ORFs are drawn as shorter lines beneath the genome
+  line, 5' aligned to their start with an arrowhead there, longest row first
+  and each labelled — the ICTV convention. They are read from a transcript row
+  (`mRNA`, `transcript`, `ncRNA`, `misc_RNA`, `primary_transcript`,
+  `sequence_feature`, `misc_feature`) whose `Note=` says `sgRNA` or
+  `subgenomic`, with `gene=` naming what it expresses; the marker is required
+  rather than inferred from the type, because RefSeq writes real `mRNA` rows
+  (spliced mastrevirus transcripts) that are not sgRNAs. `start` is the 5'
+  terminus; an end at or past the genome length means the 3' end, covering the
+  usual 3'-coterminal set, while an earlier end is kept for the 5'-proximal
+  sgRNAs closteroviruses also make. Row colour is `sgrna_color` in spec.yml.
+  `examples/byv.gff3` carries the full closterovirus ladder.
+
+  These rows are annotation and never a depth track: a plant virus sgRNA is
+  co-linear with the genome and carries no leader junction, so its reads
+  cannot be told from genomic reads and per-sgRNA coverage is not recoverable
+  from short reads. A nested set predicts a monotonic staircase in the
+  aggregate depth — each sgRNA runs from its 5' end to the genome's 3' end, so
+  depth steps up at each terminus and never down — which is why the ladder
+  shares the depth track's x-axis: it makes the prediction checkable. Whether
+  a library shows it depends on its preparation, and many do not.
+
+  Drawn in the linear layout only, deliberately: the ICTV puts no transcript
+  rows on circular genomes (geminivirus transcription is bidirectional from
+  the IR, nanovirus components carry one ORF each), so `--layout circular`
+  warns and skips. See `docs/GFF_GUIDE.md` §11 and
+  `docs/ictv_drawing_conventions.md` §6 K.
+
+- **Non-coding features: UTRs, intergenic regions, stem-loops.** GFF
+  `five_prime_UTR` / `three_prime_UTR` / `stem_loop` / `origin_of_replication`
+  rows are always read; GenBank's catch-all `misc_feature` (NCBI GFF3
+  `sequence_feature`), `regulatory_region` and `repeat_region` rows only when
+  their name or `Note=` says intergenic / common region / IR / UTR /
+  stem-loop, so RefSeq motif annotations stay off the line. A region is a
+  grey bar astride the genome line (linear) or a grey arc astride the circle
+  (circular, the ICTV begomovirus `CRA`), under the ORFs and outside the
+  layout rules; a stem-loop is the hairpin icon at its own position, which on
+  a circle replaces the default icon at position 1. A region holding an
+  unnamed stem-loop is named once, over the hairpin. Labels: `Name=` first,
+  then `product=`/`gene=`/`Note=`, with defaults for the dedicated types.
+  `examples/grbv.gff3` now carries its origin-spanning intergenic region and
+  hairpin, `examples/tgmv.gff3` its common regions (`CRA`/`CRB`) and
+  hairpins — all located from the sequences, since RefSeq annotates none —
+  and `examples/fbnyv.gff3` RefSeq's own `stem_loop` rows on every
+  component; docs/GFF_GUIDE.md §10.
+- Inside labels switch to white on a really dark fill (`color_mapping`
+  navy, the non-coding grey); every ICTV palette colour keeps black text.
+- **Polyprotein domain dividers.** RefSeq's `mature_protein_region_of_CDS`
+  rows (GenBank `mat_peptide`; `Parent=` names the CDS, else containment)
+  become `Domain` segments of their CDS. The box is drawn as one glyph split
+  by thin vertical lines, each segment in its own colour (same rule as any
+  product) and labelled with its domain name — inside when it fits at the
+  figure's size, otherwise just outside the box, staggered onto a further
+  row when names would overprint. The polyprotein's own `product` is not
+  written. Works in both layouts. `examples/pvy.gff3` / `pvy.sam` /
+  `pvy.yml` — potato virus Y with its ten mature proteins and PIPO, styled
+  to ICTV Potyviridae Fig. 2 — and `docs/figures/pvy_linear.svg`;
+  docs/GFF_GUIDE.md §9.
+- Frameshift labels carry whatever shift the `Note=` states (`+2 FS` for
+  PIPO), not only ±1.
+- **ICTV reference examples.** Seven curated RefSeq genomes, each labelled
+  and coloured as in its ICTV 9th Report family figure, with a style file and
+  simulated reads: BYDV-PAV and PLRV (−1 frameshift, readthrough, VPg), LIYV
+  (two RNAs, BAM input), TSWV (three ambisense segments), TGMV (bipartite
+  begomovirus), FBNYV (eight-component nanovirus) and PVX (triple gene
+  block). Each GFF header lists its accessions and every change from RefSeq.
+  `examples/make_example_sam.py` simulates reads for every molecule in a GFF.
+- `examples/grbv.gff3` labels curated to the ICTV convention (`gene=V1;
+  product=CP`, `gene=C1;product=RepA`, …; RefSeq's `Vn protein` names kept in
+  `Note=`), with a header comment recording the curation. `grbv.yml` no longer
+  needs a `color_mapping`; the default palette colours the curated products.
+- **ICTV-style circular options.** `circular_labels: horizontal` writes every
+  arc label level, outside the ring, as `ORF (product)`; a nested arc's label
+  steps one line away from the equator per tier so it does not overprint.
+  `circular_arcs: on_circle` sets the innermost arcs astride the genome
+  circle instead of just outside it. Both default off; `examples/grbv_ictv.yml`
+  and `docs/figures/grbv_circular_ictv.svg` show them.
 - **Frameshift and readthrough.** A RefSeq CDS split over several rows with
   `exception=ribosomal slippage` is drawn as one box per segment, each
   continuation flipped across the line and labelled `+1 FS` / `−1 FS` (sign
@@ -94,8 +275,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ### Changed (output)
 
 - Feature glyphs are drawn as flat colour with no outline, as in the
-  original VirPlot figure and the ICTV maps. The `--no-border` option is
-  removed (there is nothing to turn off). To keep adjacent same-colour boxes
+  original VirPlot figure and the ICTV maps: `--no-border` is now the
+  default (and still accepted, so existing commands keep working), and the
+  new `--border` restores the black outline. To keep adjacent same-colour boxes
   apart, the one-strand flip rule now also flips a box whose upstream
   neighbour is the same colour and within 1 % of the genome length — the
   choice the ICTV BYV figure makes for CPm/CP. With `examples/byv.yml` (the
@@ -123,6 +305,44 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- GFF3 rows that precede their sequence's `region` line are no longer dropped
+  (with a misleading "no region line" warning); features are attached after
+  the whole file is read.
+- GFF3 attribute values are percent-decoded (`%2C` → `,`, `%3B` → `;`, as
+  NCBI writes inside `product=` and `Note=`), so labels read naturally and the
+  function-word classifier sees real text.
+- A named or 3-digit colour in `function_palette` (`orange`, `#abc`) no
+  longer crashes the "putative = lighter tint" path; `lighter()` accepts any
+  matplotlib colour.
+- `color_mapping:` left empty in the YAML no longer raises `TypeError`.
+- A hand-written join (two rows sharing an `ID`) with `Note=… frameshift` on
+  both rows marks only the continuation as the frameshift, not the first
+  segment too.
+- Join segments that are in frame with each other get no sign (bare `FS`)
+  instead of `−0 FS`.
+- A frameshift continuation now flips relative to the ORF it continues
+  (found at the junction, ±2 nt), not to whichever ORF sorted before it by
+  start; a small ORF nested inside ORF1a no longer makes ORF1b land on
+  ORF1a's side.
+- Origin-crossing coordinates (`start > end`, or `end` past the length) are
+  split into their two pieces whether or not the molecule is marked circular,
+  so `--topology linear` on a circular genome, or a GFF that forgot
+  `Is_circular`, draws the feature where the coordinates say instead of as
+  an off-axis box; a `start` past the length (padded reference) is reduced
+  modulo the length; the parser warns when a non-circular region has such
+  a feature.
+- Two `samtools depth` files of different row counts no longer abort for a
+  circular genome (one may have been made against a padded reference).
+- `Feature.length` counts bases inclusively (`Feature(1, 3).length == 3`).
+- Malformed GFF or depth text raises `virplot.parsers.ParseError` (caught by
+  the CLI) instead of calling `sys.exit` from library code.
+- The linear depth outline is drawn stepped when the fill is (two or more
+  tracks), so it sits on the fill's edge.
+- All-zero depth no longer trips matplotlib's identical-ylim warning; an
+  `RNA` with no depth track plots as flat zero instead of raising; genomes
+  under eight bases get a tick step of one instead of a division by zero.
+- `CircularPlotter`'s per-figure radii start at sane defaults, so its label
+  helpers can be called in any order.
 - `--report` no longer fails when the output directory does not exist yet.
 
 ### Changed

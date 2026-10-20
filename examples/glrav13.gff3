@@ -1,0 +1,38 @@
+##gff-version 3
+#!gff-spec-version 1.21
+#!processor human annotator Haoran (Henry) Li
+# Grapevine leafroll-associated virus 13 isolate H8881 (Closteroviridae),
+# annotated at UC Davis Foundation Plant Services. Shipped with
+# examples/glrav13.fa (the reference) and examples/glrav13.bam (the reads
+# that mapped to it). Unlike the other examples the reads here are real,
+# not simulated: 212,285 alignments, mean depth 1,173x.
+##sequence-region GLRaV13_H8881 1 17564
+##species https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=1815581
+GLRaV13_H8881	UCDFPS	region	1	17564	.	+	.	ID=GLRaV13_H8881:1..17564;Dbxref=taxon:1815581;nat-host=Vitis vinifera;geo_loc_name=USA: California
+GLRaV13_H8881	UCDFPS	five_prime_UTR	1	1070	.	+	.	ID=utr5;Name=UTR-5;Note=5' untranslated region
+GLRaV13_H8881	UCDFPS	CDS	1071	7655	.	+	0	ID=cds-polyprotein_1a;Name=polyprotein_1a;gbkey=CDS;product=Methyltransferase/helicase;Note=contains methyltransferase and helicase
+GLRaV13_H8881	UCDFPS	gene	7654	9213	.	+	.	ID=gene-RdRp;Name=RdRp;gbkey=Gene;gene=RdRp;gene_biotype=protein_coding;partial=true;start_range=.,7654
+GLRaV13_H8881	UCDFPS	CDS	7654	9213	.	+	0	ID=cds-RdRp;Parent=gene-RdRp;Name=RdRp;gbkey=CDS;gene=RdRp;partial=true;product=RdRp;Note=putatively expressed as ORF1b by a +1 ribosomal frameshift with polyprotein 1a;start_range=.,7654
+GLRaV13_H8881	UCDFPS	gene	9248	9439	.	+	.	ID=gene-p7-1;Name=p7;gbkey=Gene;gene=p7;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	9248	9439	.	+	0	ID=cds-p7-1;Parent=gene-p7-1;Name=p7;gbkey=CDS;gene=p7;product=p7
+GLRaV13_H8881	UCDFPS	gene	10024	10209	.	+	.	ID=gene-p7-2;Name=p7;gbkey=Gene;gene=p7;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	10024	10209	.	+	0	ID=cds-p7-2;Parent=gene-p7-2;Name=p7;gbkey=CDS;gene=p7;product=p7
+GLRaV13_H8881	UCDFPS	gene	10213	11865	.	+	.	ID=gene-HSP70h;Name=HSP70h;gbkey=Gene;gene=HSP70h;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	10213	11865	.	+	0	ID=cds-HSP70h;Parent=gene-HSP70h;Name=HSP70h;gbkey=CDS;gene=HSP70h;product=HSP70h
+GLRaV13_H8881	UCDFPS	gene	11844	13271	.	+	.	ID=gene-p53;Name=p53;gbkey=Gene;gene=p53;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	11844	13271	.	+	0	ID=cds-p53;Parent=gene-p53;Name=p53;gbkey=CDS;gene=p53;product=p53
+GLRaV13_H8881	UCDFPS	gene	13337	14233	.	+	.	ID=gene-CP;Name=CP;gbkey=Gene;gene=CP;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	13337	14233	.	+	0	ID=cds-CP;Parent=gene-CP;Name=CP;gbkey=CDS;gene=CP;product=CP
+GLRaV13_H8881	UCDFPS	gene	14233	15699	.	+	.	ID=gene-CPm;Name=CPm;gbkey=Gene;gene=CPm;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	14233	15699	.	+	0	ID=cds-CPm;Parent=gene-CPm;Name=CPm;gbkey=CDS;gene=CPm;product=CPm
+GLRaV13_H8881	UCDFPS	gene	15699	16289	.	+	.	ID=gene-p22;Name=p22;gbkey=Gene;gene=p22;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	15699	16289	.	+	0	ID=cds-p22;Parent=gene-p22;Name=p22;gbkey=CDS;gene=p22;product=p22
+GLRaV13_H8881	UCDFPS	gene	16297	16494	.	+	.	ID=gene-p7-3;Name=p7;gbkey=Gene;gene=p7;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	16297	16494	.	+	0	ID=cds-p7-3;Parent=gene-p7-3;Name=p7;gbkey=CDS;gene=p7;product=p7
+GLRaV13_H8881	UCDFPS	gene	16532	16747	.	+	.	ID=gene-p8;Name=p8;gbkey=Gene;gene=p8;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	16532	16747	.	+	0	ID=cds-p8;Parent=gene-p8;Name=p8;gbkey=CDS;gene=p8;product=p8
+GLRaV13_H8881	UCDFPS	gene	16663	17271	.	+	.	ID=gene-p23;Name=p23;gbkey=Gene;gene=p23;gene_biotype=protein_coding
+GLRaV13_H8881	UCDFPS	CDS	16663	17271	.	+	0	ID=cds-p23;Parent=gene-p23;Name=p23;gbkey=CDS;gene=p23;product=p23
+GLRaV13_H8881	UCDFPS	gene	17234	17341	.	+	.	ID=gene-p4;Name=p4;gbkey=Gene;gene=p4;gene_biotype=protein_coding;Note=isolate-specific short 3' overlapping ORF
+GLRaV13_H8881	UCDFPS	CDS	17234	17341	.	+	0	ID=cds-p4;Parent=gene-p4;Name=p4;gbkey=CDS;gene=p4;product=p4;Note=short overlapping 3' ORF intact in H8881 and absent as a full-length ORF in LC052212.1 due to internal stop codon trunation
+GLRaV13_H8881	UCDFPS	three_prime_UTR	17342	17564	.	+	.	ID=utr3;Name=UTR-3;Note=3' untranslated region

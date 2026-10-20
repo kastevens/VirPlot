@@ -1,0 +1,21 @@
+# Style for the potato virus X example (examples/pvx.gff3), following ICTV
+# 9th Report Alphaflexiviridae Fig. 9: polymerase light blue, the triple gene
+# block green, CP lavender. Colours were sampled from the figure. TGB1-3 share
+# a colour, so neighbours separate by the flip rule.
+
+color_mapping:
+  Polymerase 147K: '#8cc4dc'
+  26K: '#7cb47c'
+  13K: '#7cb47c'
+  7K: '#7cb47c'
+  CP: '#8c84ac'
+
+annotation_fontsize: 9
+default_color: '#9f9f9f'
+shade_color: '#ca4f35'
+depth_line_color: '#85dbec'
+stacked_area_colors: ['#567eb0', '#55b9d9', '#85dbec']
+legend_location: "upper left"
+end_5_label: "5' m7G"
+end_3_label: "A(n) 3' OH"
+title: "Potato virus X, PVX (6,435 nts)"

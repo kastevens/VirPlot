@@ -1,0 +1,28 @@
+# Style for the PVY example (examples/pvy.gff3), following ICTV 9th Report
+# Potyviridae Fig. 2. The figure gives every mature protein of the polyprotein
+# its own colour, sampled here from the figure; without this mapping VirPlot
+# colours each domain by its function words instead (CP magenta, HC-Pro
+# purple, the rest grey), which is also a fair picture.
+
+color_mapping:
+  P1-Pro: '#d38eae'
+  HC-Pro: '#7fb67e'
+  P3: '#8887b2'
+  6K1: '#979998'
+  CI: '#88c3df'
+  6K2: '#979998'
+  VPg: '#c27758'
+  NIa-Pro: '#a68b67'
+  NIb: '#eecd6c'
+  CP: '#85b29b'
+  PIPO: '#8fc0a7'
+
+annotation_fontsize: 9
+default_color: '#9f9f9f'
+shade_color: '#ca4f35'
+depth_line_color: '#85dbec'
+stacked_area_colors: ['#567eb0', '#55b9d9', '#85dbec']
+legend_location: "upper left"
+end_5_label: "VPg"
+end_3_label: "A(n) 3'OH"
+title: "Potyvirus, PVY (9,704 nts)"

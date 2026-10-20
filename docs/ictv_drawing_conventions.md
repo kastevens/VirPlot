@@ -131,9 +131,9 @@ showed the spec itself needs a change. Rule numbers refer to the sections above.
 | 1 | Done. Flip-on-overlap with a collision fallback (see A below). | `layout.py` |
 | 2 | Done. Keyword classifier → ICTV palette; `color_mapping` still wins; "putative" → lighter tint. | `settings.py` |
 | 3 | Done. `Feature.strand`/`gene` carried; + above →, − below ←; same-side overlap tiers outward; `auto` picks flip/tier from `two_strand`. | `layout.py`, `plotting.py` |
-| 4 | **Partly.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=`; default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=` (linear layout). Polyprotein dividers, sgRNA rows: **not done** (see F). | `plotting.py`, `parsers.py`, `layout.py` |
-| 5 | **Done differently.** One figure per RNA with a shared y-limit and length-proportional width, not stacked rows (see G). | `cli.py`, `plotting.py` |
-| 6 | Done. `CircularPlotter`: origin at 12 o'clock with stem-loop icon, arcs just outside the circle with arrowheads, clockwise for + and anticlockwise for −, overlap nests inward; depth as an inner ring. `--layout circular|auto`. | `plotting.py` |
+| 4 | **Done.** 5′/3′ end labels and the VPg oval; ORF name outside the glyph from `gene=` / `Name=` / `locus_tag=`, omitted when it repeats the product (see D); default title `name (length nts)`; **frameshift step + `±1 FS` label and readthrough bar + `RT`**, read from RefSeq's `exception=ribosomal slippage` / `transl_except=` or from `Note=`; **polyprotein domain dividers** from RefSeq's `mature_protein_region_of_CDS` / `mat_peptide` rows, in both layouts (see F); **sgRNA rows** beneath the line, longest first, from a marked transcript row (see K). The FS/RT marks and the sgRNA ladder are linear-layout only, and the circular layout now warns rather than dropping them silently. | `plotting.py`, `parsers.py`, `layout.py`, `models.py` |
+| 5 | **Done by composing.** One figure per segment, largest first, on a shared scale and y-limit; `bin/stack_figures.py` stacks them into the figure §1 describes. A `StackedPlotter` was considered and rejected on a measurement — see G. Each segment is labelled as §1 asks (`RNA-1 (8,118 nts)`) from its region row's `Name=`, falling back to the sequence id. | `cli.py`, `plotting.py`, `parsers.py`, `bin/stack_figures.py` |
+| 6 | Done. `CircularPlotter`: origin at 12 o'clock with stem-loop icon (moved to a GFF `stem_loop` row when there is one), arcs just outside the circle with arrowheads, clockwise for + and anticlockwise for −, overlap nests inward; **IR / UTR as a grey arc astride the circle** from the GFF's non-coding rows; depth as an inner ring. `--layout circular|auto`. | `plotting.py` |
 
 ### Changes the document needs
 
@@ -172,34 +172,120 @@ rewording C2 to: direction by strand; nesting by overlap; halves follow.
 outside / product inside needs two names per feature. The code uses
 `product=` inside and `gene=` outside when present. NCBI RefSeq GFF3 for GRBV
 carries neither an ORF name nor a function — only `locus_tag=N761_gp1` and
-`product=V1 protein` — so the outside label is empty and function colouring
-needs a per-product `color_mapping` (as `examples/grbv.yml` does). Worth
-deciding whether `locus_tag` or `Name` should be accepted as the outside label.
+`product=V1 protein`. The shipped `examples/grbv.gff3` is therefore curated
+(`gene=V1;product=CP`, RefSeq name kept in `Note=`), which is what users are
+expected to do; docs/GFF_GUIDE.md §5 says so.
+
+**Settled, against a real annotation.** The outside label is now taken from
+`gene=`, then `Name=`, then `locus_tag=`, so an uncurated RefSeq record labels
+its ORFs `N761_gp1` rather than not at all, and a hand annotation that puts the
+ORF name in `Name=` is read as intended.
+
+Testing that against the GLRaV-13 H8881 annotation used in the FPS paper
+(17,564 nt, 13 ORFs) turned up a second rule the document does not state and
+real files need badly: **an outside label equal to the product is dropped.**
+That file carries `gene=` on every ORF, but for eleven of thirteen the gene and
+the product are the *same string* (`gene=CP;product=CP`, `gene=p53;product=p53`),
+because the ORF has one name and no separate known function. Writing it inside
+the box and again above it is noise, not the convention's two names. The same
+holds in the shipped `examples/grbv.gff3`, where `V3` and `C3` are named twice
+for exactly that reason. With the rule, GLRaV-13's one genuine two-name
+feature — `Name=polyprotein_1a;product=Methyltransferase/helicase` — is the only
+ORF that gets a label above its box, which is what §1 is asking for.
+
+§1 should therefore say: outside label from `gene=`, else `Name=`, else
+`locus_tag=`; inside label from `product=`; and the outside label is omitted
+when the two would read the same.
 
 **E. §1 Palette — RefSeq product names are often function-free.** The keyword
 classifier covers RdRp/Rep/CP/MP/HSP70/p2x-style names; anything else falls to
 grey unless mapped. That is the right failure mode, but the document's "map
 product names by default" will silently leave many RefSeq genomes grey.
 
-**F. §1 Expression features need an encoding — two now have one.** Frameshift
+**F. §1 Expression features need an encoding — three now have one.** Frameshift
 and readthrough are read from what RefSeq already writes (`exception=ribosomal
 slippage` on the rows of a joined CDS; `transl_except=` on a readthrough
 product) and from VirPlot's `Note=+1 frameshift` / `Note=readthrough`
 convention (docs/GFF_GUIDE.md §8). The frameshift sign is derived from the
 join geometry (skip one base = +1, re-read one = −1). Polyprotein domains
-(`mat_peptide` rows) and sgRNAs still need an encoding decision, and the
-parser still reads only `CDS` rows, so IR/UTR/stem-loop arcs (§3 baseline)
-need `parse_gff_rnas` to accept other types.
+are read from RefSeq's `mature_protein_region_of_CDS` rows (GenBank
+`mat_peptide`; `Parent=` names the CDS, or containment is used) and drawn as
+the §1 rule says — one box, thin lines between segments, a name in each —
+with one addition the rule does not state and Potyviridae Fig. 2 shows:
+**each segment is coloured on its own** (by `color_mapping`, then function
+words), the box's own `product` is not written, and a name too long for its
+segment moves outside the box (`6K1`, `6K2` in that figure). The document
+should add the per-segment colour and the outside-label fallback to the
+Polyprotein row of §1. Non-coding features (§1 palette, §3 baseline) are
+now read too: RefSeq's `five_prime_UTR` / `three_prime_UTR` / `stem_loop`
+rows always, its catch-all `sequence_feature` (`misc_feature`) /
+`regulatory_region` / `repeat_region` rows only when their words say
+intergenic / common region / IR / UTR / stem-loop, so motif annotations
+inside ORFs stay off the line. A region is a grey bar or arc astride the
+genome line; a stem-loop is the hairpin icon at its own position (which on a
+circle replaces the default icon at position 1); a region holding an unnamed
+stem-loop is named once at the hairpin, as Geminiviridae Fig. 5 writes
+`CRA`. The document should say that these are drawn **on** the line and take
+no part in the ORF layout. sgRNAs are now encoded and drawn; see K.
 
-**G. §1 Segmented genomes — stacked vs separate.** The document specifies
-stacked rows, largest first. The branch delivers separate files with a shared
-depth y-limit and width proportional to length (so they compose honestly), in
-GFF order. Either the document should record that decision or a
-`StackedPlotter` remains a to-do; ordering largest-first is a one-line change
-either way.
+**G. §1 Segmented genomes — rendered separately, composed afterwards.** The
+document specifies stacked rows, largest first. VirPlot renders one figure per
+segment and stacks them with `bin/stack_figures.py` rather than drawing a
+stacked figure directly. **This is a decision, not a missing feature**, and the
+measurement behind it is this: within one run the figure width is proportional
+to genome length and matplotlib's margins are fractional, so the panels already
+share an exact x-scale. Across TSWV's L/M/S (8,897 / 4,821 / 2,916 nt — a 3×
+spread) the measured scale drift is **0.0000%** and the plot areas start at the
+same x to within 0.00 pt. Stacking is therefore a document operation, and a
+`StackedPlotter` would re-implement in matplotlib a figure that already
+composes exactly.
 
-**H. §4 Decision logic — layout default.** "circular? → C modes" implies
-circular genomes are drawn as circles by default. The CLI defaults to
+What the decision buys and costs. The panels stay independently useful (a
+single segment is a figure in its own right, which a stacked-only renderer
+would lose), the circular case needs no second layout pass, and the composer is
+~170 lines of stdlib against a 150–250-line renderer that would have to handle
+unequal-width axes in one `GridSpec` and a radial budget for circular
+components. The cost is one extra command, which `docs/make_figures.sh` shows.
+
+Three pieces close the gap to the document's wording: segments now render
+**largest first** by default (`--rna-order length`), `--bare-x` drops the
+repeated x-axis from every panel but the bottom one, and the composer orders
+panels largest first and **aligns their plot areas** — a panel whose depth axis
+carries wider tick labels starts further right once the figure is cropped to a
+tight bounding box (0.63 pt on LIYV), which hand pasting cannot correct.
+`tests/test_stacking.py` guards the shared-scale property itself, since the
+decision is only sound while it holds.
+
+§1 needs no change: it describes the finished figure, and the composed figure
+is that figure — one row per segment, largest first, on a shared scale. It is
+§5's stage wording ("→ stacked rows") that should say the rows are composed
+from per-segment figures rather than drawn by one renderer.
+
+**H. §4 Decision logic — layout default. Settled: the document wins.** A
+circular genome is now drawn as a circle without being asked, as §4 says.
+`--layout` defaults to `auto`, and spec.yml gains a `layout` key so a
+per-example default lives beside the data it styles; precedence is `--layout`,
+then the YAML, then `auto`.
+
+**`--layout linear` stays, and becomes load-bearing.** Three reasons it cannot
+be replaced by editing the GFF. First, `Is_circular=true` is a fact about the
+*molecule*, not the figure: it drives depth wrapping at the origin and the
+splitting of origin-crossing features, so deleting it to get a linear picture
+would silently change the data handling as well. Presentation needs its own
+control, which is why `--topology` (what the molecule is) and `--layout` (how it
+is drawn) are separate axes and should stay separate. Second, the circular
+layout cannot carry everything the linear one can — the `±1 FS` and `RT` marks
+are linear-only (§6 F), as are sgRNA rows (§6 K), so a circular genome with a
+frameshift or a transcript ladder needs a way back to a track; `CircularPlotter`
+now warns rather than dropping those marks silently. Third, legibility: a linear
+track carries far more labels, and circular nesting is bounded at three lanes
+before it clamps (§6 I).
+
+`docs/make_figures.sh` is the immediate proof. Its `grbv_linear` figure asked
+for no layout and relied on the old default; under the new one it would have
+become a circle, so it now passes `--layout linear` explicitly.
+
+The original note, kept for the record: the CLI defaulted to
 `--layout linear` because a linear track carries far more labels legibly;
 `--layout auto` gives the document's behaviour. This is a product decision
 worth making explicit.
@@ -209,10 +295,69 @@ and the rim; deeper nesting is clamped to the innermost lane with a warning.
 Real cases (nanovirus components, PCV) fit; a very dense circular genome would
 need the depth ring made thinner or the arcs unrolled.
 
-**J. Version.** Stages 1–3 change existing linear output (the synthetic sample
-now has every box above the line, since none of its ORFs overlap, and its `p7`
-takes the small-ORF purple). Per §5 that warrants a minor-version bump; not
-applied on the branch — a release decision.
+**K. §1 sgRNAs — encoded as a curation convention, and linear-only by
+design.** The document asks for "shorter lines stacked beneath the genome, 5′
+aligned to their start, labelled". The branch draws exactly that, longest row
+first, from a transcript row (`mRNA`, `transcript`, `ncRNA`, `misc_RNA`,
+`primary_transcript`, `sequence_feature`, `misc_feature`) whose `Note=` says
+`sgRNA` / `subgenomic`, with `gene=` naming what it expresses
+(docs/GFF_GUIDE.md §11). The marker is required rather than inferred from the
+type, because RefSeq writes real `mRNA` rows — spliced mastrevirus transcripts
+— that are not sgRNAs. `start` is the 5′ terminus; an `end` at or past the
+genome length means the 3′ end, which covers the usual 3′-coterminal set,
+while an earlier end is kept for the 5′-proximal sgRNAs closteroviruses also
+make. `examples/byv.gff3` carries the ladder, with the two 5′ termini mapped
+by Vitushkina et al. (2002, *Virology* 297:299–307) marked as such and the
+other five flagged as illustrative placements.
+
+Two things the document should record. First, **these rows are annotation and
+never a depth track**: a plant virus sgRNA is co-linear with the genome and
+carries no leader junction (unlike *Nidovirales*), so a read from an sgRNA
+cannot be told from a genomic read at the same coordinate and per-sgRNA
+coverage is not recoverable from short reads. What a nested set *would* leave
+in the *aggregate* depth is a monotonic staircase — each sgRNA runs from its
+own 5′ end to the genome's 3′ end, so depth can only rise 3′-ward, stepping up
+at each terminus by that sgRNA's abundance. That is the reason to draw the
+ladder on the same x-axis as the depth trace: it makes the prediction
+checkable.
+
+It should be recorded as a prediction rather than an expectation, because the
+first real library in the repository does not show it. `examples/glrav13.bam`
+is a closterovirus at 1,173× mean depth with a 3′/5′ ratio of **1.55×**, and
+its per-ORF step ratios run from 0.55× to 1.93×, four of the thirteen going
+down; a 3′-coterminal ladder cannot step down at all. Whether sgRNAs dominate a library
+depends on its preparation — dsRNA enrichment captures replicative forms and
+flattens the gradient — so §1 should say the rows predict a staircase that a
+given dataset may or may not show, and that a genuine staircase explains a
+5′-to-3′ gradient which would otherwise read as a failed assembly, while its
+absence says nothing about the assembly.
+
+Second, **sgRNA rows are drawn in the linear layout only, deliberately.** The
+ICTV draws no transcript rows on circular genomes: geminivirus transcription
+is bidirectional from the IR with overlapping transcripts rather than a
+3′-coterminal set (Geminiviridae chapter, Fig. 2 shows ORFs and the stem-loop
+and nothing else), and nanovirus components carry one ORF each. Nesting seven
+near-complete arcs would also be unreadable. `--layout circular` warns and
+skips. The genuine circular case is *Caulimoviridae* — CaMV's 35S and 19S —
+which is two arcs, not a ladder, and would fit the existing nesting lanes if
+it is ever wanted. §1 should say the sgRNA row is a linear-genome convention.
+
+**J. Version. Settled: 2.2.0.** Stages 1–3 change existing linear output (the
+synthetic sample now has every box above the line, since none of its ORFs
+overlap, and its `p7` takes the small-ORF purple), and stages 4–6 add features,
+so per §5 this branch is a minor release rather than a patch. The branch also
+changes two defaults — a circular genome now draws as a circle (H), and
+segments render largest first — which users will see without asking for them,
+and that is the other half of the case for a minor bump.
+
+Applied in `src/virplot/__init__.py`, `pyproject.toml` and `CITATION.cff`, with
+the CHANGELOG's `[Unreleased]` section closed as `[2.2.0]`.
+
+**The jump from 2.0.0 is deliberate — there is no 2.1.0, and that is not an
+oversight.** 2.2 is chosen to signal that this is a substantial change rather
+than an increment, while leaving **3.0 reserved** for the release accompanying
+the second paper. Anyone auditing the tags (`v2.0.0` is the only one) should
+read the gap that way rather than as a lost release.
 
 ---
 
@@ -234,8 +379,8 @@ compared too, and a real fixture added.
 | Readthrough = one box + bar (§1) | — | BYDV-PAV: ORF3→ORF5 readthrough is two abutting boxes on the **same** side, no bar. And ORF5 stays above although the rule would put it below with ORF4. So **readthrough continuation does not flip, frameshift does** — opposite behaviours the coordinates alone cannot distinguish. *Implemented: a readthrough extension takes the side of the ORF it abuts and gets a thin bar + `RT`; the bar is VirPlot's addition, the figure has none.* |
 | ORF number outside, product inside (§1) | Closteroviridae: `ORF1a`/`ORF1b`/`66K 63K 100K` outside, `L-Pro Mtr Hel RdRp` inside. | **Luteoviridae: ORF numbers are inside the boxes** (`ORF1`…`ORF6`), sizes inside the product boxes beneath. Not universal. |
 | Palette (§1) | Closteroviridae only. | **Geminiviridae uses a different palette**: CP green, MP yellow, Rep teal, TrAP pink, REn blue. Luteoviridae: CP pink, MP blue, RTD green, P0 (suppressor) green. Colour is consistent *within a family figure*, not across the Report. "Small 3′ ORFs purple" is BYV p21 only; BYV p6 is grey. |
-| Circular: arcs "just outside the circle", nest inward (§3) | Mastrevirus: the arcs *are* the circle — thick coloured arcs replace the line where ORFs lie, the thin black line shows only in the LIR/SIR gaps. | Begomovirus: base arcs sit **on** the circle line; AC2/AC3/AC4 nest **inside** the circle. Nothing is drawn outside the ring except labels and the stem-loop. |
-| Circular labels | — | All labels are **horizontal**, outside the ring for base arcs (`AV1 (CP)`), inside the circle for nested ones (`AC2 (TrAP)`); format `ORF (function)`. No rotated text. Centre carries the component name (`DNA-A`) only, no length. **No position ticks or scale.** |
+| Circular: arcs "just outside the circle", nest inward (§3) | Mastrevirus: the arcs *are* the circle — thick coloured arcs replace the line where ORFs lie, the thin black line shows only in the LIR/SIR gaps. | Begomovirus: base arcs sit **on** the circle line; AC2/AC3/AC4 nest **inside** the circle. Nothing is drawn outside the ring except labels and the stem-loop. *Option: `circular_arcs: on_circle` (innermost tier astride the line; deeper nesting still steps outward).* |
+| Circular labels | — | All labels are **horizontal**, outside the ring for base arcs (`AV1 (CP)`), inside the circle for nested ones (`AC2 (TrAP)`); format `ORF (function)`. No rotated text. Centre carries the component name (`DNA-A`) only, no length. **No position ticks or scale.** *Option: `circular_labels: horizontal`.* |
 | Circular IR (§3) | Begomovirus: the common region is a thick grey arc straddling 12 o'clock with the stem-loop icon on it, labelled `CRA`/`IR`. Mastrevirus: `LIR` at top, `SIR` at bottom. | — |
 | Title `acronym (length nts)` (§1) | BYV, CTV, LIYV: `Beet yellows virus, BYV (15,468 nts)`. Luteoviridae: `Luteovirus, BYDV-PAV (5,677 nts)` (genus first). | — |
 | Segmented: stacked rows, largest first, shared scale (§1) | LIYV: `RNA-1 (8,118 nts)` over `RNA-2 (7,193 nts)`, one title, same x-scale, both left-aligned at 5′. | — |
@@ -250,7 +395,8 @@ compared too, and a real fixture added.
   other on the starting side, "first ORF above" is treated as a convention of
   ours, not theirs.
 * **No outlines** — glyphs are flat colour, as in the figures and the original
-  VirPlot output; there is no option to add an outline. Separation between
+  VirPlot output (`--no-border`, the default); `--border` adds a black
+  outline for those who want it. Separation between
   neighbours comes from colour and from the flip rule above.
 * **Frameshift / readthrough** — read from RefSeq's own attributes and from
   `Note=`; see F above and docs/GFF_GUIDE.md §8. With this, BYV matches
@@ -262,16 +408,27 @@ compared too, and a real fixture added.
   should be thought of as a per-family style sheet: a Geminiviridae
   `function_palette` (CP green, MP yellow, Rep teal) is a five-line YAML,
   and the right place for it is a per-example spec, not the code default.
-* **Circular ring** — VirPlot keeps its arcs outside the genome circle and
-  nests toward it, because the inside of the circle holds the depth ring,
-  which the ICTV figures do not have. Base-tier arcs could be drawn *on* the
-  circle (Begomovirus style) at no cost; nesting inside the circle cannot
-  coexist with the depth band. Rotated arc labels and rim ticks are VirPlot
-  additions; a `--labels horizontal` option would match the figures when
-  depth is not the point.
-* **IR arc and `ORF (function)` labels** — need non-CDS features
-  (`misc_feature`/`regulatory` rows) and a second name per feature in the
-  GFF; see §6 D–F.
+* **Circular ring** — by default VirPlot keeps its arcs outside the genome
+  circle and nests toward it, because the inside of the circle holds the
+  depth ring, which the ICTV figures do not have. Two spec.yml keys bring it
+  to the figures' style: `circular_arcs: on_circle` sets the innermost arcs
+  astride the circle line (Begomovirus/Mastrevirus style; outer tiers still
+  step outward, since nesting inside cannot coexist with the depth band), and
+  `circular_labels: horizontal` writes level `ORF (product)` labels outside
+  the ring. The figures label nested arcs inside the circle; VirPlot instead
+  steps a nested arc's label one line away from the equator per tier so it
+  does not overprint the arc it nests in. Rim ticks remain a VirPlot addition.
+* **IR arc** — drawn from the GFF's non-coding rows (docs/GFF_GUIDE.md §10)
+  as a grey arc astride the circle, under the ORF arcs, with the hairpin icon
+  at the `stem_loop` row's position and the name written once over it, as
+  Fig. 5 draws `CRA`; the Mastrevirus `LIR`/`SIR` are the same two rows.
+  `examples/grbv.gff3` and `examples/tgmv.gff3` carry their intergenic /
+  common regions and hairpins this way (RefSeq annotates neither for those
+  records, so the rows were located from the sequences and say so);
+  `examples/fbnyv.gff3` keeps RefSeq's own `stem_loop 1..33` rows. The depth
+  ceiling label, which stood against the circle at 12 o'clock, hangs inward
+  when such an arc straddles the origin. `ORF (function)` labels come from
+  `gene=` + `product=` with `circular_labels: horizontal`; see §6 D.
 
 ### 7.3 Test data
 
@@ -290,5 +447,18 @@ compared too, and a real fixture added.
   (`test_byv_fixture_layout_versus_ictv_figure`).
 * `examples/grbv.gff3` is a Grablovirus, not in the 9th Report; its nearest
   figure is Begomovirus DNA-A. The C2 conventions (V clockwise right, C
-  anticlockwise left, nesting) hold; RefSeq names `V1 protein` etc. carry no
-  function, which is why `grbv.yml` maps colours by hand.
+  anticlockwise left, nesting) hold. RefSeq's `V1 protein` etc. carry no
+  function, so the shipped GFF is curated to `gene=V1;product=CP` and the
+  default palette colours it; the RefSeq names are kept in `Note=`.
+* `examples/pvy.gff3` (potato virus Y, NC_001616.1) is the polyprotein
+  fixture, compared with Potyviridae Fig. 2 (drawn from TEV, same
+  organisation). With `pvy.yml` (the figure's per-domain colours, sampled
+  from the image) the ten segments, their dividers and names match; `6K1`
+  and `6K2` go outside the box as in the figure. Two differences remain:
+  the figure draws the polyprotein **on** the line with PIPO above it, where
+  L1 puts the polyprotein above and flips PIPO below; and the figure writes
+  a second row of names under the box (`35K`, `52K`, … sizes inside,
+  functions below), which VirPlot has no second label slot for — the
+  curated file keeps the function names. PIPO is really reached by
+  polymerase slippage (P3N-PIPO); the file carries the figure's `+2 fs`
+  wording as `Note=+2 frameshift`, so the label reads `+2 FS`.

@@ -4,7 +4,7 @@ import textwrap
 import numpy as np
 import pytest
 
-from virplot.parsers import parse_gff, parse_depth
+from virplot.parsers import ParseError, parse_gff, parse_depth
 
 
 # parse_gff
@@ -39,7 +39,7 @@ def test_parse_gff_unknown_product(tmp_path):
 def test_parse_gff_no_region(tmp_path):
     gff = tmp_path / "test.gff3"
     gff.write_text("seq1\t.\tCDS\t10\t200\t.\t+\t0\tID=cds1;product=X\n")
-    with pytest.raises(SystemExit):
+    with pytest.raises(ParseError):
         parse_gff(str(gff))
 
 
@@ -76,14 +76,14 @@ def test_parse_depth_out_of_range_ignored(tmp_path):
 def test_parse_depth_malformed_columns(tmp_path):
     dep = tmp_path / "bad.dep"
     dep.write_text("seq1\t1\n")  # only 2 columns
-    with pytest.raises(SystemExit):
+    with pytest.raises(ParseError):
         parse_depth(str(dep), 10)
 
 
 def test_parse_depth_non_integer(tmp_path):
     dep = tmp_path / "bad.dep"
     dep.write_text("seq1\tabc\t10\n")
-    with pytest.raises(SystemExit):
+    with pytest.raises(ParseError):
         parse_depth(str(dep), 10)
 
 
@@ -116,3 +116,138 @@ def test_parse_gff_skips_malformed_columns(tmp_path):
     seq_len, features = parse_gff(str(gff))
     assert seq_len == 500
     assert len(features) == 1
+
+
+# --- row order and attribute escapes --------------------------------------------
+
+def test_parse_gff_rows_before_their_region_line_are_kept(tmp_path):
+    # GFF3 does not require the region line first; NCBI usually writes it first
+    # but hand-edited and concatenated files often do not
+    p = tmp_path / "t.gff3"
+    p.write_text(textwrap.dedent("""\
+        ##gff-version 3
+        s1	.	CDS	10	100	.	+	0	ID=c1;product=CP
+        s1	.	stem_loop	1	30	.	+	.	ID=sl
+        s1	.	region	1	1000	.	+	.	ID=s1
+    """))
+    from virplot.parsers import parse_gff_rnas
+    (rna,) = parse_gff_rnas(str(p))
+    assert [f.product for f in rna.features] == ["CP"]
+    assert len(rna.noncoding) == 1
+
+
+def test_parse_gff_percent_decodes_attribute_values(tmp_path):
+    p = tmp_path / "t.gff3"
+    p.write_text(textwrap.dedent("""\
+        ##gff-version 3
+        s1	.	region	1	1000	.	+	.	ID=s1
+        s1	.	CDS	10	100	.	+	0	ID=c1;product=polyprotein%2C putative;Note=a%3Bb
+        s1	.	mat_peptide	10	60	.	+	.	Parent=c1;product=P1%2FP2
+    """))
+    from virplot.parsers import parse_gff_rnas
+    (rna,) = parse_gff_rnas(str(p))
+    (f,) = rna.features
+    assert f.product == "polyprotein, putative"
+    assert f.domains[0].product == "P1/P2"
+
+
+def test_wrap_feature_on_linear_region_warns(tmp_path):
+    import logging
+    from virplot.parsers import parse_gff_rnas
+    p = tmp_path / "t.gff3"
+    p.write_text("##gff-version 3\ns1\t.\tregion\t1\t1000\t.\t+\t.\tID=s1\n"
+                 "s1\t.\tCDS\t900\t100\t.\t+\t0\tID=c;product=Rep\n")
+    records = []
+    h = logging.Handler(); h.emit = records.append
+    logging.getLogger("virplot.parsers").addHandler(h)
+    try:
+        (rna,) = parse_gff_rnas(str(p))
+    finally:
+        logging.getLogger("virplot.parsers").removeHandler(h)
+    assert any("cross the origin" in r.getMessage() for r in records)
+    assert rna.feature_spans(rna.features[0]) == [(900, 1000), (1, 100)]
+
+
+# --- the ORF name written outside the glyph -------------------------------------
+#
+# The ICTV convention wants two names per feature: the ORF name outside the box,
+# the function inside. Real annotations spell the outside one three ways, and
+# very often have only one name for both.
+
+def _genes(tmp_path, body, length=4000):
+    from virplot.parsers import parse_gff_rnas
+    p = tmp_path / "n.gff3"
+    p.write_text("##gff-version 3\n"
+                 + f"A\t.\tregion\t1\t{length}\t.\t+\t.\tID=A\n"
+                 + textwrap.dedent(body))
+    (rna,) = parse_gff_rnas(str(p))
+    return [(f.gene, f.product) for f in rna.features]
+
+
+def test_outside_label_prefers_gene_then_name_then_locus_tag(tmp_path):
+    assert _genes(tmp_path, """\
+        A	.	CDS	100	400	.	+	0	ID=a;gene=ORF1a;Name=ignored;product=RdRp
+        A	.	CDS	500	800	.	+	0	ID=b;Name=polyprotein_1a;product=Methyltransferase
+        A	.	CDS	900	1200	.	+	0	ID=c;locus_tag=N761_gp1;product=V1 protein
+    """) == [("ORF1a", "RdRp"),
+             ("polyprotein_1a", "Methyltransferase"),
+             ("N761_gp1", "V1 protein")]
+
+
+def test_an_outside_label_equal_to_the_product_is_dropped(tmp_path):
+    """gene=CP;product=CP is extremely common in real annotations; writing CP
+    inside the box and again above it is noise, not the convention's two names."""
+    assert _genes(tmp_path, """\
+        A	.	CDS	100	400	.	+	0	ID=a;gene=CP;product=CP
+        A	.	CDS	500	800	.	+	0	ID=b;gene=HSP70h;product=hsp70h
+        A	.	CDS	900	1200	.	+	0	ID=c;Name=p7;product=p7
+    """) == [(None, "CP"), (None, "hsp70h"), (None, "p7")]
+
+
+def test_a_duplicate_gene_does_not_fall_through_to_name(tmp_path):
+    """gene= is the authoritative outside label; if it only repeats the
+    product the feature has one name, and Name= must not resurrect a second."""
+    assert _genes(tmp_path, """\
+        A	.	CDS	100	400	.	+	0	ID=a;gene=CP;Name=ORF6;product=CP
+    """) == [(None, "CP")]
+
+
+def test_a_feature_with_no_names_has_no_outside_label(tmp_path):
+    assert _genes(tmp_path, """\
+        A	.	CDS	100	400	.	+	0	ID=a;product=RdRp
+    """) == [(None, "RdRp")]
+
+
+# --- the GLRaV-13 example: the one fixture whose reads are real ---------------
+
+def test_glrav13_example_is_self_consistent():
+    """Its GFF3, FASTA and BAM must agree on the sequence id and length, so the
+    example plots with no --ref and no name-mismatch warning."""
+    from virplot.alignments import open_alignments
+    from virplot.parsers import gff_seqid, parse_gff_rnas
+
+    (rna,) = parse_gff_rnas("examples/glrav13.gff3")
+    assert rna.seqid == gff_seqid("examples/glrav13.gff3") == "GLRaV13_H8881"
+    assert rna.length == 17564 and not rna.circular
+
+    header, length = None, 0
+    for line in open("examples/glrav13.fa"):
+        if line.startswith(">"):
+            header = line[1:].strip()
+        else:
+            length += len(line.strip())
+    assert header == rna.seqid, "FASTA header must match the GFF3 seqid"
+    assert length == rna.length
+
+    refs = open_alignments("examples/glrav13.bam").references
+    assert refs == {rna.seqid: rna.length}, "BAM @SQ must match the GFF3 seqid and length"
+
+
+def test_glrav13_example_carries_only_mapped_reads():
+    from virplot.alignments import SKIP_FLAGS, open_alignments
+    af = open_alignments("examples/glrav13.bam")
+    n = 0
+    for aln in af.records:
+        assert not aln.flag & SKIP_FLAGS, "unmapped/secondary/QC-fail/duplicate record in the example"
+        n += 1
+    assert n == 212285

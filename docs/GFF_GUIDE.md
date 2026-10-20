@@ -1,13 +1,14 @@
 # Writing a GFF3 file for VirPlot
 
 VirPlot draws the annotation track from a GFF3 file. It reads a deliberately
-small subset of GFF3 — two feature types and four attributes — and applies a
-few conventions of its own for things GFF3 does not standardise (circularity,
-frameshifts, function colours). This guide says exactly what it reads, what it
-ignores, and how to write each situation so the figure comes out as intended.
-Examples of every case are in [`examples/`](../examples/): `byv.gff3` (linear,
-one strand, with a `Note=+1 frameshift`), `grbv.gff3` (circular, both strands),
-`sample_multi.gff3` (two segments).
+small subset of GFF3 — a few feature types and a handful of attributes — and
+applies a few conventions of its own for things GFF3 does not standardise
+(circularity, frameshifts, function colours). This guide says exactly what it
+reads, what it ignores, and how to write each situation so the figure comes
+out as intended. Examples of every case are in [`examples/`](../examples/):
+`byv.gff3` (linear, one strand, with a `Note=+1 frameshift`), `grbv.gff3`
+(circular, both strands, RefSeq labels curated), `pvy.gff3` (a polyprotein
+with its mature-protein rows), `sample_multi.gff3` (two segments).
 
 ## 1. The minimum
 
@@ -52,7 +53,20 @@ NC_022002.1	RefSeq	region	1	3206	.	+	.	ID=NC_022002.1;Is_circular=true
 * A CDS whose `seqid` has no `region` row is dropped with a warning; a file
   with no `region` row at all is an error.
 
-The molecule's display name (in titles and the circular hub) is the `seqid`.
+**Name the segment with `Name=`.** The molecule's display name — the figure
+title (`RNA-1 (8,118 nts)`) and the text at the centre of a circular map — is
+the region's `Name=` when it has one, otherwise the `seqid`. A segmented genome
+therefore reads as the ICTV figures label it:
+
+```gff3
+NC_003617.1	RefSeq	region	1	8118	.	+	.	ID=NC_003617.1;Name=RNA-1
+NC_003618.1	RefSeq	region	1	7193	.	+	.	ID=NC_003618.1;Name=RNA-2
+```
+
+`Name=` is display only. The `seqid` remains the key for matching depth (§7),
+for `--ref`, and for output file names (`<name>.NC_003617.1.svg`). `--rnas`
+accepts either, so `--rnas RNA-2` and `--rnas NC_003618.1` select the same
+segment. A YAML `title:` replaces the default title for every segment.
 
 ## 3. `CDS` rows: one per ORF
 
@@ -61,15 +75,32 @@ Each `CDS` row becomes one glyph. Two attributes name it:
 | Attribute | Drawn | Purpose |
 |---|---|---|
 | `product=` | **Inside** the glyph (or just outside it when the ORF is under 500 bp) | The protein or domain: `RdRp`, `CP`, `Hsp70h`. Also drives the default colour (§5). Missing → `unknown`. |
-| `gene=` | **Outside** the glyph, small grey text | The ORF name: `ORF1a`, `AC1`, `V2`. Optional. |
+| `gene=` | **Outside** the glyph, small grey text | The ORF name: `ORF1a`, `AC1`, `V2`. Optional. `Name=` is used when there is no `gene=`, then `locus_tag=`. |
 
 This is the ICTV figure convention: ORF number outside, product inside. Keep
 `product` short — it has to fit in the box. The long RefSeq description can go
 in `Note=`, which VirPlot ignores (and so never draws).
 
+**One name, written once.** If the outside label would read the same as
+`product`, it is dropped and only the box is labelled. Real annotations very
+often carry `gene=CP;product=CP` or `gene=p53;product=p53`, because the ORF has
+a name and no separately known function — `examples/grbv.gff3` does it for `V3`
+and `C3`. Writing the name inside the box *and* above it is noise. So give the
+two attributes two different things to say, or just one of them:
+
+```gff3
+# two names: ORF name outside, function inside — what the convention wants
+A	.	CDS	1071	7655	.	+	0	ID=a;Name=polyprotein_1a;product=Methyltransferase/helicase
+# one name: labelled once, inside the box
+A	.	CDS	9248	9439	.	+	0	ID=b;gene=p7;product=p7
+```
+
 Other attributes (`ID`, `Parent`, `locus_tag`, `Dbxref`, `protein_id`, …) are
-accepted and ignored. `gene` rows, `mRNA` rows, `mat_peptide` rows are ignored
-too, so a RefSeq GFF3 can be used as is — with two caveats in §8.
+accepted and ignored. `gene` rows and `mRNA` rows are ignored too, so a RefSeq
+GFF3 can be used as is — with two caveats in §8. Mature-protein rows
+(`mature_protein_region_of_CDS` / `mat_peptide`) are read: they split a
+polyprotein's box into domains (§9). Non-coding rows — UTRs, intergenic
+regions, stem-loops — are drawn on the genome line (§10).
 
 ## 4. Strand
 
@@ -92,8 +123,8 @@ So for a geminivirus, write the virion-sense ORFs with `+` and the
 complementary-sense ones with `-`, exactly as RefSeq does:
 
 ```gff3
-NC_022002.1	RefSeq	CDS	292	807	.	+	0	ID=v2;product=V2 protein
-NC_022002.1	RefSeq	CDS	2250	3044	.	-	0	ID=c1;product=C1 protein
+NC_022002.1	RefSeq	CDS	292	807	.	+	0	ID=v2;gene=V2;product=putative MP
+NC_022002.1	RefSeq	CDS	2250	3044	.	-	0	ID=c1;gene=C1;product=RepA
 ```
 
 Coordinates of a `-` strand feature are still written `start < end` in
@@ -132,8 +163,12 @@ Two consequences worth knowing:
   (BYV's `p6` is a membrane protein; its `p21` is a silencing suppressor —
   the name alone cannot tell). Either name the function in `product`
   (`p21 silencing suppressor`) or pin the colour in `color_mapping`.
-  `examples/grbv.yml` does the latter for GRBV, whose RefSeq products are all
-  `Vn protein` / `Cn protein`.
+  `examples/grbv.gff3` shows the former: RefSeq calls its products
+  `V1 protein` … `C3 protein`, and the shipped file rewrites them to
+  `gene=V1;product=CP`, `gene=C1;product=RepA` and so on, keeping the RefSeq
+  name in `Note=`. **Expect to do this curation for your own genomes** — a
+  header comment in the GFF recording what was changed and on what authority
+  is the right place to say so.
 * **"Putative" lightens the colour.** If `product` also contains `putative`,
   `probable`, `possible`, `hypothetical`, `predicted`, `proposed` or `-like`,
   the class colour is tinted 35 % towards white — the ICTV figures' convention
@@ -151,7 +186,16 @@ together.
 
 ## 6. Circular genomes
 
-Set `Is_circular=true` on the `region` row. Three things follow:
+Set `Is_circular=true` on the `region` row. Four things follow:
+
+* **The figure is drawn as a circle**, unless something says otherwise.
+  `--layout` (`auto` by default) decides, falling back to a `layout:` key in
+  spec.yml. Use `--layout linear` — or `layout: linear` in the YAML — for the
+  linear track of a circular genome; do **not** delete `Is_circular=true` to
+  get one, because that would also turn off the two behaviours below. The
+  molecule's shape and the figure's shape are separate settings on purpose.
+  Note the `±1 FS` / `RT` marks (§8) and sgRNA rows (§12) are drawn in the
+  linear layout only, and a circular figure warns when it has to leave them out.
 
 * **Depth wraps.** Reads that run off the end continue from position 1, and
   positions past the end are taken modulo the length. This is what makes a
@@ -299,19 +343,206 @@ present.
 `--layout circular` places these ORFs correctly (a frameshift or readthrough
 arc nests like any other) but writes no mark yet.
 
-### Not yet drawn
+Subgenomic RNAs are the third expression mechanism; they get their own
+section, §12.
 
-Polyprotein domain dividers (`mat_peptide` rows), subgenomic RNAs and
-non-coding features (`misc_feature`, `regulatory`, `stem_loop`) are ignored by
-the parser; see §6 F and §7.2 of
-[`ictv_drawing_conventions.md`](ictv_drawing_conventions.md) for the intended
-encodings. The `noncoding` colour class exists for the day they are read.
+## 9. Polyproteins: domains inside one box
 
-## 9. Checklist
+Potyviruses, picornaviruses, comoviruses, flaviviruses, coronaviruses — many
+genomes translate one long ORF into a polyprotein that is cut into mature
+proteins. The ICTV figures draw this as **one box split by thin vertical
+lines**, each segment named (Potyviridae Fig. 2: `P1-Pro | HC-Pro | P3 | 6K1 |
+CI | …`). VirPlot draws it the same way from the rows RefSeq already provides.
+
+**RefSeq form — nothing to change.** RefSeq lists the mature proteins under
+the CDS as `mature_protein_region_of_CDS` rows (the GFF3 spelling of GenBank's
+`mat_peptide`), each with `Parent=` naming the CDS and its own `product=`:
+
+```
+NC_001616.1	RefSeq	CDS	185	9376	.	+	0	ID=cds-NP_056759.1;product=polyprotein
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	185	1036	.	+	.	Parent=cds-NP_056759.1;product=P1 protein
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	1037	2404	.	+	.	Parent=cds-NP_056759.1;product=HC-Pro protein
+…
+```
+
+What VirPlot does with them:
+
+- The CDS is still one feature — one box, one position in the flip/tier
+  layout, labelled outside by its `gene=` if it has one. Its own `product=`
+  (`polyprotein`) is **not** written: the domains label the box instead.
+- Each domain is a segment of the box in its own colour, chosen by the same
+  rule as any product (§5: `color_mapping`, then function words, then grey),
+  with a thin line at every boundary. Any stretch of the CDS with no domain
+  keeps the polyprotein's colour.
+- A domain's `product=` is written inside its segment when it fits at the
+  figure's size, otherwise just outside the box — the figure's `6K1`, `6K2`.
+  Outside labels that would overprint step out onto a second row.
+- The last domain usually stops three bases short of the CDS (RefSeq leaves
+  the stop codon out); that is not a boundary and no line is drawn there.
+
+**Hand-written form.** Use the `mat_peptide` type if you prefer; `Parent=` is
+optional — a row without one is attached to the smallest CDS on its strand
+that contains it. Rows that match no CDS are dropped with a warning.
+
+```
+A	.	CDS	100	5000	.	+	0	ID=pp;gene=ORF1;product=polyprotein
+A	.	mat_peptide	100	2000	.	+	.	product=Pro
+A	.	mat_peptide	2001	4997	.	+	.	product=RdRp
+```
+
+**Curate the names.** RefSeq's `P1 protein`, `coat protein`, `NIa-VPg
+protein` are long for a segment and function-free for the colour rule;
+`examples/pvy.gff3` shortens them to the figure's `P1-Pro`, `CP`, `VPg` and
+keeps the RefSeq names in `Note=`, and `examples/pvy.yml` pins the figure's
+per-domain colours. Do the same for your own genomes.
+
+**Limits.** A domain that straddles a frameshift junction (coronavirus
+`nsp12`, which starts in ORF1a and ends in ORF1b) is attached to the segment
+holding most of it and drawn clipped to that segment. Domains are drawn in
+both layouts; in the circular layout each domain is labelled by the same
+rule as an arc (along it, or radially outside when narrow).
+
+## 10. Non-coding features: UTRs, intergenic regions, stem-loops
+
+The ICTV figures mark a few things that are not ORFs: the begomovirus common
+region as a thick grey arc with its stem-loop icon (`CRA`, `IR`), the
+mastrevirus `LIR`/`SIR`, the hairpin between the two ORFs of an ambisense
+segment. VirPlot draws these **on the genome line itself** — they take no
+part in the flip/tier/nest layout — in two shapes:
+
+| Shape | Drawn as | For |
+|---|---|---|
+| region | a grey bar astride the line (linear) or a grey arc astride the circle (circular), named in small text beside it | UTRs, intergenic / common regions, origins |
+| stem-loop | a hairpin icon standing on the line (linear) or on the outside of the ring (circular), named at its tip | stem-loops, hairpins, nick sites |
+
+**Which rows are read.** Two tiers, so that a RefSeq file works as is
+without its motif annotations cluttering the line:
+
+- Always: `five_prime_UTR`, `three_prime_UTR`, `UTR`, `intergenic_region`,
+  `origin_of_replication`, `stem_loop`.
+- Only when their words say so: GenBank's catch-all `misc_feature` (which
+  NCBI's GFF3 spells `sequence_feature`), `regulatory_region` /
+  `regulatory`, `repeat_region`, `sequence_secondary_structure`. These are
+  read when the name or `Note=` contains a non-coding word — `intergenic`,
+  `common region`, `IR`, `LIR`, `SIR`, `CR`/`CRA`/`CRB`, `UTR`,
+  `untranslated`, `stem-loop`, `hairpin`, `non-coding`, `ori` — and skipped
+  otherwise (a `misc_feature` reading `RdRp motif` or a `polyA_signal_sequence`
+  is not drawn). A short region (under 100 nt) whose words say stem-loop /
+  hairpin is drawn as the icon rather than a bar.
+
+**Label.** The first of `Name=`, `product=`, `gene=`, `standard_name=`,
+`regulatory_class=`, then `Note=`. The dedicated types have defaults when
+nothing is given (`5′ UTR`, `3′ UTR`, `IR`, `ori`); a `stem_loop` row is
+labelled only when actually named, since its `Note=` is usually a
+description. A region that contains an unnamed stem-loop is named **once, at
+the hairpin's tip** — the figures write `CRA` over the icon, not along the
+arc. Keep labels short with `Name=`.
+
+**Colour.** Always the `noncoding` grey of the function palette (`#6f6f6f`),
+unless the label is pinned in `color_mapping`.
+
+**Circular origin.** By default the hairpin icon marks position 1. A
+`stem_loop` row moves it to where the stem-loop actually is — the nick site
+is rarely exactly at position 1 in a RefSeq record. Without one, the icon
+stays at the origin, unlabelled.
+
+```
+# RefSeq form (NCBI GFF3), used as is
+NC_001507.1	RefSeq	sequence_feature	2501	326	.	+	.	ID=id-…;Note=common region;gbkey=misc_feature
+NC_001507.1	RefSeq	stem_loop	110	142	.	+	.	ID=id-…;Note=conserved stem-loop structure;gbkey=stem_loop
+
+# hand-written, naming things as the figure does
+A	.	misc_feature	2501	2926	.	+	.	Name=CRA;Note=common region, spans the origin (2600 + 326)
+A	.	stem_loop	110	142	.	+	.	Name=IR
+A	.	five_prime_UTR	1	68	.	+	.	ID=utr5
+```
+
+An origin-crossing region on a circle is written with `end` past the genome
+length (§6), as `examples/grbv.gff3` does for its intergenic region.
+
+## 11. Subgenomic RNAs
+
+Many plus-strand RNA plant viruses express their 3' ORFs from a nested set of
+**3'-coterminal subgenomic RNAs** — *Closteroviridae*, *Alphaflexiviridae*,
+*Tombusviridae*, *Virgaviridae*. The ICTV figures draw them as shorter lines
+stacked beneath the genome, 5' aligned to their start. VirPlot does the same,
+longest row first.
+
+GFF3 has no feature type meaning "this is a subgenomic RNA", and RefSeq does
+not annotate them for plant viruses, so — exactly as with frameshift and
+readthrough (§8) — **this is a curation convention: a transcript row that says
+it is one.**
+
+```gff3
+# 5' terminus, 3' end at the genome end, named by what it expresses
+NC_001598.1	VirPlot	mRNA	13570	15480	.	+	.	ID=sg_cp;gene=CP;Note=sgRNA
+```
+
+| Column | Write |
+|---|---|
+| type | `mRNA`, `transcript`, `ncRNA`, `misc_RNA`, `primary_transcript`, `sequence_feature` or `misc_feature` |
+| start | the sgRNA's **5' terminus** — the only coordinate that carries information in a coterminal set |
+| end | the genome length (or anything past it) for a 3'-coterminal sgRNA; an earlier end is kept as written, for the 5'-proximal sgRNAs closteroviruses also make |
+| `Note=` | must match `sgRNA`, `sg RNA`, `subgenomic` or `sub-genomic` — this marker is **required** |
+| `gene=` | what the sgRNA expresses (`CP`, `Hsp70h`); a leading `sgRNA` is stripped, so `gene=sgRNA CP` also labels the row `CP` |
+
+The marker is required rather than inferred from the type, because RefSeq
+writes real `mRNA` rows — spliced mastrevirus transcripts, for instance — that
+are **not** sgRNAs and must not become ladder rows. A row with no name at all
+falls back to `sgRNA1`, `sgRNA2`… numbered 5' to 3'.
+
+`examples/byv.gff3` carries the full closterovirus ladder.
+
+**Why these are annotation and never a depth track.** A plant virus sgRNA is
+co-linear with the genome and carries no leader junction (unlike
+*Nidovirales*, where `periscope` and `LeTRS` count leader-spanning reads), so
+a read from an sgRNA is indistinguishable from a genomic read at the same
+coordinate. Per-sgRNA coverage cannot be recovered from short reads.
+
+What a nested set *would* leave in the aggregate depth is a **monotonic
+staircase**: every sgRNA covers its own 5' end through to the genome's 3' end,
+so depth can only rise as you read 3'-ward, stepping up at each 5' terminus by
+that sgRNA's abundance. That is why the rows share the depth track's x-axis —
+not because the staircase is always there, but because drawing them together
+is what lets you check.
+
+**Whether a given library shows it is an empirical question, and often the
+answer is no.** The abundance of sgRNAs relative to genomic RNA depends on the
+preparation: a dsRNA-enriched library captures replicative forms and flattens
+the gradient, while poly(A) or random-primed total RNA may show it strongly.
+The real-read example shipped here is the cautionary case —
+`examples/glrav13.bam`, a closterovirus at 1,173× mean depth, has a 3'/5'
+ratio of only **1.55×**, and stepping across its ORF starts gives ratios from
+0.55× to 1.93× — **four of its thirteen steps go down.** A true 3'-coterminal
+ladder cannot step down at all, so that profile is a mild 3' bias, not a
+staircase.
+
+So read the ladder as a **prediction to test against the depth trace**, not as
+an explanation to apply to it:
+
+| What you see | What it means |
+|---|---|
+| steps up at the annotated 5' ends, never down | the set is expressed and abundant in this library |
+| a step with no annotated sgRNA | an unannotated sgRNA, a DI RNA, or mismapping |
+| an annotated sgRNA with no step | not expressed here, mis-annotated, or a preparation that flattens sgRNAs |
+| no monotonic structure at all | the usual case for many preparations — judge coverage on its own terms |
+
+A genuine staircase does explain a 5'-to-3' coverage gradient that would
+otherwise read as a failed assembly. Its absence proves nothing about the
+assembly either way.
+
+**Layout limit.** sgRNA rows are drawn in the **linear layout only**. This is
+deliberate, not missing: the ICTV draws no transcript rows on circular
+genomes. Geminivirus transcription is bidirectional from the intergenic region
+with overlapping transcripts rather than a 3'-coterminal set, and nanovirus
+components carry one ORF each. `--layout circular` warns and skips them.
+
+## 12. Checklist
 
 - [ ] `##gff-version 3` first line; nine tab-separated columns.
 - [ ] One `region` row per molecule, `end` = genome length,
-      `Is_circular=true` if it is a circle.
+      `Is_circular=true` if it is a circle, `Name=` for its segment name
+      (`RNA-1`, `DNA-A`).
 - [ ] `seqid` identical across GFF, SAM/BAM `@SQ`, FASTA header, depth file.
 - [ ] One `CDS` row per ORF; `product=` short and naming the **function**;
       `gene=` for the ORF name; long descriptions in `Note=`.
@@ -321,5 +552,17 @@ encodings. The `noncoding` colour class exists for the day they are read.
       **with the sign written**. Readthrough via `transl_except=`, or an
       extension row that starts at partner end + 1 with `Note=readthrough`.
 - [ ] Origin-crossing features only on `Is_circular=true` molecules.
+- [ ] Polyproteins: keep RefSeq's `mature_protein_region_of_CDS` rows (or
+      write `mat_peptide` rows) and shorten their `product=` to the names you
+      want inside the segments.
+- [ ] Non-coding landmarks: `five_prime_UTR` / `three_prime_UTR` /
+      `stem_loop` rows as RefSeq gives them; an intergenic or common region as
+      a `misc_feature` with `Name=IR` (or `CRA`, `LIR`…); a `stem_loop` row
+      where the nick site is, so the hairpin icon sits there.
+- [ ] Subgenomic RNAs: a `mRNA` (or `transcript`) row per sgRNA with
+      `Note=sgRNA` and `gene=` naming what it expresses; `start` is the 5'
+      terminus, and the end may be left at the genome length for the usual
+      3'-coterminal set.
 - [ ] Products with no function word either renamed or pinned in
       `color_mapping`.
+

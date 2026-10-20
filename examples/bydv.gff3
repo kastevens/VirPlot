@@ -1,0 +1,23 @@
+##gff-version 3
+##sequence-region NC_004750.1 1 5677
+# Barley yellow dwarf virus PAV (BYDV-PAV), RefSeq NC_004750.1, 5,677 nt
+# linear +ssRNA (genus Luteovirus). CDS coordinates are those of the RefSeq
+# record; labels and colours follow ICTV 9th Report Luteoviridae Fig. 2,
+# which writes the ORF number inside each box. Curation:
+#  - RefSeq gives ORF1+2 as one CDS in two rows (142..1155, 1155..2744) with no
+#    slippage attribute; here ORF1 is the P1 CDS and ORF2 the -1 frameshift
+#    continuation, written with Note= so VirPlot draws the FS step.
+#  - RefSeq gives ORF3+5 as one CDS with transl_except at 3458..3460; here ORF5
+#    is written as the extension beyond the ORF3 stop with Note=readthrough.
+#  - Omitted, not in the figure: ORF3a (2734..2877, non-AUG, described 2015)
+#    and a hypothetical ORF7 (5309..5476).
+# Placement differs from the figure for ORF3-ORF5: VirPlot keeps ORF3 on the
+# side of ORF2 (no overlap), the figure starts ORF3 above. See
+# docs/ictv_drawing_conventions.md section 7.1.
+NC_004750.1	RefSeq	region	1	5677	.	+	.	ID=NC_004750.1;Name=BYDV-PAV;Is_circular=false
+NC_004750.1	RefSeq	CDS	142	1161	.	+	0	ID=orf1;product=ORF1;Note=39K (P1) helicase motifs
+NC_004750.1	RefSeq	CDS	1155	2744	.	+	0	ID=orf2;product=ORF2;Note=-1 frameshift from ORF1 (ORF1+2 is the 99K RdRp)
+NC_004750.1	RefSeq	CDS	2858	3460	.	+	0	ID=orf3;product=ORF3;Note=22K major coat protein
+NC_004750.1	RefSeq	CDS	2901	3362	.	+	0	ID=orf4;product=ORF4;Note=17K probable movement protein
+NC_004750.1	RefSeq	CDS	3461	4813	.	+	0	ID=orf5;product=ORF5;Note=readthrough of the ORF3 stop (ORF3+5 is the 72K minor coat protein)
+NC_004750.1	RefSeq	CDS	4920	5111	.	+	0	ID=orf6;product=ORF6;Note=P6 (7K) unknown function

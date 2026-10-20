@@ -1,0 +1,15 @@
+##gff-version 3
+##sequence-region NC_011620.1 1 6435
+# Potato virus X (PVX), RefSeq NC_011620.1, 6,435 nt linear +ssRNA (genus
+# Potexvirus). Coordinates are those of the RefSeq record; ORF names, products
+# and colours follow ICTV 9th Report Alphaflexiviridae Fig. 9. ORF2-ORF4 are
+# the triple gene block (TGB1-3); the figure names their products 26K, 13K
+# and 7K, which RefSeq calls 25K, 12K and 8K. ORF5 is the 21K coat protein.
+# Placement: VirPlot keeps ORF2 on ORF1's side (they do not overlap); the
+# figure starts the TGB below the line, so the TGB alternation is mirrored.
+NC_011620.1	RefSeq	region	1	6435	.	+	.	ID=NC_011620.1;Name=PVX;Is_circular=false
+NC_011620.1	RefSeq	CDS	85	4455	.	+	0	ID=orf1;gene=ORF1;product=Polymerase 147K;Note=replicase (Mtr Hel RdRp)
+NC_011620.1	RefSeq	CDS	4486	5166	.	+	0	ID=orf2;gene=ORF2;product=26K;Note=TGB1
+NC_011620.1	RefSeq	CDS	5147	5494	.	+	0	ID=orf3;gene=ORF3;product=13K;Note=TGB2
+NC_011620.1	RefSeq	CDS	5427	5639	.	+	0	ID=orf4;gene=ORF4;product=7K;Note=TGB3
+NC_011620.1	RefSeq	CDS	5650	6363	.	+	0	ID=orf5;gene=ORF5;product=CP;Note=coat protein (21K)

@@ -106,12 +106,15 @@ def _place_flip(ordered: list[Feature], spans: SpanFn,
     prev: Feature | None = None
     for feat in ordered:
         wanted = current
-        if feat.mechanism == "frameshift" and prev is not None:
-            wanted = -current                     # the step across the line IS the frameshift
+        if feat.mechanism == "frameshift" and placed:
+            # the step across the line IS the frameshift: flip relative to the
+            # ORF it continues, which need not be the previous one by start
+            # (a nested small ORF can sort between ORF1a and ORF1b)
+            partner = _partner(placed, feat, slack=2)
+            wanted = -(partner.side if partner else current)
         elif feat.mechanism == "readthrough" and placed:
-            # continues the box it abuts (not necessarily the previous by start:
-            # a nested ORF4 can sit between ORF3 and its readthrough ORF5)
-            partner = next((p for p in placed if _abuts(p.feature, feat)), None)
+            # continues the box it abuts (same caveat about nested ORFs)
+            partner = _partner(placed, feat, slack=0)
             wanted = partner.side if partner else current
         elif prev is not None and (spans_overlap(spans(prev), spans(feat))
                                    or (flip_if is not None and flip_if(prev, feat))):
@@ -128,10 +131,19 @@ def _place_flip(ordered: list[Feature], spans: SpanFn,
     return placed
 
 
-def _abuts(upstream: Feature, feat: Feature) -> bool:
-    """True when ``feat`` starts right where ``upstream`` stops, in reading order."""
+def _abuts(upstream: Feature, feat: Feature, slack: int = 0) -> bool:
+    """True when ``feat`` starts where ``upstream`` stops, in reading order.
+
+    ``slack`` allows the junction to overlap or gap by up to that many bases:
+    a frameshift continuation re-reads one base (−1) or skips one (+1).
+    """
     if upstream.strand != feat.strand:
         return False
     if feat.forward:
-        return upstream.end + 1 == feat.start
-    return upstream.start - 1 == feat.end
+        return abs(upstream.end + 1 - feat.start) <= slack
+    return abs(upstream.start - 1 - feat.end) <= slack
+
+
+def _partner(placed: list[Placement], feat: Feature, slack: int) -> Placement | None:
+    """The placed ORF that ``feat`` continues from, if any."""
+    return next((p for p in placed if _abuts(p.feature, feat, slack)), None)

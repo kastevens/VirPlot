@@ -56,158 +56,126 @@ unit-testable without rendering.
 classDiagram
     direction LR
 
-    class Feature {
-        <<frozen dataclass>>
-        +int start
-        +int end
-        +str strand
-        +str product
-        +str gene
-        +str mechanism
-        +int shift
-        +forward() bool
-        +length() int
-        +midpoint() float
-    }
-
-    class DepthTrack {
-        <<dataclass>>
-        +str label
-        +ndarray values
-    }
-
+    %% ---------------- model: plain data, no behaviour beyond geometry ----------
     class RNA {
-        <<dataclass>>
-        +str name
-        +str seqid
-        +int length
-        +bool circular
-        +list~Feature~ features
-        +list~DepthTrack~ depth
-        +add_depth(label, y)
-        +total_depth() ndarray
-        +labels() list~str~
-        +tracks() list~ndarray~
-        +positions() ndarray
-        +two_strand() bool
-        +feature_spans(feature) list~span~
+        «Aggregate»
+        name, length, circular
+        features, noncoding, depth
+        two_strand()
+        feature_spans(f) spans
     }
-
-    class Settings {
-        <<dataclass>>
-        +dict color_mapping
-        +dict function_palette
-        +str default_color
-        +str overlap_mode
-        +str end_5_label
-        +str end_3_label
-        +str title
-        +feature_color(product) str
+    class Feature {
+        «Value Object»
+        start, end, strand
+        product, gene
+        mechanism, shift
+        domains_within(s, e)
+        dividers_within(s, e)
     }
-
-    class Placement {
-        <<frozen dataclass>>
-        +Feature feature
-        +int side
-        +int tier
+    class Domain {
+        «Value Object»
+        start, end, product
     }
-
-    class layout {
-        <<module>>
-        +place_features(features, spans, mode) list~Placement~
-        +resolve_mode(mode, two_strand) str
-        +spans_overlap(a, b) bool
+    class Noncoding {
+        «Value Object»
+        start, end, label, kind
     }
-
-    class Plotter {
-        +Settings settings
-        +Namespace args
-        +float shared_ymax
-        +float shared_denom
-        +int max_length
-        +prepare(rnas)
-        +render(rna, thresholds, out_base)*
-        #_prepared_tracks(rna)
-        #_placements(rna, circular)
-        #_feature_color(product)
-        #_add_legend(ax, layers, labels)
-        #_add_title(fig, rna)
-        #_save(fig, extra_artists, out_base)
+    class DepthTrack {
+        label, values
     }
+    RNA *-- "0..*" Feature
+    RNA *-- "0..*" Noncoding
+    RNA *-- "0..*" DepthTrack
+    Feature *-- "0..*" Domain
 
-    class LinearPlotter {
-        +render(rna, thresholds, out_base)
-        #_draw_backbone(ax, rna, pad)
-        #_draw_annotations(ax, rna)
-        #_arrow_points(...)
-        #_draw_depth(ax, rna, tracks, total)
-        #_shade_gaps(ax, thresholds)
-        #_style_depth_axis(ax, total)
-    }
-
-    class CircularPlotter {
-        +render(rna, thresholds, out_base)
-        #_theta(pos, seq_len)
-        #_depth_radius(values, ymax)
-        #_draw_annotations(ax, rna)
-        #_label_feature(...)
-        #_draw_depth(ax, rna, tracks, total)
-        #_shade_gaps(ax, rna, thresholds)
-        #_draw_axis(ax, rna, total)
-    }
-
+    %% ---------------- input: files in, RNA out --------------------------------
     class parsers {
-        <<module>>
-        +parse_gff_rnas(path) list~RNA~
-        +parse_depth(path, seq_len, seqid, ref, circular)
-        +load_depth(path, seq_len, ...) 
+        «module · Builder»
+        parse_gff_rnas(path) RNA[]
+        load_depth(path, ...) ndarray
     }
-
     class alignments {
-        <<module>>
-        +depth_from_alignments(path, seq_len, ...)
-        +open_alignments(path) AlignmentFile
-        +resolve_reference(refs, seqid, ref, path) str
-        +is_alignment_file(path) bool
+        «module · Factory + Iterator»
+        open_alignments(path) AlignmentFile
+        depth_from_alignments(...) ndarray
     }
-
-    class ReadSet {
-        <<dataclass>>
-        +str label
-        +list~str~ unpaired
-        +list~str~ mate1
-        +list~str~ mate2
-        +paired() bool
-        +validate()
-    }
-
     class analysis {
-        <<module>>
-        +smooth_depth(y, window) ndarray
-        +call_blocks(y, threshold)
-        +write_csvs(intervals, gaps, outdir, base, T)
-        +ensure_bowtie2_index(fasta, outdir, threads) str
-        +map_reads(reads, index, out_sam, threads) str
-        +fasta_lengths(fasta) dict
+        «module»
+        smooth_depth() · call_blocks()
+        map_reads() · ensure_bowtie2_index()
+    }
+    parsers ..> RNA : builds
+    parsers ..> alignments : SAM / BAM
+    analysis ..> parsers : bowtie2 SAM
+
+    %% ---------------- rules: pure functions -----------------------------------
+    class layout {
+        «module · Strategy»
+        place_features(features, spans, mode, flip_if) Placement[]
+        flip · tier · nest
+    }
+    class Placement {
+        «Value Object»
+        feature, side, tier
+    }
+    layout ..> Placement : creates
+    class Settings {
+        «Rule table»
+        color_mapping, function_palette
+        feature_color(product) colour
     }
 
-    RNA "1" *-- "0..*" Feature : features
-    RNA "1" *-- "0..*" DepthTrack : depth
-    Placement --> Feature
-    layout ..> Placement : returns
-    layout ..> RNA : feature_spans
+    %% ---------------- render -------------------------------------------------
+    class Plotter {
+        «Abstract base · shared helpers»
+        settings, args
+        prepare(rnas)
+        render(rna, thresholds, out)*
+        _placements(rna) · _save(fig)
+    }
+    class LinearPlotter {
+        render()
+        two stacked axes
+    }
+    class CircularPlotter {
+        render()
+        one polar axes
+    }
     Plotter <|-- LinearPlotter
     Plotter <|-- CircularPlotter
     Plotter --> Settings
-    Plotter ..> RNA : render(rna)
-    Plotter ..> layout : _placements
-    Plotter ..> analysis : smooth_depth
-    parsers ..> RNA : builds
-    parsers ..> alignments : load_depth
-    analysis ..> ReadSet : map_reads
+    Plotter ..> layout : flip_if hook
+    Plotter ..> RNA : draws
+    class cli {
+        «module · Strategy selector»
+        main()
+    }
+    cli ..> Plotter : picks by --layout
+    cli ..> parsers
 ```
 
-The same picture as a static image, with data flow left to right:
+Guillemets mark the design patterns the code happens to use — none was
+designed in up front, each fell out of a simpler need:
+
+* **Value Object** — `Feature`, `Domain`, `Noncoding`, `Placement` are frozen
+  dataclasses: compared by value, safe to share, replaced rather than mutated
+  (`parsers._with`).
+* **Aggregate** — `RNA` is the one mutable object; it owns its features,
+  landmarks and depth tracks, and every function downstream takes an `RNA`.
+* **Builder** — `parsers.parse_gff_rnas` assembles RNAs over several passes
+  (rows → joins → mechanisms → domains → landmarks) before anyone sees them.
+* **Factory + Iterator** — `alignments.open_alignments` sniffs SAM vs BAM and
+  returns an `AlignmentFile` whose `records()` is a lazy generator, so a
+  BAM is never held in memory.
+* **Strategy** — twice. `layout.place_features(mode)` dispatches to
+  `flip` / `tier` / `nest`, and the CLI picks `LinearPlotter` or
+  `CircularPlotter` per RNA from `--layout`. `flip_if` is a hook the plotter
+  injects so the pure layout module never learns about colour.
+* **Rule table** — `Settings.feature_color` and `classify_function` are an
+  ordered list of (pattern → class) with explicit overrides first; adding a
+  function class is one row.
+
+The same picture as a static image:
 
 ![VirPlot class layout](class_layout.svg)
 
@@ -238,7 +206,12 @@ accident:
    `exception=ribosomal slippage` become one box per segment with the
    continuation marked `mechanism="frameshift"` (sign from the join
    geometry); a CDS with `transl_except=` is trimmed to its extension and
-   marked `"readthrough"`; `Note=` can state either for hand-written files. `--rnas` selects and orders a subset;
+   marked `"readthrough"`; `Note=` can state either for hand-written files.
+   `mature_protein_region_of_CDS` / `mat_peptide` rows become the `Domain`
+   segments of the CDS named by their `Parent=` (or the smallest CDS that
+   contains them). UTR, intergenic-region and stem-loop rows become
+   `RNA.noncoding` landmarks (RefSeq's catch-all `sequence_feature` rows only
+   when their words say non-coding). `--rnas` selects and orders a subset;
    `--topology` overrides circularity for all of them.
 3. **Map reads** — if `-U`/`-1`/`-2` were given, `_map_read_sets` checks
    bowtie2 is on `PATH`, warns where the reference FASTA's lengths disagree
@@ -293,7 +266,7 @@ raw `start`/`end`.
   a readthrough extension always stays with the box it abuts; otherwise flip
   across the line when overlapping the upstream neighbour, or when that
   neighbour is the same colour and closer than `NEAR_GAP_FRACTION` (1 %) of
-  the genome — glyphs have no outline, so
+  the genome — glyphs have no outline by default (`--no-border`), so
   two adjacent same-colour boxes would otherwise merge (the plotter passes
   this test in as `flip_if`, keeping `layout.py` colour-blind); if the
   wanted side is already occupied there, try the other side, then tier
@@ -344,8 +317,14 @@ in `settings.OVERLAP_MODES`. Test it with `Feature` objects alone.
 keeps only `CDS`; widening it means deciding how non-coding features are
 drawn (the ICTV figures use grey arcs/boxes) and giving `Feature` a `kind`.
 
-**Expression features** (frameshift, readthrough, sgRNAs) are blocked on an
-encoding decision in the GFF; see §6 F and §7.2 of the conventions doc.
+**Expression features.** Frameshift, readthrough, polyprotein domains and
+subgenomic RNAs are all encoded now — RefSeq's own attributes where it has
+them, a `Note=` curation convention where it does not (`GFF_GUIDE.md` §8, §9,
+§12). sgRNAs live on `RNA.sgrnas` and are drawn by `LinearPlotter._draw_sgrnas`
+beneath the ORF tiers; they are annotation only and add no depth track, since
+a plant virus sgRNA is co-linear with the genome and its reads cannot be
+separated from genomic ones. See §6 K of the conventions doc for why they are
+linear-layout only.
 
 ## 7. Testing
 
@@ -367,6 +346,8 @@ Suites and what they pin down:
 | `test_circular.py` | `Is_circular` detection, wrapping at the origin, GRBV example end to end |
 | `test_circular_plot.py` | Polar geometry, origin-crossing arcs, pinned radial range, `--layout` selection |
 | `test_mechanisms.py` | RefSeq joins (+1, −1, minus strand, spliced-not-slipped), `Note=` forms, `transl_except` trimming, the always-flip / never-flip rules, and the `FS` / `RT` marks |
+| `test_noncoding.py` | Which row types are read and when, label precedence, hairpin-vs-region, origin-crossing regions; bars/arcs astride the line, the hairpin's position and side, one name per region+hairpin, grey unless mapped |
+| `test_domains.py` | Mature-protein rows by `Parent=` and by containment, join segments, orphans; clipping and stop-codon snapping; dividers, per-segment colours, inside/outside labels and row staggering in both layouts |
 | `test_conventions.py` | Flip / tier / nest rules, palette precedence, settings keys, arrows, VPg, and the BYV fixture against ICTV Closteroviridae Fig 2 |
 | `test_settings.py`, `test_cli.py` | YAML loading, log formatting |
 
@@ -385,6 +366,7 @@ back to the original figure's thin black outline over a solid fill.
 | `sample_multi.gff3` | The above plus a 3 kb second segment (reads for both in `sample.sam`) | Multi-RNA output and shared scaling |
 | `byv.gff3`, `byv.sam`, `byv.yml` | Beet yellows virus, real NC_001598.1 coordinates with ICTV ORF names; flat simulated reads; the Closteroviridae Fig 2 palette | The L1 flip rule against a published figure — matches it on every ORF |
 | `grbv.gff3`, `grbv.sam`, `grbv.yml` | Grapevine red blotch virus, real NC_022002.1 annotation (circular, both strands); simulated reads continuous across the origin | Circular wrapping, C2 layout, two-strand linear layout |
-| `make_reads.py`, `make_grbv_sam.py`, `make_sample_sam.py` | Deterministic read simulators (SEQ/QUAL are `*`) | Regenerating the `.sam` fixtures |
+| `pvy.gff3`, `pvy.sam`, `pvy.yml` | Potato virus Y, real NC_001616.1 polyprotein with its ten `mature_protein_region_of_CDS` rows and PIPO; the Potyviridae Fig 2 palette | Polyprotein domain dividers, outside labels for short domains |
+| `make_reads.py`, `make_grbv_sam.py`, `make_sample_sam.py`, `make_example_sam.py` | Deterministic read simulators (SEQ/QUAL are `*`) | Regenerating the `.sam` fixtures |
 
-All reads are simulated; the annotations for BYV and GRBV are real.
+All reads are simulated; the annotations for BYV, GRBV and PVY are real.

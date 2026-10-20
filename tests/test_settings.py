@@ -44,3 +44,24 @@ def test_load_settings_partial(tmp_path):
     s = load_settings(str(yml))
     assert s.annotation_fontsize == 14
     assert s.default_color == Settings.default_color
+
+
+def test_lighter_accepts_any_matplotlib_colour():
+    from virplot.settings import lighter
+    assert lighter("#000000") == "#595959"
+    assert lighter("#abc").startswith("#") and len(lighter("#abc")) == 7
+    assert lighter("tomato").startswith("#")          # named colour, no traceback
+    assert lighter("not-a-colour") == "not-a-colour"   # left for matplotlib to report
+
+
+def test_putative_product_with_named_palette_colour_does_not_crash():
+    s = Settings(function_palette={"capsid": "orange"})
+    assert s.feature_color("putative coat protein").startswith("#")
+
+
+def test_empty_color_mapping_in_yaml_means_no_mapping(tmp_path):
+    p = tmp_path / "s.yml"
+    p.write_text("color_mapping:\ntitle: x\n")        # key present, value null
+    s = load_settings(str(p))
+    assert s.color_mapping == {}
+    assert s.feature_color("CP")                      # no TypeError

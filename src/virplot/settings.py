@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass, field
 
 import yaml
+from matplotlib.colors import to_hex, to_rgb
 
 log = logging.getLogger(__name__)
 
@@ -14,7 +15,12 @@ _KNOWN_KEYS = {
     "color_mapping", "default_color", "depth_line_color", "shade_color",
     "annotation_fontsize", "stacked_area_colors", "legend_location", "title",
     "overlap_mode", "end_5_label", "end_3_label", "function_palette",
+    "circular_labels", "circular_arcs", "sgrna_color",
 }
+
+CIRCULAR_LABELS = ("tangential", "horizontal")
+CIRCULAR_ARCS = ("outside", "on_circle")
+LAYOUTS = ("auto", "linear", "circular")
 
 OVERLAP_MODES = ("auto", "flip", "tier")
 
@@ -44,7 +50,8 @@ _FUNCTION_RULES: list[tuple[str, str]] = [
     # named function only: a bare "p20"/"p6" says nothing about role (BYV p6 is
     # a membrane protein and grey in the figure), so pN names fall to default
     (r"\b(silencing|suppressor|vsr|hc-?pro)", "suppressor"),
-    (r"\b(intergenic|\bir\b|utr|stem[- ]loop|hairpin|non-?coding)", "noncoding"),
+    (r"\b(intergenic|\bir\b|\b[ls]ir\b|common[- ]region|\bcr[ab]?\b|utr|untranslated|"
+     r"stem[- ]loop|hairpin|non-?coding|origin of replication|\bori\b)", "noncoding"),
 ]
 
 _PUTATIVE = re.compile(r"\b(putative|probable|possible|hypothetical|predicted|"
@@ -60,14 +67,16 @@ def classify_function(product: str) -> str | None:
     return None
 
 
-def lighter(hex_color: str, amount: float = 0.35) -> str:
-    """Tint a ``#rrggbb`` colour towards white (ICTV: 'putative' = lighter)."""
-    hex_color = hex_color.lstrip("#")
-    if len(hex_color) != 6:
-        return "#" + hex_color
-    r, g, b = (int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
-    mix = lambda c: int(round(c + (255 - c) * amount))
-    return f"#{mix(r):02x}{mix(g):02x}{mix(b):02x}"
+def lighter(color: str, amount: float = 0.35) -> str:
+    """Tint any matplotlib colour (``#rrggbb``, ``#abc``, ``tomato``) towards
+    white (ICTV: 'putative' = lighter); an unparsable colour is returned as is
+    so matplotlib reports it at draw time."""
+    try:
+        r, g, b = to_rgb(color)
+    except ValueError:
+        return color
+    mix = lambda c: c + (1.0 - c) * amount
+    return to_hex((mix(r), mix(g), mix(b)))
 
 
 @dataclass
@@ -86,6 +95,13 @@ class Settings:
     end_3_label: str = "3'"              # e.g. "3' OH", "A(n)"
     function_palette: dict[str, str] = field(
         default_factory=lambda: dict(DEFAULT_FUNCTION_PALETTE))
+    # circular layout style (ICTV figures: horizontal labels, arcs on the circle)
+    circular_labels: str = "tangential"      # tangential | horizontal
+    circular_arcs: str = "outside"           # outside | on_circle
+    sgrna_color: str = "#8C2F39"             # subgenomic RNA rows under the line
+    # how this genome should be drawn; --layout overrides it. "auto" draws a
+    # circular molecule as a circle and a linear one as a track.
+    layout: str = "auto"                     # auto | linear | circular
 
     def feature_color(self, product: str) -> str:
         """Colour for a product: explicit mapping, then function class, then default.
@@ -124,8 +140,15 @@ def load_settings(yaml_path: str) -> Settings:
     palette = dict(DEFAULT_FUNCTION_PALETTE)
     palette.update(raw.get("function_palette") or {})
 
+    def choice(key: str, options: tuple, default: str) -> str:
+        value = str(raw.get(key, default)).lower()
+        if value not in options:
+            log.warning("%s %r not one of %s; using %r", key, value, "/".join(options), default)
+            return default
+        return value
+
     return Settings(
-        color_mapping=raw.get("color_mapping", {}),
+        color_mapping=dict(raw.get("color_mapping") or {}),
         default_color=raw.get("default_color", Settings.default_color),
         depth_line_color=raw.get("depth_line_color", Settings.depth_line_color),
         shade_color=raw.get("shade_color", Settings.shade_color),
@@ -137,4 +160,8 @@ def load_settings(yaml_path: str) -> Settings:
         end_5_label=str(raw.get("end_5_label", Settings.end_5_label)),
         end_3_label=str(raw.get("end_3_label", Settings.end_3_label)),
         function_palette=palette,
+        circular_labels=choice("circular_labels", CIRCULAR_LABELS, Settings.circular_labels),
+        circular_arcs=choice("circular_arcs", CIRCULAR_ARCS, Settings.circular_arcs),
+        sgrna_color=str(raw.get("sgrna_color", Settings.sgrna_color)),
+        layout=choice("layout", LAYOUTS, Settings.layout),
     )

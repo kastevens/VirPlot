@@ -1,0 +1,33 @@
+##gff-version 3
+##sequence-region NC_001616.1 1 9704
+# Potato virus Y (PVY), RefSeq NC_001616.1, 9,704 nt linear +ssRNA
+# (genus Potyvirus). The polyprotein example: one CDS whose ten mature
+# proteins are given as mature_protein_region_of_CDS rows (GenBank
+# mat_peptide), exactly as RefSeq writes them. VirPlot draws them as one box
+# split by thin lines, each segment labelled and coloured on its own, as in
+# ICTV 9th Report Potyviridae Fig. 2 (which uses TEV; the organisation is the
+# same). Coordinates are RefSeq's. Curation:
+#  - product= on each mature protein shortened to the figure's label
+#    (P1-Pro, HC-Pro, P3, 6K1, CI, 6K2, VPg, NIa-Pro, NIb, CP); RefSeq's
+#    "P1 protein", "coat protein" etc. kept in Note=.
+#  - PIPO (RefSeq cds-YP_006393460.1, a partial CDS in the +2 frame within P3)
+#    given Note=+2 frameshift so VirPlot flips it and writes "+2 FS", as the
+#    figure's "PIPO (+2 fs)". It is really reached by polymerase slippage
+#    (P3N-PIPO); the figure's wording is kept.
+#  - RefSeq's gene rows and polyA_site are omitted (not read by VirPlot).
+# Colours in examples/pvy.yml were sampled from the figure. The figure draws
+# the polyprotein on the line and PIPO above it; VirPlot's one-strand rule
+# puts the polyprotein above and flips PIPO below (conventions doc section 7).
+NC_001616.1	RefSeq	region	1	9704	.	+	.	ID=NC_001616.1;Name=PVY;Is_circular=false
+NC_001616.1	RefSeq	CDS	185	9376	.	+	0	ID=cds-NP_056759.1;product=polyprotein;protein_id=NP_056759.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	185	1036	.	+	.	ID=id-NP_056759.1:1..284;Parent=cds-NP_056759.1;product=P1-Pro;Note=RefSeq product P1 protein;protein_id=NP_734243.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	1037	2404	.	+	.	ID=id-NP_056759.1:285..740;Parent=cds-NP_056759.1;product=HC-Pro;Note=RefSeq product HC-Pro protein;protein_id=NP_734244.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	2405	3499	.	+	.	ID=id-NP_056759.1:741..1105;Parent=cds-NP_056759.1;product=P3;Note=RefSeq product P3 protein;protein_id=NP_734251.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	3500	3655	.	+	.	ID=id-NP_056759.1:1106..1157;Parent=cds-NP_056759.1;product=6K1;Note=RefSeq product 6K1 protein;protein_id=NP_734245.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	3656	5557	.	+	.	ID=id-NP_056759.1:1158..1791;Parent=cds-NP_056759.1;product=CI;Note=RefSeq product CI protein; cylindrical inclusion helicase;protein_id=NP_734246.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	5558	5713	.	+	.	ID=id-NP_056759.1:1792..1843;Parent=cds-NP_056759.1;product=6K2;Note=RefSeq product 6K2 protein;protein_id=NP_734247.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	5714	6277	.	+	.	ID=id-NP_056759.1:1844..2031;Parent=cds-NP_056759.1;product=VPg;Note=RefSeq product NIa-VPg protein;protein_id=NP_734252.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	6278	7009	.	+	.	ID=id-NP_056759.1:2032..2275;Parent=cds-NP_056759.1;product=NIa-Pro;Note=RefSeq product NIa-Pro protein;protein_id=NP_734248.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	7010	8572	.	+	.	ID=id-NP_056759.1:2276..2796;Parent=cds-NP_056759.1;product=NIb;Note=RefSeq product NIb protein; RdRp;protein_id=NP_734249.1
+NC_001616.1	RefSeq	mature_protein_region_of_CDS	8573	9373	.	+	.	ID=id-NP_056759.1:2797..3063;Parent=cds-NP_056759.1;product=CP;Note=RefSeq product coat protein;protein_id=NP_734250.1
+NC_001616.1	RefSeq	CDS	2920	3144	.	+	0	ID=cds-YP_006393460.1;product=PIPO;Note=+2 frameshift within P3 (P3N-PIPO); RefSeq partial CDS;protein_id=YP_006393460.1

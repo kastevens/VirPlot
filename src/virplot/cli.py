@@ -13,7 +13,7 @@ from virplot.analysis import (MappingError, ReadSet, call_blocks, default_read_l
                               missing_bowtie2_tools, write_csvs)
 from virplot.models import RNA
 from virplot.alignments import AlignmentError
-from virplot.parsers import default_label, load_depth, parse_gff_rnas
+from virplot.parsers import ParseError, default_label, load_depth, parse_gff_rnas
 from virplot.plotting import CircularPlotter, LinearPlotter
 from virplot.settings import load_settings
 
@@ -66,15 +66,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ref",
                    help="Reference name to use from SAM/BAM/depth files when the GFF "
                         "sequence id does not match (single-RNA GFF only)")
+    p.add_argument("--rna-order", choices=["length", "gff"], default="length",
+                   help="Order segments largest first (the ICTV stacking order) "
+                        "or as the GFF lists them [%(default)s]; --rnas sets its own order")
     p.add_argument("--rnas", nargs="+", metavar="SEQID",
-                   help="Plot only these GFF sequence ids, in this order "
-                        "(default: every 'region' in the GFF)")
+                   help="Plot only these RNAs, in this order, each given by GFF sequence "
+                        "id or by its region's Name= (default: every 'region' in the GFF)")
     p.add_argument("--topology", choices=["auto", "circular", "linear"], default="auto",
                    help="Treat the genome(s) as circular or linear; 'auto' follows the "
                         "GFF region line's Is_circular attribute [%(default)s]")
-    p.add_argument("--layout", choices=["linear", "circular", "auto"], default="linear",
+    p.add_argument("--layout", choices=["linear", "circular", "auto"], default=None,
                    help="Figure layout: a linear track, a circular (polar) plot, or "
-                        "'auto' to draw circular genomes as circles [%(default)s]")
+                        "'auto' to draw circular genomes as circles. Overrides the "
+                        "spec.yml 'layout' key; without either, 'auto' [default: auto]")
     p.add_argument("--free-y", action="store_true",
                    help="With several RNAs, let each figure pick its own depth y-limit "
                         "instead of sharing one")
@@ -89,6 +93,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Output directory for the plot")
     p.add_argument("-n", "--normalize", action="store_true",
                    help="Normalize depth values to max=1")
+    p.add_argument("--bare-x", action="store_true",
+                   help="Drop the x-axis label and tick numbers, for a panel that will be "
+                        "stacked under another (see bin/stack_figures.py)")
     p.add_argument("--grid", action="store_true",
                    help="Enable background grid on depth plot")
     p.add_argument("--smooth", action="store_true",
@@ -101,6 +108,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Base name for output file [%(default)s]")
     p.add_argument("--no-label", action="store_true",
                    help="Do not label feature names in feature rectangles")
+    p.add_argument("--border", action=argparse.BooleanOptionalAction, default=False,
+                   help="Outline feature glyphs in black (--border), or draw them as "
+                        "flat colour as the ICTV figures do (--no-border)")
     p.add_argument("-t", "--thresholds", nargs="+", type=int, default=[1, 5],
                    help="Coverage thresholds to call intervals and breaks [%(default)s]")
     p.add_argument("-r", "--report", action="store_true",
@@ -198,15 +208,37 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1)
 
     # --- parse annotations ---
-    rnas = parse_gff_rnas(args.gff)
+    try:
+        rnas = parse_gff_rnas(args.gff)
+    except ParseError as exc:
+        log.error("%s", exc)
+        sys.exit(1)
     if args.rnas:
+        # A sequence id wins; a region Name= is accepted when it names exactly
+        # one RNA, so `--rnas RNA-1` selects what the figure title calls RNA-1.
         by_id = {r.seqid: r for r in rnas}
-        missing = [x for x in args.rnas if x not in by_id]
+        by_name: dict[str, list] = {}
+        for r in rnas:
+            by_name.setdefault(r.name, []).append(r)
+        chosen, missing = [], []
+        for x in args.rnas:
+            if x in by_id:
+                chosen.append(by_id[x])
+            elif len(by_name.get(x, [])) == 1:
+                chosen.append(by_name[x][0])
+            else:
+                missing.append(x)
         if missing:
+            available = [r.seqid if r.name == r.seqid else f"{r.seqid} ({r.name})"
+                         for r in rnas]
             log.error("--rnas not found in GFF: %s (available: %s)",
-                      ", ".join(missing), ", ".join(by_id))
+                      ", ".join(missing), ", ".join(available))
             sys.exit(1)
-        rnas = [by_id[x] for x in args.rnas]
+        rnas = chosen
+    elif args.rna_order == "length":
+        # ICTV: segments are stacked largest first. An explicit --rnas is the
+        # user's own order and is left alone.
+        rnas = sorted(rnas, key=lambda r: (-r.length, r.seqid or ""))
     if args.ref and len(rnas) > 1:
         log.error("--ref applies to a single RNA; use --rnas to select one, "
                   "or drop --ref so each RNA is matched by its GFF sequence id")
@@ -219,7 +251,8 @@ def main(argv: list[str] | None = None) -> None:
     for rna in rnas:
         shape = "circular" if rna.circular else "linear"
         if multi:
-            log.info("%s: %d bp, %d features, %s", rna.seqid, rna.length,
+            named = rna.seqid if rna.name == rna.seqid else f"{rna.seqid} ({rna.name})"
+            log.info("%s: %d bp, %d features, %s", named, rna.length,
                      len(rna.features), shape)
         else:
             log.info("Parsed %d features from GFF (%d bp, %s)",
@@ -249,7 +282,7 @@ def main(argv: list[str] | None = None) -> None:
                 y, n, kind = load_depth(df, rna.length, seqid=rna.seqid,
                                         ref=args.ref, min_mapq=args.min_mapq,
                                         circular=rna.circular)
-            except AlignmentError as exc:
+            except (AlignmentError, ParseError) as exc:
                 log.error("%s", exc)
                 sys.exit(1)
             where = f"{rna.seqid} in {df}" if multi else df
@@ -259,13 +292,23 @@ def main(argv: list[str] | None = None) -> None:
                 log.info("Parsed %d depth entries for %s", n, where)
                 counts.add(n)
             rna.add_depth(label, y)
-        if len(counts) > 1:
+        # a circular genome's depth files may legitimately differ in length
+        # (one made against a padded reference, one not)
+        if len(counts) > 1 and not rna.circular:
             log.error("Mismatching position count across depth files for %s: %s",
                       rna.seqid, counts)
             sys.exit(1)
 
     settings = load_settings(args.yaml)
     log.info("Loaded settings from %s", args.yaml)
+
+    # Layout is a presentation choice, so it is resolved separately from the
+    # molecule's shape: --layout beats the spec.yml 'layout' key, and without
+    # either a circular genome is drawn as a circle. The GFF's Is_circular says
+    # what the molecule *is* (it drives depth wrapping and origin-crossing
+    # features) and is not the place to change how the figure looks.
+    if args.layout is None:
+        args.layout = settings.layout
 
     os.makedirs(args.outdir, exist_ok=True)
     # One prepared plotter per layout, so cross-RNA scaling is shared; --layout

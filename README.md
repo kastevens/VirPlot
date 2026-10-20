@@ -8,7 +8,19 @@ This tool generates **SVG, PDF, or PNG plots** that combine viral genome feature
 |---|---|
 | ![BYV](docs/figures/byv_linear.svg) | ![GRBV circular](docs/figures/grbv_circular.svg) |
 
-Reads in the examples are simulated; the annotations are real RefSeq records. More renders in [`docs/figures/`](docs/figures/); `sh docs/make_figures.sh` regenerates them.
+Polyprotein — PVY (`examples/pvy.gff3` + `pvy.yml`): RefSeq's mature-protein rows become the segments of one box.
+
+![PVY](docs/figures/pvy_linear.svg)
+
+Segmented — TSWV (`examples/tswv.gff3` + `tswv.yml`): one figure per segment on a shared scale, composed into the ICTV stacked figure by `bin/stack_figures.py`.
+
+![TSWV stacked](docs/figures/tswv_stacked.svg)
+
+Real reads — GLRaV-13 (`examples/glrav13.gff3` + `glrav13.yml`), plotted straight from `examples/glrav13.bam`: 212,285 alignments against `examples/glrav13.fa`, mean depth 1,173x.
+
+![GLRaV-13](docs/figures/glrav13_linear.svg)
+
+Reads in the other examples are simulated; the annotations are real records. More renders in [`docs/figures/`](docs/figures/); `sh docs/make_figures.sh` regenerates them.
 
 Developed and maintained by Haoran (Henry) Li for [Foundation Plant Services](https://fps.ucdavis.edu/index.cfm) at [UC Davis](https://www.ucdavis.edu/).
 
@@ -50,7 +62,7 @@ pip install .
 
 ## Quick Start
 
-Example data in `examples/`: a synthetic two-segment genome (`sample.gff3`, `sample_multi.gff3`, `sample.dep`, `sample.sam`, `spec.yml`); beet yellows virus with its real RefSeq NC_001598.1 coordinates, ICTV ORF names and the ICTV figure palette (`byv.gff3`, `byv.sam`, `byv.yml`); and a circular one — grapevine red blotch virus, real RefSeq NC_022002.1 annotation (`grbv.gff3`, `grbv.sam`, `grbv.yml`). Reads in the `.sam` files are simulated (`make_reads.py`, `make_grbv_sam.py`).
+Example data in `examples/`: a synthetic two-segment genome (`sample.gff3`, `sample_multi.gff3`, `sample.dep`, `sample.sam`, `spec.yml`); beet yellows virus with its real RefSeq NC_001598.1 coordinates, ICTV ORF names and the ICTV figure palette (`byv.gff3`, `byv.sam`, `byv.yml`); a circular one — grapevine red blotch virus, real RefSeq NC_022002.1 annotation (`grbv.gff3`, `grbv.sam`, `grbv.yml`); and a polyprotein — potato virus Y, RefSeq NC_001616.1 with its `mature_protein_region_of_CDS` rows (`pvy.gff3`, `pvy.sam`, `pvy.yml`). Reads in the `.sam` files are simulated (`make_reads.py`, `make_grbv_sam.py`, `make_example_sam.py`).
 
 ```bash
 # Basic plot
@@ -81,7 +93,7 @@ cp examples/spec.yml my_project.yml
 
 Three input files are required:
 
-1. **GFF3 file** — genome annotations containing CDS features and a `region` entry per RNA giving its length (see [`docs/GFF_GUIDE.md`](docs/GFF_GUIDE.md) for the conventions)
+1. **GFF3 file** — genome annotations: a `region` entry per RNA giving its length, the CDS features, and optionally a polyprotein's mature-protein rows and non-coding landmarks (UTRs, intergenic regions, stem-loops), all as RefSeq writes them (see [`docs/GFF_GUIDE.md`](docs/GFF_GUIDE.md) for the conventions)
 2. **Depth source** — one of
    - FASTQ reads plus a reference FASTA (`-x`, `-U`/`-1`/`-2`); VirPlot runs bowtie2 and reads its SAM, **or**
    - tab-delimited output from `samtools depth -a`, **or**
@@ -99,7 +111,7 @@ virplot -g examples/sample_multi.gff3 -d examples/sample.sam -y examples/spec.ym
 # -> virplot.SyntheticVirus1.svg, virplot.SyntheticVirus2.svg
 ```
 
-So the separate figures can be laid side by side without misleading the reader, they share one depth y-limit and their widths are proportional to RNA length. `--free-y` and `--equal-width` switch either behaviour off; `--rnas SEQID [SEQID ...]` selects and orders a subset. With `--normalize`, depth is scaled by the maximum across all plotted RNAs.
+So the separate figures can be laid side by side without misleading the reader, they share one depth y-limit and their widths are proportional to RNA length. `--free-y` and `--equal-width` switch either behaviour off; `--rnas SEQID [SEQID ...]` selects and orders a subset, by sequence id or by the region's `Name=`. Each figure is titled by its region's `Name=` when the GFF gives one (`RNA-1 (8,118 nts)`), otherwise by its sequence id; file names always use the sequence id. With `--normalize`, depth is scaled by the maximum across all plotted RNAs.
 
 ### Circular genomes
 
@@ -126,7 +138,11 @@ virplot -g examples/grbv.gff3 -d examples/grbv.sam -y examples/grbv.yml \
   --layout circular --legend --title
 ```
 
-`--layout auto` uses the circle for genomes the GFF marks circular and the linear tracks for the rest, which is what you want when one GFF holds both. The default stays `linear`: a circle is the honest picture of the molecule, but a linear track carries far more feature labels legibly, so it remains the better default for a densely annotated genome.
+`--layout auto` — **the default** — uses the circle for genomes the GFF marks `Is_circular=true` and the linear track for the rest, which is also what you want when one GFF holds both. A `layout:` key in spec.yml sets a per-example default beside the data it styles; `--layout` overrides it.
+
+To get the linear track of a circular genome, pass `--layout linear` (or set `layout: linear`). Do **not** delete `Is_circular=true` to achieve it: that attribute says what the molecule *is*, and removing it also turns off depth wrapping at the origin and the splitting of origin-crossing features. The linear track is still the better picture of a densely annotated genome — it carries far more labels legibly — and it is the only layout that draws the `±1 FS` / `RT` marks and sgRNA rows, so a circular figure warns when it has to leave those out.
+
+Two spec.yml keys move the circle closer to the ICTV figures: `circular_labels: horizontal` writes every label level outside the ring as `ORF (product)`, and `circular_arcs: on_circle` sets the innermost arcs astride the genome circle (`examples/grbv_ictv.yml`).
 
 Layout and topology are independent. `--topology` decides whether depth wraps at the origin (the arithmetic); `--layout` decides how it is drawn. Drawing a circular genome with `--topology linear` renders the false origin dip as a wedge cut out of the ring at 12 o'clock — a quick way to see whether your pipeline handled the origin.
 
@@ -175,7 +191,7 @@ virplot [-h] [-V] -g GFF [-d DEPTH [DEPTH ...]] [-l LABELS [LABELS ...]]
         [--layout {linear,circular,auto}] [--free-y] [--equal-width]
         [--min-mapq MIN_MAPQ] -y YAML [-o OUTDIR] [-n] [--grid] [--smooth]
         [--yscale {linear,symlog}] [--linthresh LINTHRESH]
-        [--name NAME] [--no-label]
+        [--name NAME] [--no-label] [--border | --no-border]
         [-t THRESHOLDS [THRESHOLDS ...]] [-r] [--shade-breaks]
         [--legend] [--title] [-f {svg,pdf,png}] [-v]
 ```
@@ -193,7 +209,7 @@ virplot [-h] [-V] -g GFF [-d DEPTH [DEPTH ...]] [-l LABELS [LABELS ...]]
 | `--bowtie2-args`     | Extra options passed to bowtie2 verbatim |
 | `-l`, `--labels`     | Label(s) for each depth source (same order as `--depth`)       |
 | `--ref`              | Reference name to use from SAM/BAM/depth files when it differs from the GFF sequence id (single-RNA GFF only) |
-| `--rnas`             | Plot only these GFF sequence ids, in this order (default: every `region`) |
+| `--rnas`             | Plot only these RNAs, in this order, by sequence id or region `Name=` (default: every `region`) |
 | `--free-y`           | With several RNAs, let each figure pick its own y-limit          |
 | `--equal-width`      | With several RNAs, draw every figure at full width               |
 | `--min-mapq`         | Skip SAM/BAM reads with MAPQ below this (default: 0)           |
@@ -209,6 +225,7 @@ virplot [-h] [-V] -g GFF [-d DEPTH [DEPTH ...]] [-l LABELS [LABELS ...]]
 | `--yscale`           | Y-axis scale: `linear` or `symlog` (default: `linear`)         |
 | `--linthresh`        | Symlog linear threshold around 0 (default: `10.0`)             |
 | `--no-label`         | Hide feature labels                                            |
+| `--border`, `--no-border` | Outline feature glyphs in black, or draw them as flat colour (default: `--no-border`) |
 | `-t`, `--thresholds` | Coverage thresholds for interval/gap analysis (default: `1 5`) |
 | `-r`, `--report`     | Write CSV reports of intervals and gaps per threshold          |
 | `--shade-breaks`     | Shade coverage gaps on the depth plot                          |
@@ -229,6 +246,8 @@ All visual elements are customizable via the YAML file:
 | `default_color`       | Color for unmapped products           |
 | `shade_color`         | Color for shaded gap regions          |
 | `depth_line_color`    | Fill colour of a single depth track (default `#85dbec`) |
+| `circular_labels`     | `tangential` (default, along the arc) or `horizontal` (level, outside the ring, `ORF (product)`, as in the ICTV figures) |
+| `circular_arcs`       | `outside` (default, arcs just outside the genome circle) or `on_circle` (innermost arcs astride the circle, as in the ICTV figures) |
 | `annotation_fontsize` | Font size for feature labels          |
 | `stacked_area_colors` | Color palette for stacked area chart  |
 | `legend_location`     | Legend position (e.g. `"upper left"`) |
@@ -242,7 +261,7 @@ See `examples/spec.yml` for a complete template.
 
 | Document | What it covers |
 |---|---|
-| [`docs/GFF_GUIDE.md`](docs/GFF_GUIDE.md) | How to write the GFF3: the two rows VirPlot reads, `product`/`gene` naming, strand and layout, `Is_circular`, origin-crossing features, frameshifts, and the function words that pick default colours |
+| [`docs/GFF_GUIDE.md`](docs/GFF_GUIDE.md) | How to write the GFF3: the rows VirPlot reads, `product`/`gene` naming, strand and layout, `Is_circular`, origin-crossing features, frameshifts and readthrough, polyprotein domains, non-coding landmarks, and the function words that pick default colours |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the code is organised: data model, pipeline, **class diagram**, the behaviours that are easy to get wrong, how to extend it, the test suites |
 | [`docs/ictv_drawing_conventions.md`](docs/ictv_drawing_conventions.md) | The genome-map drawing rules the annotation track follows, their implementation status, and how they compare with the published ICTV figures |
 | [`docs/class_layout.svg`](docs/class_layout.svg) | The class layout as a static diagram |
@@ -261,7 +280,8 @@ The package lives in `src/virplot/`; `python -m virplot` runs the CLI from a che
 
 ## Supplementary Scripts
 
-Two standalone scripts in `bin/` assist with depth file preparation:
+Three standalone scripts in `bin/` assist with depth file preparation and
+figure composition:
 
 - **`depth_filter.py`** — Filter depth entries by sequence header:
 
@@ -274,6 +294,22 @@ Two standalone scripts in `bin/` assist with depth file preparation:
   ```bash
   python3 bin/depth_merger.py -i sample1.dep sample2.dep -o combined.dep
   ```
+
+- **`stack_figures.py`** — Stack a segmented genome's figures into one
+  ICTV-style multipartite figure (DNA-A/DNA-B, LIYV RNA-1/RNA-2, TSWV L/M/S,
+  nanovirus components). Render the segments in **one** run so they share a
+  scale and a depth y-limit, then compose:
+
+  ```bash
+  virplot -g tswv.gff3 -d tswv.sam -y tswv.yml -f svg --bare-x -o out --name tswv
+  python3 bin/stack_figures.py -i out/tswv.*.svg -o out/tswv_stacked.svg
+  ```
+
+  Segments render largest first by default (`--rna-order`), `--bare-x` leaves
+  the x-axis on the bottom panel only, and the composer aligns the panels' plot
+  areas. VirPlot has no stacked-figure renderer because it does not need one:
+  within a run the panels already share an exact x-scale, so stacking is a
+  document operation — see `docs/ictv_drawing_conventions.md` §6 G.
 
 ---
 
