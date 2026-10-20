@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "VirPlot"
 version: 2.2.0
-date-released: 2026-10-02
+date-released: 2026-10-19
 authors:
   - family-names: Li
     given-names: Haoran
@@ -39,5 +39,5 @@ preferred-citation:
       email: kastevens@ucdavis.edu
   title: "VirPlot"
   version: 2.2.0
-  date-released: 2026-10-02
+  date-released: 2026-10-19
   url: "https://github.com/ucdavis/VirPlot"
