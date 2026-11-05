@@ -2,7 +2,7 @@
 
 Branch `feature/stranded-maf`. Status: **stranded depth implemented**
 (`--stranded`; decisions in §4 and §5). Minor-allele frequency (MAF) is the
-second feature planned for the branch and is sketched in §6.
+second feature planned for the branch; its design is in `variation_design.md`.
 
 ![Prototypes](stranded_prototypes.svg)
 
@@ -160,16 +160,12 @@ was accepted with A. The scale reads `0` on the zero ring, `+ N× depth` at
 the outer edge and `− N×` at the inner edge. Radial symlog (D) was not
 adopted, so the circular layout still ignores `--yscale symlog`.
 
-## 6. Minor-allele frequency (later on this branch)
+## 6. Minor-allele frequency
 
-* The SAM/BAM reader skips SEQ and QUAL today. MAF needs the 4-bit BAM
-  sequence (and SAM column 10) decoded into per-position A/C/G/T/deletion
-  counts, with base-quality and minimum-depth thresholds.
-* MAF at a position is 1 − (major allele count ÷ depth), so no reference
-  FASTA is needed.
-* Strand matters here too: a variant seen on one strand only is a classic
-  artefact. The strand-split counts from §3 give a strand-bias filter at no
-  extra cost.
+Moved to [`variation_design.md`](variation_design.md), which separates
+within-sample variation (MAF, π, mixed isolates) from divergence from the
+reference (consensus errors, misassembly), and covers the strand-bias
+problem a stranded library causes (§2.5 there).
 
 ## 7. Order of work
 

@@ -70,6 +70,7 @@ Stranded depth is in (`--stranded`; `docs/stranded_depth.md`). Left:
 - [ ] **A stranded circular dataset.** Nothing in the repository checks the
       circular layout against a real stranded library, or measures how
       balanced the strands of a DNA virus are.
-- [ ] **Minor-allele frequency.** Decode SEQ and QUAL, count alleles per
-      position, and draw MAF against depth; the strand split gives a
-      strand-bias filter (`docs/stranded_depth.md` §6).
+- [ ] **Within-sample variation and divergence from the reference.**
+      Decode SEQ and QUAL; draw a variation track (MAF) and a divergence
+      track (reference disagreements, clip pileups) under depth, with a
+      per-sample report. Design and order of work: `docs/variation_design.md`.
