@@ -9,8 +9,10 @@ script takes any single-reference BAM and the FASTA it was mapped to:
 
 ```bash
 python3 docs/design/variation_measurements.py                        # GLRaV-13
-python3 docs/design/variation_measurements.py --bam S.bam --fasta ref.fa --around 12239
+python3 docs/design/variation_measurements.py --bam S.bam --fasta ref.fa --around RNA2:1546
 ```
+
+It handles several references per BAM and reports each separately.
 
 ---
 
@@ -172,7 +174,8 @@ variants are independent.
 1. **A consensus error in the reference**, if the reference is this
    sample's own assembly: a wrong base or an indel the assembler got wrong.
 2. **A misassembly**: a chimeric join of two isolates or two regions, a
-   collapsed repeat, an inversion.
+   collapsed or expanded repeat, an inversion, or an artefact at a contig
+   end: a fold-back chimera, or an end that stops short of the molecule's.
 3. **A reference from another isolate** ("reference bias"). Reads map less
    well where the sample diverges, so depth and identity track local
    divergence rather than the virus. shiver builds a sample-specific
@@ -193,15 +196,24 @@ variants are independent.
 | Non-reference fraction along the genome | 3, 4 | Rises across divergent regions; equal to the non-major fraction elsewhere. |
 | Mismatches per read along the genome | 2, 3, 4 | From MD/NM tags or the reference. Flat when the reference fits. |
 | Soft-clip pileup at one site, with split (SA) alignments | 2, or a minority junction (§2.1, 4) | The clipped parts' alignment says where the junction goes. Its share of the reads at the site says minority or majority. |
+| Indel alleles among reads spanning a whole repeat | 1: an extra or missing repeat unit | Per-site counts understate indels in a repeat, because a read that ends inside the repeat aligns without them (ENV041: 45% per site, 87% among spanning reads, §5.2). |
+| Coverage half a read length from a contig end | a truncated end | With end-to-end alignment, about 50% of the interior when the molecule runs past the end, about 100% when it ends there. |
+| Mates unmapped near a contig end | a truncated end | The mates lie in sequence the contig lacks. |
+| Read-start (or read-end) pileup with no coverage beyond it | the molecule's real end, inside the contig | With coverage running through it, a pileup is duplicates or a fragmentation hot spot instead; GLRaV-13 has several near its 3′ end. |
 | Depth step or dip | any of 1–5 | Never decisive alone; read it with the signals above. |
-| Discordant pairs, insert size (paired-end) | 2 | GLRaV-13's reads are single-end. |
+| Discordant pairs, insert size (paired-end) | 2 | GLRaV-13's reads are single-end; ENV041's are paired. |
 
-Two practical points:
+Practical points:
 
 * **Soft clips appear only with a local aligner** (`bwa mem`, or
   `bowtie2 --local`). In bowtie2's default end-to-end mode, which VirPlot's
   `-x` mapping uses, a read across a junction is either rejected or forced
   through with mismatches. Pass `--bowtie2-args "--local"` to see clips.
+* **End-to-end alignment fakes variation at a truncated end.** The aligner
+  squeezes the overhanging part of a read into insertions and mismatches in
+  the last bases, which then look like variants (ENV041 RNA2: 6–37% at
+  2,553–2,560). The script marks calls within one read length of such an
+  end with `*`.
 * **Prior art.** Pilon (Walker et al. 2014) corrects bases, fixes
   misassemblies and fills gaps from read alignments. REAPR (Hunt et al. 2013)
   scores each base by perfect, unique short-insert coverage and finds
@@ -305,19 +317,107 @@ side of the CP start.
 
 ---
 
-## 5. Design for VirPlot
+## 5. Worked case: ENV041, coguvirus RNA1 and RNA2 (reads checked)
 
-### 5.1 One pileup pass
+Two contigs from a SPAdes assembly, NODE_93 (RNA1, 6,730 nt) and NODE_4667
+(RNA2, 2,560 nt), and their reads: 150-nt pairs mapped with bowtie2 in its
+default end-to-end mode, unmapped reads removed (`samtools view -F 4`). The
+library is stranded: 71% of fragments on RNA1, and 86% on RNA2, run one way.
+The RNA2 figure shows no coverage over the first ~55 nt, a drop at ~215, a
+narrow dip at ~1,545, and a falling 3′ end.
+
+```bash
+python3 docs/design/variation_measurements.py --bam ENV041_mapped.bam --fasta ENV041_coguvirus_RNA1_RNA2.fasta
+```
+
+### 5.1 RNA1: the reference fits
+
+* **No divergence.** No site where the read majority differs from the
+  reference, no indel cluster, and mismatches per read flat along the genome
+  (0.16–0.22 per 700-nt window).
+* **One population.** π 0.0010. Away from the ends there are 3 variant sites
+  ≥ 2%, from 2.2% to 7.1%.
+* **Ends close, perhaps a few bases off.** The read-supported termini are
+  complementary over 11 nt (TCCCACTTATT at 2–12, AATAAGTGGGA at
+  6,714–6,724).
+  * Left end: coverage half a read in is 76% of the interior, and about 20
+    reads carry ~6 nt more (ACAAAG).
+  * Right end: reads stop at 6,719 (40% of the depth there ends at that
+    base), and the last 5 nt average 6×.
+  * The variants at 3, 4, 6 and 6,720 are overhang artefacts (`*`).
+  * Confirming either end needs the unmapped reads or a local alignment.
+
+### 5.2 RNA2: three reference errors, none of them an interior base
+
+No interior base has a read majority that differs from the reference. The
+problems are at the ends and in the poly-T repeat of the intergenic region
+(between ORF1, 133–1,248, and the complementary-sense ORF2, 1,633–2,490).
+
+1. **Bases 1–54 are an assembly artefact.**
+   * From the sequence alone: 1–31 repeat 266–296, and 29–54 are the reverse
+     complement of 235–260, a fold-back chimera. No read aligns there.
+   * Reads begin in a pileup: 2,428 start at 63 (83% of the depth there), 767
+     at 64, and 675 at 68. The few that extend further read into Illumina
+     TruSeq adapter (…CCCTACACGACGCTC), the end of the cDNA fragment. The
+     molecule's end is at about 62–63 (CCAAAG…).
+   * The figure's drop at ~215 is the pileup's other end: 2,413 reads end at
+     212, 150 nt later. It is not a feature of the genome.
+2. **The intergenic poly-T repeat has one unit too many.**
+   * Of 4,192 reads that span the whole repeat (1,504–1,597), 86.9% are 8 nt
+     shorter than the contig, 97% are 7–9 nt shorter, and 0.5% match it. The
+     contig carries an extra ATTTTTTA unit (1,539–1,546, where the reads place
+     the deletion), so this is a consensus error.
+   * Counted per site, only 45–47% of reads show the deletion, because a read
+     that ends inside the repeat aligns without it.
+   * This is the figure's narrow dip: depth counts aligned bases, and almost
+     no molecule has these 8.
+3. **The 3′ end is truncated.**
+   * Coverage half a read in is 53% of the interior, the end-to-end ramp.
+   * 7,594 reads have unmapped mates, 6,849 of them with midpoints in
+     2,301–2,500: the mates lie in sequence the contig lacks.
+   * bowtie2 squeezes overhangs into 1–18-nt insertions at 2,550–2,556 and
+     mismatches at 2,553–2,560, which appear as 6–37% "variants".
+   * The reads carry at least 17 nt past the end (TTTCCAGTGAGTGCCGC), each
+     base supported by 500–1,800 reads. That sequence is not adapter, and not
+     found elsewhere in either contig.
+
+**Within-sample variation.** Away from the ends and the repeat there are 4
+variant sites ≥ 2%: 627 (3.8%), 634 (38.5%), 1,408 (2.3%) and 1,733 (2.6%).
+634 is at 38–39% on both fragment orientations and unlinked to 627
+(*r*² 0.02). The variants at 1,544–1,586 come from aligning repeat-length
+alleles. This is one population with one high-frequency variant, like
+GLRaV-13's three sites near 40%.
+
+### 5.3 What to change in the reference
+
+* **RNA2, left end:** start the contig at the read pileup (62–63, CCAAAG…),
+  which removes the fold-back artefact. RNA2's left end as the reads show
+  it (CCAAAG…) and RNA1's (ACAAAG…, on thinner support) both begin with
+  CAAAG, as segments that share terminal sequence would. That is a lead to
+  check, not a finding.
+* **RNA2, intergenic region:** remove one ATTTTTTA unit from the repeat.
+* **RNA2, right end:** extend it. Either remap with `--local`, so the
+  overhangs appear as soft clips with their sequence, or reassemble with the
+  unmapped reads, which this BAM no longer contains.
+* **Re-run the check.** A corrected contig should show no majority
+  disagreements, and both ends near 100%.
+
+---
+
+## 6. Design for VirPlot
+
+### 6.1 One pileup pass
 
 `alignments.py` decodes SEQ and QUAL (4-bit BAM sequence; SAM column 10)
 alongside the depth it already counts. One pass collects per-site A/C/G/T
 counts at base quality ≥ 30, split by read orientation (the stranded-depth
-machinery), plus soft-clip starts and ends with their SA partners, and
-mismatches per read. Within-sample statistics need no reference.
+machinery), plus soft-clip starts and ends with their SA partners,
+mismatches and indel events per read, read starts and ends, and mate
+flags. Within-sample statistics need no reference.
 Divergence needs one: the FASTA given to `-x`, a new `--fasta`, or the
 reference bases recovered from MD tags.
 
-### 5.2 Tracks, under the depth track on the same x-axis
+### 6.2 Tracks, under the depth track on the same x-axis
 
 * **Variation**: the non-major fraction per site, depth-gated, with the
   threshold line, and variant sites ticked.
@@ -329,17 +429,20 @@ Where the majority matches the reference the two tracks coincide, so the
 divergence track shows only what differs. Circular layouts: later, as rings
 inside the depth band.
 
-### 5.3 Report (CSV), per sample
+### 6.3 Report (CSV), per sample
 
 * **Variation**: π over all sites and over variant sites only; variant
   sites per kb at the threshold; the folded spectrum in fixed bins; a
   one- versus two-cluster fit with the minor share and the number of sites
   that agree with it; *r*² for variant pairs a read spans.
 * **Divergence**: disagreement sites (position, reference → majority,
-  fraction); clip pileups (position, reads, share, SA partner); mismatches
-  per read by window.
+  fraction), with repeat indels judged by spanning reads; clip pileups
+  (position, reads, share, SA partner); mismatches per read by window;
+  read-start pileups with no coverage beyond them; for each contig end, the
+  coverage half a read in and the mates unmapped nearby. Calls within one
+  read length of a truncated end are flagged.
 
-### 5.4 Options (sketch)
+### 6.4 Options (sketch)
 
 | Option | Default |
 |---|---|
@@ -349,9 +452,10 @@ inside the depth band.
 | `--min-depth` | 200 (Roder et al.) |
 | `--maf-min` | 0.03; 0.01 when replicate libraries agree (Roder et al.) |
 
-### 5.5 Open questions
+### 6.5 Open questions
 
-* Indels as alleles: count them, or leave them to the divergence track?
+* Indels in the variation track: repeat indels are judged by spanning reads
+  (§3.2); whether to draw them as alleles is open.
 * Replicate libraries: a concordance option, or leave replicates to the
   user?
 * A population panel for Fws, once FPS has many samples of one virus.
@@ -359,19 +463,21 @@ inside the depth band.
 
 ---
 
-## 6. Order of work
+## 7. Order of work
 
 1. [ ] Decode SEQ and QUAL; per-site counts by orientation; clips and SA
-   partners; mismatches per read. Test against `variation_measurements.py`.
+   partners; mismatches, indels, read starts and ends, and mate flags per
+   read. Test against `variation_measurements.py`.
 2. [ ] Variation statistics and report.
 3. [ ] Variation track.
-4. [ ] Divergence statistics, track and report (`--fasta`, MD fallback).
+4. [ ] Divergence statistics, track and report (`--fasta`, MD fallback),
+   including the contig-end test and spanning-read repeat indels.
 5. [ ] Cluster fit and linkage in the report.
 6. [ ] Circular rings.
 
 ---
 
-## 7. Sources
+## 8. Sources
 
 * Zhao L, Illingworth CJR (2019). Measurements of intrahost viral diversity
   require an unbiased diversity metric. *Virus Evolution*.
